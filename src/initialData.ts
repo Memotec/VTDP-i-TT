@@ -1,0 +1,285 @@
+import { InventoryItem } from './types.ts';
+import imgVhf from './assets/images/vhf_transceiver_rack_1787736640747.jpg';
+import imgVccs from './assets/images/vccs_switch_module_1787736655148.jpg';
+import imgGps from './assets/images/gps_ntp_server_1787736673535.jpg';
+import imgRadar from './assets/images/cns_radar_antenna_1787737065985.jpg';
+import imgRecorder from './assets/images/atc_voice_recorder_1787737082216.jpg';
+import imgUps from './assets/images/cns_power_ups_1787737096058.jpg';
+import imgSwitch from './assets/images/cns_cisco_switch_1787737110906.jpg';
+
+export {
+  imgVhf,
+  imgVccs,
+  imgGps,
+  imgRadar,
+  imgRecorder,
+  imgUps,
+  imgSwitch,
+};
+
+export const STOCK_CNS_ILLUSTRATIONS = [
+  {
+    id: 'vhf',
+    label: 'Máy phát/thu VHF AM (Jotron / R&S)',
+    category: 'VHF AM',
+    image: imgVhf,
+  },
+  {
+    id: 'vccs',
+    label: 'Card chuyển mạch thoại VCCS (Frequentis)',
+    category: 'VCCS',
+    image: imgVccs,
+  },
+  {
+    id: 'gps',
+    label: 'Máy chủ thời gian GPS Time Server (Meinberg)',
+    category: 'GPS & Ăng-ten',
+    image: imgGps,
+  },
+  {
+    id: 'radar',
+    label: 'Hệ thống Radar & Ăng-ten giám sát ATM',
+    category: 'Radar & Giám sát',
+    image: imgRadar,
+  },
+  {
+    id: 'recorder',
+    label: 'Hệ thống ghi âm thoại & dữ liệu bay (NiceLog)',
+    category: 'Ghi âm & Lưu trữ',
+    image: imgRecorder,
+  },
+  {
+    id: 'ups',
+    label: 'Hệ thống nguồn UPS & Chỉnh lưu 48V DC',
+    category: 'Nguồn & UPS',
+    image: imgUps,
+  },
+  {
+    id: 'switch',
+    label: 'Router / Switch quang chuyên dụng CNS',
+    category: 'Mạng & Truyền dẫn',
+    image: imgSwitch,
+  },
+];
+
+export const getCategoryStockIllustration = (name: string, category?: string): string => {
+  const query = `${name} ${category || ''}`.toLowerCase();
+  if (query.includes('radar') || query.includes('giám sát') || query.includes('ssr') || query.includes('psr')) {
+    return imgRadar;
+  }
+  if (query.includes('ghi âm') || query.includes('recorder') || query.includes('lưu trữ') || query.includes('nices')) {
+    return imgRecorder;
+  }
+  if (query.includes('nguồn') || query.includes('ups') || query.includes('pin') || query.includes('ắc quy') || query.includes('rectifier')) {
+    return imgUps;
+  }
+  if (query.includes('vccs') || query.includes('thoại') || query.includes('sitti') || query.includes('card') || query.includes('voice')) {
+    return imgVccs;
+  }
+  if (query.includes('gps') || query.includes('thời gian') || query.includes('time server') || query.includes('ăng-ten') || query.includes('antenna')) {
+    return imgGps;
+  }
+  if (query.includes('switch') || query.includes('router') || query.includes('quang') || query.includes('mạng') || query.includes('cisco')) {
+    return imgSwitch;
+  }
+  return imgVhf;
+};
+
+export const CATEGORIES: string[] = [
+  'Tất cả loại',
+  'VHF AM',
+  'VCCS',
+  'GPS & Ăng-ten',
+  'Ghi âm & Lưu trữ',
+  'Nguồn & UPS',
+  'Mạng & Truyền dẫn',
+  'Khác'
+];
+
+export const INITIAL_INVENTORY: InventoryItem[] = [
+  {
+    id: 'cns-01',
+    name: 'Khối máy phát VHF AM Jotron TA-7650',
+    pn: 'TA-7650-50W',
+    sn: 'JT2024-88410',
+    warehouse: 'KHO-VHF-01',
+    loc: 'Tủ A1 - Ngăn 1',
+    qty: 2,
+    auditStatus: 'OK',
+    auditDate: '26/08/2026 08:30',
+    auditNote: 'Đã kiểm tra công suất phát đạt chuẩn 50W',
+    category: 'VHF AM',
+    imageUrl: imgVhf,
+    imagePrompt: 'Khối máy phát VHF AM chuyên dụng TA-7650 lắp trong tủ rack viễn thông hàng không',
+    history: [
+      {
+        id: 'h-01',
+        status: 'OK',
+        date: '26/08/2026 08:30',
+        note: 'Kiểm tra định kỳ quý 3, thông số RF ổn định',
+        user: 'admin'
+      }
+    ]
+  },
+  {
+    id: 'cns-02',
+    name: 'Khối máy thu VHF AM Jotron RA-7203',
+    pn: 'RA-7203-RX',
+    sn: 'JT2024-77312',
+    warehouse: 'KHO-VHF-02',
+    loc: 'Tủ A1 - Ngăn 2',
+    qty: 3,
+    auditStatus: 'OK',
+    auditDate: '26/08/2026 08:45',
+    auditNote: 'Độ nhạy thu tốt, Squelch hoạt động chuẩn',
+    category: 'VHF AM',
+    imageUrl: imgVhf,
+    history: [
+      {
+        id: 'h-02',
+        status: 'OK',
+        date: '26/08/2026 08:45',
+        note: 'Kiểm định độ nhạy thu tín hiệu',
+        user: 'admin'
+      }
+    ]
+  },
+  {
+    id: 'cns-03',
+    name: 'Bộ chuyển mạch thoại VCCS Frequentis VCS3020X Card IP',
+    pn: 'VCS3020X-IPB',
+    sn: 'FQ-8921-0044',
+    warehouse: 'KHO-VCCS-01',
+    loc: 'Tủ B2 - Ngăn 3',
+    qty: 1,
+    auditStatus: 'OK',
+    auditDate: '25/08/2026 14:10',
+    auditNote: 'Card dự phòng nóng còn nguyên niêm phong',
+    category: 'VCCS',
+    imageUrl: imgVccs,
+    imagePrompt: 'Card IP chuyển mạch thoại VCCS Frequentis VCS3020X chuyên dụng',
+    history: [
+      {
+        id: 'h-03',
+        status: 'OK',
+        date: '25/08/2026 14:10',
+        note: 'Kiểm tra niêm phong kho dự phòng',
+        user: 'admin'
+      }
+    ]
+  },
+  {
+    id: 'cns-04',
+    name: 'Card giao tiếp Audio 8 kênh VCCS SITTI Multiswitch',
+    pn: 'SITTI-AUD-8CH',
+    sn: 'ST2023-44109',
+    warehouse: 'KHO-VCCS-02',
+    loc: 'Tủ B2 - Ngăn 4',
+    qty: 2,
+    auditStatus: null,
+    auditDate: null,
+    auditNote: '',
+    category: 'VCCS',
+    imageUrl: imgVccs,
+    history: []
+  },
+  {
+    id: 'cns-05',
+    name: 'Ăng-ten lưỡng cực VHF Ground Plane chuyên dụng',
+    pn: 'ANT-VHF-GP118',
+    sn: 'AT2024-0012',
+    warehouse: 'KHO-ANT-01',
+    loc: 'Kho ngoài - Giá treo 2',
+    qty: 4,
+    auditStatus: 'OK',
+    auditDate: '26/08/2026 09:15',
+    auditNote: 'VSWR < 1.3 trong dải 118-137 MHz',
+    category: 'GPS & Ăng-ten',
+    imageUrl: imgRadar,
+    history: []
+  },
+  {
+    id: 'cns-06',
+    name: 'Bộ phân phối tín hiệu GPS Time Server Meinberg LANTIME M300',
+    pn: 'M300-GPS-NTP',
+    sn: 'MB2022-99014',
+    warehouse: 'KHO-GPS-01',
+    loc: 'Tủ C1 - Ngăn 1',
+    qty: 1,
+    auditStatus: 'OK',
+    auditDate: '24/08/2026 10:20',
+    auditNote: 'Đồng bộ xung 1PPS và NTP đạt chuẩn Stratum 1',
+    category: 'GPS & Ăng-ten',
+    imageUrl: imgGps,
+    imagePrompt: 'Máy chủ đồng bộ thời gian GPS Time Server Meinberg LANTIME M300 chuẩn hàng không',
+    history: []
+  },
+  {
+    id: 'cns-07',
+    name: 'Ổ cứng chuyên dụng ghi âm thoại hàng không NiceLog SAS 2TB',
+    pn: 'NL-SAS-2TB-ENT',
+    sn: 'WD2023-882194',
+    warehouse: 'KHO-REC-01',
+    loc: 'Tủ C2 - Ngăn 2',
+    qty: 6,
+    auditStatus: null,
+    auditDate: null,
+    auditNote: '',
+    category: 'Ghi âm & Lưu trữ',
+    imageUrl: imgRecorder,
+    history: []
+  },
+  {
+    id: 'cns-08',
+    name: 'Module nguồn dự phòng Hot-Swap Rohde & Schwarz Series 4200',
+    pn: 'RS4200-PSU-48V',
+    sn: 'RS2024-55102',
+    warehouse: 'KHO-PWR-01',
+    loc: 'Tủ D1 - Ngăn 2',
+    qty: 3,
+    auditStatus: 'MISSING',
+    auditDate: '25/08/2026 16:00',
+    auditNote: 'Thiếu 01 module đã xuất thay thế tại trạm đài phụ',
+    category: 'Nguồn & UPS',
+    imageUrl: imgUps,
+    history: [
+      {
+        id: 'h-04',
+        status: 'MISSING',
+        date: '25/08/2026 16:00',
+        note: 'Ghi nhận xuất khẩn cấp 1 bộ cho đài phụ cận',
+        user: 'guest'
+      }
+    ]
+  },
+  {
+    id: 'cns-09',
+    name: 'Bộ lọc thông dải RF Cavity Filter VHF 118-137MHz',
+    pn: 'BPF-118137-4C',
+    sn: 'FL2023-11029',
+    warehouse: 'KHO-RF-01',
+    loc: 'Tủ A2 - Ngăn 3',
+    qty: 2,
+    auditStatus: 'OK',
+    auditDate: '26/08/2026 07:50',
+    auditNote: 'Suy hao chèn < 0.8dB, độ cách ly > 30dB',
+    category: 'VHF AM',
+    imageUrl: imgVhf,
+    history: []
+  },
+  {
+    id: 'cns-10',
+    name: 'Bộ cấp nguồn liên tục UPS Online Eaton 9PX 3000VA RT',
+    pn: '9PX3000IRT2U',
+    sn: 'ET2023-77419',
+    warehouse: 'KHO-UPS-01',
+    loc: 'Phòng nguồn - Bệ 1',
+    qty: 1,
+    auditStatus: null,
+    auditDate: null,
+    auditNote: '',
+    category: 'Nguồn & UPS',
+    imageUrl: imgUps,
+    history: []
+  }
+];

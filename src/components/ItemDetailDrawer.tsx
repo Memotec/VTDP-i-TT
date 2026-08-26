@@ -1,0 +1,258 @@
+import React from 'react';
+import {
+  X,
+  Clock,
+  QrCode,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  MapPin,
+  Tag,
+  Hash,
+  Layers,
+  Edit3,
+  Send
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { InventoryItem, Role } from '../types.ts';
+
+interface ItemDetailDrawerProps {
+  item: InventoryItem | null;
+  role: Role | null;
+  onClose: () => void;
+  onEdit: (item: InventoryItem) => void;
+  onUsage: (item: InventoryItem) => void;
+}
+
+export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
+  item,
+  role,
+  onClose,
+  onEdit,
+  onUsage,
+}) => {
+  if (!item) return null;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex justify-end z-[80000] animate-fade-in">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md h-screen shadow-2xl flex flex-col border-l border-slate-150 dark:border-slate-800 animate-slide-left">
+        {/* Drawer Header */}
+        <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-150 dark:border-slate-800 flex justify-between items-center shrink-0">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] uppercase font-black bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-400 px-2.5 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/40">
+                Chi tiết thiết bị CNS
+              </span>
+              <span className="text-[9px] font-bold bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md">
+                {item.category}
+              </span>
+            </div>
+            <h3 className="font-black text-slate-900 dark:text-white text-sm line-clamp-1">
+              {item.name}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 px-2.5 hover:text-slate-950 dark:hover:text-white text-slate-400 cursor-pointer rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+            title="Đóng"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable details contents */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
+          {/* QR Code Identification Card */}
+          <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 dark:from-slate-800/60 dark:to-slate-800/30 p-5 rounded-3xl border border-slate-200/70 dark:border-slate-700 flex flex-col items-center justify-center text-center space-y-3">
+            {item.warehouse ? (
+              <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-150 dark:border-slate-700">
+                <QRCodeSVG value={item.warehouse} size={150} level="M" />
+              </div>
+            ) : (
+              <div className="w-36 h-36 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex items-center justify-center text-[11px] text-slate-400">
+                Chưa có mã QR
+              </div>
+            )}
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-center gap-1.5 text-xs font-mono font-black text-indigo-600 dark:text-indigo-400">
+                <QrCode className="w-3.5 h-3.5" />
+                <span>{item.warehouse || 'N/A'}</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Mã QR định danh quản lý & vị trí kho dự phòng tại chỗ
+              </p>
+            </div>
+          </div>
+
+          {/* Equipment Technical Attributes */}
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4.5 rounded-3xl border border-slate-200/60 dark:border-slate-700 space-y-4">
+            <div className="flex items-center gap-1.5 text-xs font-black uppercase text-slate-800 dark:text-white tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">
+              <FileText className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Thông số & Vị trí kỹ thuật</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5 text-xs">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Tag className="w-3 h-3" /> P/N - Model
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200 font-semibold block">
+                  {item.pn || 'N/A'}
+                </strong>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Hash className="w-3 h-3" /> Serial Number (S/N)
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold block">
+                  {item.sn}
+                </strong>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Layers className="w-3 h-3" /> Số lượng tồn kho
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200 font-black block">
+                  {item.qty} bộ / chiếc
+                </strong>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> Vị trí phân kho
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200 font-semibold block">
+                  {item.loc || 'N/A'}
+                </strong>
+              </div>
+            </div>
+
+            {/* Audit Status block */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                  Trạng thái kiểm định
+                </span>
+                {item.auditStatus === 'OK' ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-extrabold text-[10px] bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="w-3 h-3" /> ĐỦ / HOẠT ĐỘNG TỐT
+                  </span>
+                ) : item.auditStatus === 'MISSING' ? (
+                  <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-extrabold text-[10px] bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="w-3 h-3" /> THIẾU / HỎNG HÓC
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-bold text-[10px] bg-slate-200/60 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                    CHƯA KIỂM KÊ
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                  Ngày kiểm kê cuối
+                </span>
+                <strong className="text-slate-700 dark:text-slate-300 block font-mono text-[11px]">
+                  {item.auditDate || 'Chưa ghi nhận'}
+                </strong>
+              </div>
+            </div>
+
+            {item.auditNote && (
+              <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-700 space-y-0.5">
+                <span className="text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider">
+                  Ghi chú kiểm định:
+                </span>
+                <p className="text-slate-600 dark:text-slate-300 text-xs font-medium leading-relaxed italic">
+                  "{item.auditNote}"
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* History Timeline */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5 border-b border-slate-150 dark:border-slate-800 pb-2">
+              <Clock className="w-4 h-4 text-indigo-500" />
+              <span className="text-xs font-black uppercase text-slate-800 dark:text-white tracking-widest">
+                LỊCH SỬ KIỂM KÊ GẦN ĐÂY
+              </span>
+            </div>
+
+            {!item.history || item.history.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 font-medium text-xs bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                Chưa có hoạt động kiểm kê lịch sử được lưu vết cho mã này.
+              </div>
+            ) : (
+              <div className="relative border-l border-slate-200 dark:border-slate-700 ml-3.5 pl-4.5 space-y-4">
+                {item.history.map((hist) => (
+                  <div key={hist.id} className="relative text-xs">
+                    <div
+                      className={`absolute left-[-26px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-slate-900 ${
+                        hist.status === 'OK' ? 'border-emerald-500' : 'border-rose-500'
+                      }`}
+                    ></div>
+
+                    <div className="flex justify-between items-start">
+                      <strong
+                        className={
+                          hist.status === 'OK'
+                            ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                            : 'text-rose-600 dark:text-rose-400 font-bold'
+                        }
+                      >
+                        {hist.status === 'OK' ? '● ĐỦ / HOẠT ĐỘNG TỐT' : '▲ THIẾU THIẾT BỊ'}
+                      </strong>
+                      <span className="text-[10px] text-slate-400 font-semibold">{hist.date}</span>
+                    </div>
+                    {hist.note && (
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed mt-1">
+                        {hist.note}
+                      </p>
+                    )}
+                    <div className="text-[10px] text-slate-400 italic mt-1 font-semibold block">
+                      Người kiểm tra: {hist.user.toUpperCase()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drawer footer */}
+        <div className="px-6 py-4.5 bg-slate-50 dark:bg-slate-800 border-t border-slate-150 dark:border-slate-800 flex justify-between gap-3 shrink-0">
+          <button
+            onClick={() => {
+              onClose();
+              if (role === 'admin') onEdit(item);
+            }}
+            disabled={role !== 'admin'}
+            className="flex-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer text-center disabled:opacity-40 flex items-center justify-center gap-1.5"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Chỉnh sửa</span>
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              onUsage(item);
+            }}
+            className="flex-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-900/35 text-amber-700 dark:text-amber-400 font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Báo sử dụng</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer text-center"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

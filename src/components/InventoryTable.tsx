@@ -128,7 +128,19 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                       <span className="text-slate-400 italic text-[10px]">- Chưa cấp -</span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 text-center font-black text-slate-800 dark:text-slate-200">{item.qty}</td>
+                  <td className="px-4 py-3.5 text-center">
+                    {item.qty === 0 ? (
+                      <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full font-black text-[10px] border border-rose-300/80 dark:border-rose-800 animate-pulse" title="Đã hết hàng tồn kho (0 cái)">
+                        0 (Hết hàng)
+                      </span>
+                    ) : item.qty === 1 ? (
+                      <span className="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-black text-[10px] border border-amber-300/80 dark:border-amber-800" title="Dưới ngưỡng an toàn dự phòng (<= 1)">
+                        1 (Sắp hết ⚠️)
+                      </span>
+                    ) : (
+                      <span className="font-black text-slate-800 dark:text-slate-200">{item.qty}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3.5 text-center">
                     <div className="flex flex-col items-center gap-1">
                       {item.auditStatus === 'OK' ? (
@@ -304,10 +316,20 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                 </div>
                 <div>
                   <span className="text-[8.5px] uppercase font-bold text-slate-400 block mb-0.5">Số Lượng & Vị trí</span>
-                  <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1 font-bold">
-                    <span className="font-black text-indigo-600 dark:text-indigo-400">x{item.qty} bộ</span>
-                    {item.loc && <span className="text-[9px] font-normal truncate max-w-[65px]" title={item.loc}>({item.loc})</span>}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {item.qty === 0 ? (
+                      <span className="inline-flex items-center gap-0.5 bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 rounded-full font-black text-[9px] border border-rose-300/80 dark:border-rose-800 animate-pulse">
+                        0 cái (Hết hàng)
+                      </span>
+                    ) : item.qty === 1 ? (
+                      <span className="inline-flex items-center gap-0.5 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-black text-[9px] border border-amber-300/80 dark:border-amber-800">
+                        x1 bộ (Sắp hết ⚠️)
+                      </span>
+                    ) : (
+                      <span className="font-black text-indigo-600 dark:text-indigo-400">x{item.qty} bộ</span>
+                    )}
+                    {item.loc && <span className="text-[9px] font-normal truncate max-w-[65px] text-slate-500" title={item.loc}>({item.loc})</span>}
+                  </div>
                 </div>
               </div>
 

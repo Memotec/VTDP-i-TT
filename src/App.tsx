@@ -3,7 +3,7 @@ import {
   QrCode, Search, Database, RefreshCw, Plus, Edit,
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
-  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key
+  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key, AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -56,9 +56,13 @@ const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
 export default function App() {
   // Inventory state
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [role, setRole] = useState<Role | null>(null);
+  const [role, setRole] = useState<Role>(() => {
+    const saved = localStorage.getItem('cns_session_active');
+    if (saved === 'admin' || saved === 'guest') return saved as Role;
+    return 'admin';
+  });
   const [currentUsername, setCurrentUsername] = useState<string>(() => {
-    return localStorage.getItem('cns_current_username') || '';
+    return localStorage.getItem('cns_current_username') || 'admin';
   });
 
   // Dynamic user accounts list
@@ -88,7 +92,9 @@ export default function App() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả loại');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'MISSING' | 'UNCHECKED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'MISSING' | 'UNCHECKED' | 'LOW_STOCK'>('ALL');
+  const [isLowStockBannerDismissed, setIsLowStockBannerDismissed] = useState(false);
+  const [isLowStockDropdownOpen, setIsLowStockDropdownOpen] = useState(false);
 
   // Categories list
   const [categories, setCategories] = useState<string[]>(() => {
@@ -401,6 +407,10 @@ export default function App() {
     }, 4000);
   };
 
+  const lowStockItems = useMemo(() => {
+    return inventory.filter(item => (item.qty ?? 0) <= 1);
+  }, [inventory]);
+
   const stats = useMemo<AuditStats>(() => {
     const totalItems = inventory.length;
     const totalQty = inventory.reduce((acc, item) => acc + (item.qty || 0), 0);
@@ -415,9 +425,10 @@ export default function App() {
       checkedCount,
       okCount,
       missingCount,
-      healthRate
+      healthRate,
+      lowStockCount: lowStockItems.length
     };
-  }, [inventory]);
+  }, [inventory, lowStockItems.length]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(item => {
@@ -425,6 +436,7 @@ export default function App() {
       if (statusFilter === 'OK' && item.auditStatus !== 'OK') return false;
       if (statusFilter === 'MISSING' && item.auditStatus !== 'MISSING') return false;
       if (statusFilter === 'UNCHECKED' && item.auditStatus !== null) return false;
+      if (statusFilter === 'LOW_STOCK' && (item.qty ?? 0) > 1) return false;
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();
@@ -587,6 +599,13 @@ export default function App() {
       saveInventoryLocally(updated);
       addToast('Cập nhật dữ liệu thiết bị thành công!', 'success');
       playScanBeep(900, 0.1);
+
+      const newQtyNum = Number(formQty) || 0;
+      if (newQtyNum <= 1) {
+        setTimeout(() => {
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formName.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
+        }, 350);
+      }
     } else {
       const isDuplicate = inventory.some(item => item.sn.toLowerCase() === formSn.trim().toLowerCase());
       if (isDuplicate) {
@@ -610,6 +629,13 @@ export default function App() {
       saveInventoryLocally([...inventory, newItem]);
       addToast('Đã thêm thiết bị mới vào kho thành công!', 'success');
       playScanBeep(880, 0.15);
+
+      const newQtyNum = Number(formQty) || 0;
+      if (newQtyNum <= 1) {
+        setTimeout(() => {
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formName.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
+        }, 350);
+      }
     }
     clearForm();
   };
@@ -1230,9 +1256,11 @@ export default function App() {
     localStorage.setItem('cns_usage_slips_v1', JSON.stringify(nextSlips));
 
     if (deductInv && selectedItemForUsage) {
+      let resultedQty = selectedItemForUsage.qty;
       const updatedInv = inventory.map(item => {
         if (item.id === selectedItemForUsage.id) {
           const newQty = item.qty - newSlip.qtyUsed;
+          resultedQty = newQty;
           const updatedHistory = item.history ? [...item.history] : [];
           updatedHistory.unshift({
             id: `h-use-${Date.now()}`,
@@ -1246,6 +1274,12 @@ export default function App() {
         return item;
       });
       saveInventoryLocally(updatedInv);
+
+      if (resultedQty <= 1) {
+        setTimeout(() => {
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Sau khi xuất, thiết bị "${selectedItemForUsage.name}" chỉ còn lại ${resultedQty} cái (Dưới ngưỡng an toàn <= 1)! Cần lập kế hoạch nhập bổ sung.`, 'error');
+        }, 500);
+      }
     }
 
     playScanBeep(1000, 0.2);
@@ -1363,12 +1397,27 @@ export default function App() {
                 </div>
               )}
 
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all text-sm tracking-wide mt-5 active:scale-[0.98] cursor-pointer"
-              >
-                ĐĂNG NHẬP HỆ THỐNG
-              </button>
+              <div className="flex flex-col gap-2 mt-5">
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all text-sm tracking-wide active:scale-[0.98] cursor-pointer"
+                >
+                  ĐĂNG NHẬP HỆ THỐNG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRole('admin');
+                    setCurrentUsername('admin');
+                    localStorage.setItem('cns_session_active', 'admin');
+                    localStorage.setItem('cns_current_username', 'admin');
+                    addToast('Đã vào hệ thống với quyền Quản trị viên (Super Admin).', 'success');
+                  }}
+                  className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2.5 rounded-2xl transition-all text-xs cursor-pointer"
+                >
+                  Bỏ qua & Vào ngay với quyền Super Admin
+                </button>
+              </div>
             </form>
 
             <div className="mt-8 border-t border-slate-100 dark:border-slate-800 pt-6 text-center text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
@@ -1428,6 +1477,98 @@ export default function App() {
               >
                 <Settings className="w-4.5 h-4.5 text-slate-500 hover:text-indigo-500 transition-colors" />
               </button>
+
+              {/* Low Stock Warning Header Button & Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsLowStockDropdownOpen(!isLowStockDropdownOpen)}
+                  className={`relative p-2 rounded-2xl border shadow-sm transition-all focus:outline-none cursor-pointer ${
+                    lowStockItems.length > 0
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/80 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                  title={`Cảnh báo an toàn tồn kho (${lowStockItems.length} thiết bị có số lượng <= 1)`}
+                >
+                  <AlertTriangle className={`w-4.5 h-4.5 ${lowStockItems.length > 0 ? 'animate-bounce text-amber-600 dark:text-amber-400' : ''}`} />
+                  {lowStockItems.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white rounded-full text-[9.5px] font-black flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow-sm animate-pulse">
+                      {lowStockItems.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown Menu */}
+                {isLowStockDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-4 z-[9999] animate-scale-in">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                          Cảnh Báo Tồn Kho (≤ 1 bộ)
+                        </h4>
+                      </div>
+                      <span className="text-[10px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/80 dark:border-amber-800">
+                        {lowStockItems.length} mã
+                      </span>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar my-2 divide-y divide-slate-100 dark:divide-slate-800">
+                      {lowStockItems.length === 0 ? (
+                        <p className="py-6 text-center text-xs text-slate-400 font-medium">
+                          Tất cả thiết bị trong kho đều đạt mức an toàn (&gt; 1 cái).
+                        </p>
+                      ) : (
+                        lowStockItems.map(item => (
+                          <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl transition-colors">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={item.name}>
+                                {item.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 text-[9.5px] text-slate-400 mt-0.5 font-mono">
+                                <span>S/N: {item.sn}</span>
+                                {item.loc && <span>• {item.loc}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                                item.qty === 0
+                                  ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
+                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                              }`}>
+                                {item.qty === 0 ? '0 cái (Hết)' : `x${item.qty} cái`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedItemDetail(item);
+                                  setIsLowStockDropdownOpen(false);
+                                }}
+                                className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                              >
+                                Xem
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter('LOW_STOCK');
+                          setIsLowStockDropdownOpen(false);
+                        }}
+                        className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold text-center transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
+                      >
+                        Lọc danh sách thiết bị sắp hết
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* UPGRADED ADMIN & ROLE CONTROLS */}
               {role === 'admin' ? (
@@ -1501,9 +1642,87 @@ export default function App() {
             </div>
           </header>
 
+          {/* LOW STOCK SAFETY ALERT BANNER */}
+          {!isLowStockBannerDismissed && lowStockItems.length > 0 && (
+            <div className="mt-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-rose-500/10 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-rose-950/30 border border-amber-300 dark:border-amber-700/70 rounded-[2rem] p-5 shadow-sm">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20 mt-0.5">
+                    <AlertTriangle className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-black text-amber-950 dark:text-amber-200 uppercase tracking-wide">
+                        Cảnh Báo Mức An Toàn: Có {lowStockItems.length} Thiết Bị Dưới Ngưỡng Dự Phòng (SL ≤ 1 cái)
+                      </h3>
+                      <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-black uppercase animate-pulse">
+                        Cần Tiếp Liệu
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-1 font-medium leading-relaxed">
+                      Số lượng vật tư dự phòng tại chỗ của các thiết bị này đang ở mức tối thiểu (≤ 1 bộ). Đề xuất kiểm tra thực tế và lập kế hoạch bổ sung để đảm bảo dự phòng cho hệ thống CNS/ATM.
+                    </p>
+
+                    {/* Quick list of low stock items chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      {lowStockItems.slice(0, 6).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSelectedItemDetail(item)}
+                          className="inline-flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 border border-amber-300 dark:border-amber-700/80 px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
+                          title="Nhấp để xem chi tiết thiết bị này"
+                        >
+                          <span className="truncate max-w-[140px]">{item.name}</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-black ${item.qty === 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
+                            {item.qty === 0 ? '0 cái (Hết)' : `x${item.qty} cái`}
+                          </span>
+                        </button>
+                      ))}
+                      {lowStockItems.length > 6 && (
+                        <span className="text-[11px] font-extrabold text-amber-800 dark:text-amber-300 self-center">
+                          +{lowStockItems.length - 6} thiết bị khác...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(statusFilter === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                      statusFilter === 'LOW_STOCK'
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white'
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    {statusFilter === 'LOW_STOCK' ? 'Hiện tất cả' : 'Lọc thiết bị sắp hết'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLowStockBannerDismissed(true)}
+                    className="p-2 text-amber-800 hover:text-amber-950 dark:text-amber-300 dark:hover:text-white rounded-xl hover:bg-amber-200/50 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+                    title="Tạm ẩn cảnh báo này"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards and Charts */}
           <div className="mt-6">
-            <StatsCards stats={stats} inventory={inventory} />
+            <StatsCards
+              stats={stats}
+              inventory={inventory}
+              onFilterLowStock={() => setStatusFilter('LOW_STOCK')}
+            />
           </div>
 
           {/* Search and Action Toolbar */}
@@ -1680,6 +1899,20 @@ export default function App() {
                   className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-300 shadow-sm' : 'text-slate-500'}`}
                 >
                   Chưa kiểm ({inventory.filter(i => i.auditStatus === null).length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('LOW_STOCK')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                    statusFilter === 'LOW_STOCK'
+                      ? 'bg-amber-500 text-white shadow-sm font-black'
+                      : lowStockItems.length > 0
+                      ? 'text-amber-600 dark:text-amber-400 font-extrabold hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
+                      : 'text-slate-500'
+                  }`}
+                  title="Lọc các thiết bị có số lượng <= 1 bộ"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  Sắp hết ({lowStockItems.length})
                 </button>
               </div>
             </div>

@@ -1,18 +1,20 @@
 import React from 'react';
-import { Layers, CheckSquare, Activity, XCircle, Check } from 'lucide-react';
+import { Layers, CheckSquare, Activity, XCircle, Check, AlertTriangle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { AuditStats, InventoryItem } from '../types.ts';
 
 interface StatsCardsProps {
   stats: AuditStats;
   inventory: InventoryItem[];
+  onFilterLowStock?: () => void;
 }
 
-export const StatsCards: React.FC<StatsCardsProps> = ({ stats, inventory }) => {
+export const StatsCards: React.FC<StatsCardsProps> = ({ stats, inventory, onFilterLowStock }) => {
   const totalOk = inventory.filter(item => item.auditStatus === 'OK').reduce((sum, item) => sum + (item.qty || 0), 0);
   const totalMissing = inventory.filter(item => item.auditStatus === 'MISSING').reduce((sum, item) => sum + (item.qty || 0), 0);
   const totalUnchecked = inventory.filter(item => item.auditStatus === null).reduce((sum, item) => sum + (item.qty || 0), 0);
   const totalAll = totalOk + totalMissing + totalUnchecked;
+  const lowStockCount = inventory.filter(item => (item.qty || 0) <= 1).length;
 
   const ratioOk = totalAll > 0 ? Math.round((totalOk / totalAll) * 100) : 0;
   const ratioMissing = totalAll > 0 ? Math.round((totalMissing / totalAll) * 100) : 0;
@@ -44,7 +46,20 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, inventory }) => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-[1.8rem] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tổng số lượng</p>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.totalQty}</h3>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.totalQty}</h3>
+              {lowStockCount > 0 && onFilterLowStock && (
+                <button
+                  type="button"
+                  onClick={onFilterLowStock}
+                  className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-300/80 dark:border-amber-800 animate-pulse hover:bg-amber-200 cursor-pointer"
+                  title="Xem các thiết bị có số lượng <= 1"
+                >
+                  <AlertTriangle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                  {lowStockCount} mã ≤ 1
+                </button>
+              )}
+            </div>
             <p className="text-[10px] text-slate-500">Cái / chiếc tồn kho</p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 border border-emerald-100/55 dark:border-emerald-900/35">

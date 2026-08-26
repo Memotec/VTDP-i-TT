@@ -71,6 +71,7 @@ export interface AuditStats {
   okCount: number;
   missingCount: number;
   healthRate: number;
+  lowStockCount?: number;
 }
 
 export interface UsageSlip {

@@ -1429,36 +1429,36 @@ export default function App() {
         </div>
       ) : (
         /* MAIN LOGGED IN APP */
-        <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex-1 flex flex-col w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
           {/* Header */}
           <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-500 rounded-xl text-white shadow-md shadow-indigo-500/10">
-                  <Database className="w-6 h-6" />
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-md shadow-indigo-600/15 flex items-center justify-center">
+                  <Database className="w-7 h-7" />
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <h1 className="text-2xl sm:text-3xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5 flex-wrap">
                     VẬT TƯ DỰ PHÒNG TẠI CHỖ
-                    <span className="text-[9px] translate-y-[-4px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                    <span className="text-xs font-black bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full uppercase tracking-wider border border-indigo-200 dark:border-indigo-900">
                       Đội Thông Tin
                     </span>
                   </h1>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
                     Hệ thống quản lý định danh & kiểm định hiện vật nội bộ CNS/ATM
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3.5 py-1.5 rounded-2xl shadow-sm text-xs font-semibold">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
+              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-2xl shadow-sm text-xs sm:text-sm font-semibold">
                 <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'syncing' ? 'bg-indigo-500 animate-ping' : syncStatus === 'success' ? 'bg-emerald-500' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-slate-400'}`}></span>
-                <span className="text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px]">
+                <span className="text-slate-700 dark:text-slate-200 font-extrabold uppercase text-xs">
                   {syncStatus === 'syncing' ? 'Đang sync...' : syncStatus === 'success' ? 'Đã Sync Cloud' : 'Offline'}
                 </span>
                 {syncConfig.lastSynced && (
-                  <span className="text-[10px] text-slate-400 ml-1 font-normal">({syncConfig.lastSynced})</span>
+                  <span className="text-xs text-slate-400 ml-1 font-normal">({syncConfig.lastSynced})</span>
                 )}
               </div>
 
@@ -1726,15 +1726,15 @@ export default function App() {
           </div>
 
           {/* Search and Action Toolbar */}
-          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 mt-6 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400" />
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 sm:p-5 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4 shadow-sm">
+            <div className="relative w-full xl:w-[420px]">
+              <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm: Tên thiết bị, P/N, S/N, Mã Kho..."
-                className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm placeholder:text-slate-400"
+                className="w-full pl-12 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm sm:text-base font-medium placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
@@ -1746,73 +1746,73 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-              <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 dark:bg-slate-800 p-1">
+            <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+              <div className="flex items-center gap-1 rounded-2xl bg-slate-100/80 dark:bg-slate-800 p-1 border border-slate-200/50 dark:border-slate-700/50">
                 <button
                   onClick={() => fetchCloudData()}
                   disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3 text-[10px] uppercase font-extrabold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  className="p-2 px-3.5 text-xs font-black uppercase text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
                   title="Tải cấu trúc từ đám mây về"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 text-indigo-500 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                   Tải Về (PULL)
                 </button>
                 <button
                   onClick={syncToCloud}
                   disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3 text-[10px] uppercase font-extrabold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  className="p-2 px-3.5 text-xs font-black uppercase text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
                   title="Đẩy dữ liệu hiện có lên Cloud"
                 >
                   Đẩy Lên (PUSH)
                 </button>
               </div>
 
-              <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 hidden md:block mx-1"></div>
+              <div className="w-px h-7 bg-slate-200 dark:bg-slate-800 hidden xl:block mx-1"></div>
 
               <button
                 onClick={() => {
                   setScanTargetItem(null);
                   setIsScannerOpen(true);
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-600/10 transition-colors text-xs tracking-wide cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 px-5 rounded-2xl shadow-md shadow-indigo-600/15 transition-all text-xs sm:text-sm tracking-wide cursor-pointer"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-4.5 h-4.5 animate-pulse" />
                 KIỂM KÊ (QUÉT)
               </button>
 
-              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-xl p-1">
+              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50">
                 <button
                   onClick={() => startPrintSession('QR')}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title="In bộ mã QR"
                 >
-                  <Printer className="w-3.5 h-3.5" />
+                  <Printer className="w-4 h-4 text-indigo-500" />
                   MÃ QR
                 </button>
                 <button
                   onClick={() => startPrintSession('LABEL')}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title="In tem nhãn kỹ thuật"
                 >
                   TEM NHÃN
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-xl p-1">
+              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50 flex-wrap sm:flex-nowrap">
                 <button
                   onClick={handleExportExcel}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-emerald-600 dark:text-emerald-400 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-emerald-700 dark:text-emerald-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title="Xuất bảng Excel (.xlsx)"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
                   EXCEL
                 </button>
                 <button
                   onClick={handleExportWebBill}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-indigo-600 dark:text-indigo-400 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-indigo-700 dark:text-indigo-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title="Xuất biên bản kiểm định PDF"
                 >
-                  <FileText className="w-3.5 h-3.5" />
+                  <FileText className="w-4 h-4 text-indigo-500" />
                   BIÊN BẢN
                 </button>
                 <button
@@ -1832,18 +1832,18 @@ export default function App() {
                       setHandoverRows(initialRows);
                     }
                   }}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-rose-600 dark:text-rose-400 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-rose-700 dark:text-rose-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5 shadow-xs"
                   title="Lập Biên Bản Bàn Giao thiết bị"
                 >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <ArrowRightLeft className="w-4 h-4 text-rose-500" />
                   BB BÀN GIAO
                 </button>
                 <button
                   onClick={() => setIsUsageHistoryOpen(true)}
-                  className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-amber-600 dark:text-amber-400 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-amber-700 dark:text-amber-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5 shadow-xs"
                   title="Xem lịch sử phiếu báo sử dụng"
                 >
-                  <History className="w-3.5 h-3.5" />
+                  <History className="w-4 h-4 text-amber-500" />
                   PHIẾU SỬ DỤNG ({usageSlips.length})
                 </button>
               </div>
@@ -1851,19 +1851,19 @@ export default function App() {
           </section>
 
           {/* Filter Pills */}
-          <div className="mt-6 flex flex-col lg:flex-row gap-5 items-start lg:items-stretch">
-            <div className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4 shadow-sm flex flex-wrap gap-1.5 items-center">
-              <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider mr-2 ml-1 flex items-center gap-1">
-                <Filter className="w-3 h-3 text-indigo-500" /> Loại máy:
+          <div className="mt-6 flex flex-col xl:flex-row gap-5 items-start xl:items-stretch">
+            <div className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 shadow-sm flex flex-wrap gap-2 items-center">
+              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-2 ml-1 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-indigo-500" /> Phân Loại:
               </span>
               {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
                     selectedCategory === cat
-                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/10'
-                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
+                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
                   }`}
                 >
                   {cat}
@@ -1871,96 +1871,96 @@ export default function App() {
               ))}
             </div>
 
-            <div className="w-full lg:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4 shadow-sm flex flex-wrap gap-1 items-center">
-              <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider mr-2 ml-1">
+            <div className="w-full xl:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 shadow-sm flex flex-wrap gap-2 items-center">
+              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-2 ml-1">
                 Kiểm kê:
               </span>
-              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-[11px] font-bold">
+              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 text-xs sm:text-sm font-extrabold flex-wrap sm:flex-nowrap gap-1">
                 <button
                   onClick={() => setStatusFilter('ALL')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}
+                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
                   Tất cả
                 </button>
                 <button
                   onClick={() => setStatusFilter('OK')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${statusFilter === 'OK' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500'}`}
+                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'OK' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'}`}
                 >
                   Tốt / Đủ ({inventory.filter(i => i.auditStatus === 'OK').length})
                 </button>
                 <button
                   onClick={() => setStatusFilter('MISSING')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${statusFilter === 'MISSING' ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500'}`}
+                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'MISSING' ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
                 >
                   Thiếu / Hỏng ({inventory.filter(i => i.auditStatus === 'MISSING').length})
                 </button>
                 <button
                   onClick={() => setStatusFilter('UNCHECKED')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-300 shadow-sm' : 'text-slate-500'}`}
+                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
                   Chưa kiểm ({inventory.filter(i => i.auditStatus === null).length})
                 </button>
                 <button
                   onClick={() => setStatusFilter('LOW_STOCK')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                     statusFilter === 'LOW_STOCK'
                       ? 'bg-amber-500 text-white shadow-sm font-black'
                       : lowStockItems.length > 0
-                      ? 'text-amber-600 dark:text-amber-400 font-extrabold hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
+                      ? 'text-amber-600 dark:text-amber-400 font-extrabold hover:bg-amber-100/80 dark:hover:bg-amber-950/50'
                       : 'text-slate-500'
                   }`}
                   title="Lọc các thiết bị có số lượng <= 1 bộ"
                 >
-                  <AlertTriangle className="w-3 h-3" />
+                  <AlertTriangle className="w-3.5 h-3.5" />
                   Sắp hết ({lowStockItems.length})
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Admin Editor Form or Guest Helper & Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
+          {/* Admin Editor Form & Main Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
             {role === 'admin' ? (
-              <div id="editor-panel" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.2rem] p-6 shadow-sm h-fit">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="p-1 px-2.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-[10px] font-black rounded-lg uppercase">
+              <div id="editor-panel" className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.2rem] p-6 shadow-sm h-fit">
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="p-1 px-3 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-lg uppercase">
                     Admin Form
                   </span>
-                  <h2 className="text-sm font-extrabold text-slate-800 dark:text-white uppercase tracking-wider">
+                  <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
                     {editingItemId ? 'Cập Nhật Thiết Bị' : 'Thêm Mới Thiết Bị'}
                   </h2>
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="space-y-4">
+                <form onSubmit={handleFormSubmit} className="space-y-4.5">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">Tên thiết bị *</label>
+                    <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Tên thiết bị *</label>
                     <input
                       type="text"
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
                       placeholder="VD: Máy thu phát VHF Jotron"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-semibold placeholder:text-slate-400"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <div className="flex justify-between items-center mb-1 ml-1">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Phân loại</label>
+                      <div className="flex justify-between items-center mb-1.5 ml-1">
+                        <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">Phân loại</label>
                         {!isAddingNewCat ? (
                           <button
                             type="button"
                             onClick={() => setIsAddingNewCat(true)}
-                            className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                           >
-                            <Plus className="w-2.5 h-2.5" /> Thêm nhanh
+                            <Plus className="w-3 h-3" /> Thêm
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => { setIsAddingNewCat(false); setNewCatInput(''); }}
-                            className="text-[9px] font-bold text-rose-500 hover:underline cursor-pointer"
+                            className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
                           >
                             Hủy
                           </button>
@@ -1970,20 +1970,20 @@ export default function App() {
                         <select
                           value={formCategory}
                           onChange={(e) => setFormCategory(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-extrabold"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-extrabold"
                         >
                           {categories.filter(cat => cat !== 'Tất cả loại').map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
                         </select>
                       ) : (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="text"
                             placeholder="Phân loại..."
                             value={newCatInput}
                             onChange={(e) => setNewCatInput(e.target.value)}
-                            className="flex-1 min-w-0 px-2 py-1.5 rounded-xl border border-indigo-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-bold"
+                            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-indigo-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-bold"
                           />
                           <button
                             type="button"
@@ -2005,7 +2005,7 @@ export default function App() {
                                 addToast('Tên loại không được trống!', 'error');
                               }
                             }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-[32px] px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center shrink-0"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-[36px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0"
                           >
                             Lưu
                           </button>
@@ -2013,105 +2013,101 @@ export default function App() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">Số lượng</label>
+                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Số lượng</label>
                       <input
                         type="number"
                         min="1"
                         required
                         value={formQty}
                         onChange={(e) => setFormQty(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-bold"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-extrabold"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">P/N (Model)</label>
+                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">P/N (Model)</label>
                       <input
                         type="text"
                         value={formPn}
                         onChange={(e) => setFormPn(e.target.value)}
                         placeholder="Mã Model"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-semibold placeholder:text-slate-400"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">S/N *</label>
+                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">S/N *</label>
                       <input
                         type="text"
                         required
                         value={formSn}
                         onChange={(e) => setFormSn(e.target.value)}
                         placeholder="Số Sê-ri"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-mono font-bold placeholder:text-slate-400"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-mono font-bold placeholder:text-slate-400"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">Mã Kho (QR)</label>
+                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Mã Kho (QR)</label>
                       <input
                         type="text"
                         value={formWarehouse}
                         onChange={(e) => setFormWarehouse(e.target.value)}
                         placeholder="VD: KHO-01"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-bold placeholder:text-slate-400 uppercase"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-bold placeholder:text-slate-400 uppercase"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase ml-1">Vị trí tủ / ngăn</label>
+                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Vị trí tủ / ngăn</label>
                       <input
                         type="text"
                         value={formLoc}
                         onChange={(e) => setFormLoc(e.target.value)}
                         placeholder="Tủ 2 - Ngăn B"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-semibold placeholder:text-slate-400"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
                       />
                     </div>
                   </div>
 
-                  <div className="pt-3 flex gap-2">
+                  <div className="pt-3 flex gap-2.5">
                     <button
                       type="submit"
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors shadow-sm shadow-indigo-600/10 cursor-pointer text-center"
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-600/15 cursor-pointer text-center"
                     >
                       {editingItemId ? 'LƯU CHỈNH SỬA' : 'THÊM MỚI KHO'}
                     </button>
                     <button
                       type="button"
                       onClick={clearForm}
-                      className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-colors cursor-pointer"
                     >
                       Reset
                     </button>
                   </div>
                 </form>
               </div>
-            ) : (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.2rem] p-6 shadow-sm h-fit space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="p-1 px-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-black rounded-lg uppercase">
-                    Quyền kiểm kê
-                  </span>
-                  <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">Tài khoản Guest</h2>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Bạn đang đăng nhập bằng quyền <strong className="text-slate-700 dark:text-slate-200">Kiểm kê viên (Guest)</strong>.
-                  Bạn có thể tra cứu nhanh, kiểm kê bằng QR code và kết xuất báo cáo Excel/Biên bản.
-                </p>
-                <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/30 dark:border-indigo-900/40 rounded-2xl flex gap-2">
-                  <Info className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-indigo-700 dark:text-indigo-400">
-                    Để thêm mới hoặc chỉnh sửa thông số thiết bị, vui lòng đăng nhập bằng quyền Quản trị viên (Admin).
-                  </p>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             {/* Inventory Table & Cards */}
-            <div className="lg:col-span-3">
+            <div className={role === 'admin' ? 'lg:col-span-8 xl:col-span-9' : 'col-span-12'}>
+              {role !== 'admin' && (
+                <div className="mb-4 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                        Chế độ Kiểm kê viên (Guest): <span className="font-normal text-slate-600 dark:text-slate-400">Bạn có toàn quyền tra cứu, quét mã QR/mã vạch kiểm kê hiện vật và xuất báo cáo PDF/Excel.</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <InventoryTable
                 filteredInventory={filteredInventory}
                 role={role}

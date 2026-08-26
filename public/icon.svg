@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="50%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  
+  <!-- App Background with Rounded Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  
+  <!-- Inner Glow Ring -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4"/>
+
+  <!-- Main Box & QR Graphic -->
+  <g filter="url(#shadow)">
+    <!-- Server / Hardware Container -->
+    <rect x="110" y="120" width="292" height="272" rx="36" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-width="8"/>
+    
+    <!-- QR / Scanner Symbol -->
+    <!-- Top-Left Corner -->
+    <path d="M150 190 V160 H180" fill="none" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="165" y="175" width="20" height="20" rx="4" fill="#38bdf8"/>
+    
+    <!-- Top-Right Corner -->
+    <path d="M362 190 V160 H332" fill="none" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="327" y="175" width="20" height="20" rx="4" fill="#38bdf8"/>
+
+    <!-- Bottom-Left Corner -->
+    <path d="M150 322 V352 H180" fill="none" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="165" y="317" width="20" height="20" rx="4" fill="#38bdf8"/>
+
+    <!-- Center Laser Line -->
+    <line x1="140" y1="256" x2="372" y2="256" stroke="#ec4899" stroke-width="8" stroke-linecap="round"/>
+    <line x1="170" y1="256" x2="342" y2="256" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Inventory Box Icon -->
+    <path d="M220 236 L256 216 L292 236 L256 256 Z" fill="url(#accent)"/>
+    <path d="M220 238 L256 258 V296 L220 276 Z" fill="#6366f1"/>
+    <path d="M292 238 L256 258 V296 L292 276 Z" fill="#818cf8"/>
+  </g>
+
+  <!-- Tag / Text Badge -->
+  <rect x="176" y="408" width="160" height="42" rx="21" fill="#10b981"/>
+  <text x="256" y="435" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="900" text-anchor="middle" letter-spacing="2">ĐỘI TT</text>
+</svg>

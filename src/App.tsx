@@ -3,7 +3,8 @@ import {
   QrCode, Search, Database, RefreshCw, Plus, Edit,
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
-  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key, AlertTriangle
+  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key, AlertTriangle,
+  Smartphone, Download, Sparkles
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +20,8 @@ import { HandoverModal, HandoverRow } from './components/HandoverModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { InventoryTable } from './components/InventoryTable.tsx';
 import { AdminAccountModal } from './components/AdminAccountModal.tsx';
+import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
+import { MobileAppInstallModal } from './components/MobileAppInstallModal.tsx';
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
   {
@@ -129,6 +132,8 @@ export default function App() {
   const [selectedItemForUsage, setSelectedItemForUsage] = useState<InventoryItem | null>(null);
   const [isUsageHistoryOpen, setIsUsageHistoryOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
 
   // Handover document state
   const [handoverNo, setHandoverNo] = useState(() => `${Math.floor(100 + Math.random() * 900)}/KT`);

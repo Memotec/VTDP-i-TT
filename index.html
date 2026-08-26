@@ -2,15 +2,34 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quản Lý Vật Tư Dự Phòng App</title>
-    <meta name="description" content="Ứng dụng QLVT DP Đội TT." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Quản Lý Vật Tư Dự Phòng Đội TT</title>
+    <meta name="description" content="Ứng dụng Quản Lý Vật Tư Dự Phòng Tại Chỗ - Đội Thông Tin." />
+    
+    <!-- Mobile App & PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="QLVT Đội TT" />
+    <meta name="application-name" content="QLVT Đội TT" />
+    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <meta name="msapplication-TileColor" content="#4f46e5" />
+    <meta name="format-detection" content="telephone=no" />
+    
+    <!-- Manifest & App Icons -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    
+    <!-- Open Graph & Social -->
     <meta property="og:title" content="Quản Lý Vật Tư Dự Phòng Đội TT" />
-    <meta property="og:description" content="An application built with Đội TT." />
+    <meta property="og:description" content="Ứng dụng quản lý & kiểm kê vật tư dự phòng tại chỗ - Đội Thông Tin." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icon.svg" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
-  <body>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 select-none sm:select-auto antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

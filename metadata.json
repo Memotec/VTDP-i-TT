@@ -1,5 +1,5 @@
 {
-  "name": "Quản Lý Kho Vật Tư CNS & ATM",
+  "name": "Quản Lý Kho Vật Tư Dự Phòng Đội Thông Tin",
   "description": "Hệ thống quản lý vật tư dự phòng tại chỗ, kiểm kê định danh QR Code và lập biên bản bàn giao thiết bị kỹ thuật hàng không Đội Thông Tin.",
   "requestFramePermissions": [
     "camera"

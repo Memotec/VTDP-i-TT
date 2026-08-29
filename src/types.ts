@@ -76,6 +76,7 @@ export interface AuditStats {
 
 export interface UsageSlip {
   id: string;
+  docNumber?: string;
   itemId: string;
   itemName: string;
   sn: string;
@@ -85,6 +86,12 @@ export interface UsageSlip {
   originalLoc?: string;
   user: string;
   qtyUsed: number;
+  unit?: string;
+  giverDept?: string;
+  giverName?: string;
+  giverPos?: string;
+  receiverDept?: string;
+  receiverPos?: string;
   purpose: string;
   notes?: string;
   targetLocation: string;
@@ -127,3 +134,35 @@ export interface DispatchedRecord {
   returnedQty?: number;
   returnNote?: string;
 }
+
+export type AuditActionType =
+  | 'ITEM_CREATE'
+  | 'ITEM_UPDATE'
+  | 'ITEM_DELETE'
+  | 'INVENTORY_AUDIT'
+  | 'USAGE_DISPATCH'
+  | 'HANDOVER_CREATE'
+  | 'STOCK_RETURN'
+  | 'DATA_IMPORT'
+  | 'DATA_RESTORE'
+  | 'AUTH_LOGIN'
+  | 'CATEGORY_CHANGE';
+
+export interface SystemAuditLogEntry {
+  id: string;
+  timestamp: string; // e.g. "29/08/2026 14:35:10"
+  actionType: AuditActionType;
+  actionTitle: string; // e.g. "Thêm mới thiết bị Card CPU RMC-300"
+  performedBy: string; // Username e.g. "admin", "ky_su_nam"
+  performedByName?: string; // Full name e.g. "KS. Nguyễn Văn Khải"
+  userRole: Role;
+  targetId?: string; // Item ID or Record ID
+  targetName?: string; // Equipment name or Doc number
+  targetCategory?: string;
+  targetSN?: string;
+  details: string; // Specific description & parameters
+  prevData?: string; // Previous state summary (if editing/updating)
+  newData?: string; // New state summary
+  ipAddress?: string; // e.g. "192.168.10.15 (Trạm Kỹ Thuật TACC)"
+}
+

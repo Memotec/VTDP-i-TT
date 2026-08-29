@@ -43,6 +43,7 @@ interface AdminAccountModalProps {
   users: UserAccount[];
   onUpdateUsers: (newUsers: UserAccount[]) => void;
   currentUsername: string;
+  onOpenAuditLog?: () => void;
 }
 
 export const AdminAccountModal: React.FC<AdminAccountModalProps> = ({
@@ -54,7 +55,8 @@ export const AdminAccountModal: React.FC<AdminAccountModalProps> = ({
   onLogout,
   users,
   onUpdateUsers,
-  currentUsername
+  currentUsername,
+  onOpenAuditLog
 }) => {
   if (!isOpen) return null;
 
@@ -462,6 +464,21 @@ export const AdminAccountModal: React.FC<AdminAccountModalProps> = ({
             <Lock className="w-3.5 h-3.5" />
             <span>Bảo Mật</span>
           </button>
+
+          {onOpenAuditLog && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenAuditLog();
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/80 border border-amber-300/80 dark:border-amber-800 transition-all cursor-pointer shrink-0 ml-auto"
+              title="Mở Trang Nhật Ký Kiểm Toán Hệ Thống (System Audit Log)"
+            >
+              <History className="w-3.5 h-3.5 text-amber-600" />
+              <span>Xem Nhật Ký Hệ Thống (Audit Log)</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Body */}

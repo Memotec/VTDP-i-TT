@@ -3,13 +3,13 @@ import {
   QrCode, Search, Database, RefreshCw, Plus, Edit,
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
-  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag
+  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
+  Smartphone, Download, Sparkles, Tag, Activity
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord } from './types.ts';
-import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS } from './initialData.ts';
+import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType } from './types.ts';
+import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
 import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
 import { PrintPreviewModal, PrintMode } from './components/PrintPreviewModal.tsx';
@@ -26,6 +26,9 @@ import { MobileAppInstallModal } from './components/MobileAppInstallModal.tsx';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
 import { ReturnStockModal } from './components/ReturnStockModal.tsx';
 import { DispatchedDetailModal } from './components/DispatchedDetailModal.tsx';
+import { SystemAuditLogView } from './components/SystemAuditLogView.tsx';
+import { SystemAuditLogModal } from './components/SystemAuditLogModal.tsx';
+
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
   {
@@ -140,7 +143,20 @@ export default function App() {
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
   const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED'>('INVENTORY');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED' | 'AUDIT_LOG'>('INVENTORY');
+
+  // System Audit Log state
+  const [auditLogs, setAuditLogs] = useState<SystemAuditLogEntry[]>(() => {
+    const saved = localStorage.getItem('cns_system_audit_logs_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch { /* fallback */ }
+    }
+    return INITIAL_SYSTEM_AUDIT_LOGS;
+  });
+  const [isAuditLogModalOpen, setIsAuditLogModalOpen] = useState(false);
 
   // Dispatched & Deployed Equipment Registry state
   const [dispatchedRecords, setDispatchedRecords] = useState<DispatchedRecord[]>(() => {
@@ -229,6 +245,7 @@ export default function App() {
   const usageSlipsRef = useRef<UsageSlip[]>([]);
   const dispatchedRecordsRef = useRef<DispatchedRecord[]>([]);
   const categoriesRef = useRef<string[]>([]);
+  const auditLogsRef = useRef<SystemAuditLogEntry[]>([]);
 
   useEffect(() => {
     inventoryRef.current = inventory;
@@ -245,6 +262,10 @@ export default function App() {
   useEffect(() => {
     categoriesRef.current = categories;
   }, [categories]);
+
+  useEffect(() => {
+    auditLogsRef.current = auditLogs;
+  }, [auditLogs]);
 
   useEffect(() => {
     syncConfigRef.current = syncConfig;
@@ -396,6 +417,77 @@ export default function App() {
       console.warn('LocalStorage save error:', err);
     }
   };
+
+  const saveAuditLogsLocally = (newLogs: SystemAuditLogEntry[]) => {
+    setAuditLogs(newLogs);
+    try {
+      localStorage.setItem('cns_system_audit_logs_v1', JSON.stringify(newLogs));
+    } catch (err) {
+      console.warn('Audit logs save error:', err);
+    }
+  };
+
+  const addSystemAuditLog = (
+    actionType: AuditActionType,
+    actionTitle: string,
+    details: string,
+    target?: {
+      id?: string;
+      name?: string;
+      sn?: string;
+      category?: string;
+      prevData?: string;
+      newData?: string;
+    }
+  ) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('vi-VN');
+    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const timestamp = `${dateStr} ${timeStr}`;
+
+    const currentActorUser = currentUsername || 'guest';
+    const matchedUser = users.find(u => u.username.toLowerCase() === currentActorUser.toLowerCase());
+
+    const newLogEntry: SystemAuditLogEntry = {
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp,
+      actionType,
+      actionTitle,
+      performedBy: currentActorUser,
+      performedByName: matchedUser?.fullName || (role === 'admin' ? 'Quản Trị Viên' : 'Kiểm Kê Viên'),
+      userRole: role || 'guest',
+      targetId: target?.id,
+      targetName: target?.name,
+      targetSN: target?.sn,
+      targetCategory: target?.category,
+      details,
+      prevData: target?.prevData,
+      newData: target?.newData,
+      ipAddress: '192.168.1.45 (Trạm Kỹ Thuật Đội Thông Tin)',
+    };
+
+    const updated = [newLogEntry, ...auditLogsRef.current];
+    saveAuditLogsLocally(updated);
+  };
+
+  const handleClearAuditLogs = () => {
+    if (role !== 'admin') {
+      addToast('Chỉ Quản trị viên mới có quyền dọn dẹp nhật ký hệ thống!', 'error');
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'DỌN DẸP / XÓA TOÀN BỘ NHẬT KÝ',
+      message: 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử nhật ký kiểm toán hệ thống? Hành động này sẽ làm mới danh sách nhật ký.',
+      onConfirm: () => {
+        saveAuditLogsLocally([]);
+        addToast('Đã dọn dẹp sạch toàn bộ nhật ký hệ thống!', 'info');
+        setConfirmDialog(null);
+      }
+    });
+  };
+
 
   const handleManualSaveLocalStorage = () => {
     try {
@@ -552,6 +644,12 @@ export default function App() {
         addToast(`Xin chào ${matchedUser.fullName} (Kiểm kê viên)! Đăng nhập thành công.`, 'success');
       }
       playScanBeep(1000, 0.15);
+
+      addSystemAuditLog(
+        'AUTH_LOGIN',
+        'Đăng nhập hệ thống',
+        `Tài khoản @${matchedUser.username} (${matchedUser.fullName}) đăng nhập thành công với vai trò ${matchedUser.role === 'admin' ? 'Super Admin' : 'Kiểm Kê Viên'}.`
+      );
     } else {
       setLoginError('Tài khoản hoặc mật khẩu không chính xác!');
       playScanBeep(300, 0.25);
@@ -618,6 +716,7 @@ export default function App() {
     }
 
     if (editingItemId) {
+      const existingItem = inventory.find(i => i.id === editingItemId);
       const updated = inventory.map(item => {
         if (item.id === editingItemId) {
           return {
@@ -636,6 +735,20 @@ export default function App() {
       saveInventoryLocally(updated);
       addToast('Cập nhật dữ liệu thiết bị thành công!', 'success');
       playScanBeep(900, 0.1);
+
+      addSystemAuditLog(
+        'ITEM_UPDATE',
+        'Chỉnh sửa thông tin thiết bị',
+        `Cập nhật thiết bị "${formName.trim()}": Kho ${formWarehouse.trim().toUpperCase()}, Vị trí ${formLoc.trim()}, SL ${formQty}, Loại ${formCategory}`,
+        {
+          id: editingItemId,
+          name: formName.trim(),
+          sn: formSn.trim(),
+          category: formCategory,
+          prevData: `SL: ${existingItem?.qty || 1} | Kho: ${existingItem?.warehouse || 'Chưa gán'} | Vị trí: ${existingItem?.loc || 'Chưa gán'}`,
+          newData: `SL: ${formQty} | Kho: ${formWarehouse.trim().toUpperCase()} | Vị trí: ${formLoc.trim()}`
+        }
+      );
 
       const newQtyNum = Number(formQty) || 0;
       if (newQtyNum <= 1) {
@@ -667,6 +780,19 @@ export default function App() {
       addToast('Đã thêm thiết bị mới vào kho thành công!', 'success');
       playScanBeep(880, 0.15);
 
+      addSystemAuditLog(
+        'ITEM_CREATE',
+        'Thêm mới thiết bị vào kho',
+        `Nhập mới thiết bị "${formName.trim()}" (S/N: ${formSn.trim()}, P/N: ${formPn.trim() || 'N/A'}, SL: ${formQty}) tại Kho ${formWarehouse.trim().toUpperCase()}`,
+        {
+          id: newItem.id,
+          name: newItem.name,
+          sn: newItem.sn,
+          category: newItem.category,
+          newData: `SL: ${newItem.qty} | Kho: ${newItem.warehouse} | Vị trí: ${newItem.loc}`
+        }
+      );
+
       const newQtyNum = Number(formQty) || 0;
       if (newQtyNum <= 1) {
         setTimeout(() => {
@@ -691,6 +817,20 @@ export default function App() {
         saveInventoryLocally(nextInv);
         addToast('Đã xóa thiết bị khỏi cơ sở dữ liệu.', 'success');
         playScanBeep(400, 0.3);
+
+        addSystemAuditLog(
+          'ITEM_DELETE',
+          'Xóa thiết bị khỏi kho',
+          `Xóa vĩnh viễn thiết bị "${item.name}" (S/N: ${item.sn}, SL: ${item.qty}) khỏi hệ thống quản lý`,
+          {
+            id: item.id,
+            name: item.name,
+            sn: item.sn,
+            category: item.category,
+            prevData: `Tồn kho trước khi xóa: ${item.qty} ${item.loc ? `(${item.loc})` : ''}`
+          }
+        );
+
         setConfirmDialog(null);
       }
     });
@@ -722,6 +862,20 @@ export default function App() {
     saveInventoryLocally(updated);
     addToast(`Đã cập nhật trạng thái cho S/N: ${item.sn}`, 'success');
     playScanBeep(nextStatus === 'OK' ? 950 : 350, 0.12);
+
+    addSystemAuditLog(
+      'INVENTORY_AUDIT',
+      'Kiểm kê nhanh trên danh sách',
+      `Đánh dấu trạng thái "${nextStatus === 'OK' ? 'ĐỦ / TỐT (OK)' : (nextStatus === 'MISSING' ? 'THIẾU / HỎNG' : 'CHƯA KIỂM')}" cho thiết bị "${item.name}" (S/N: ${item.sn})`,
+      {
+        id: item.id,
+        name: item.name,
+        sn: item.sn,
+        category: item.category,
+        prevData: `Trạng thái: ${item.auditStatus || 'Chưa kiểm'}`,
+        newData: `Trạng thái: ${nextStatus || 'Chưa kiểm'}`
+      }
+    );
   };
 
   const handleResetAuditStatus = () => {
@@ -739,6 +893,13 @@ export default function App() {
         saveInventoryLocally(reseted);
         addToast('Đã đặt toàn bộ thiết bị về trạng thái Chưa Kiểm kê.', 'info');
         playScanBeep(300, 0.4);
+
+        addSystemAuditLog(
+          'INVENTORY_AUDIT',
+          'Đặt lại toàn bộ trạng thái kiểm kê',
+          `Đặt toàn bộ ${inventory.length} thiết bị về trạng thái Chưa Kiểm Kê.`
+        );
+
         setConfirmDialog(null);
       }
     });
@@ -789,6 +950,20 @@ export default function App() {
     saveInventoryLocally(updated);
     playScanBeep(status === 'OK' ? 1047 : 330, 0.16);
     addToast(`Quét thành công! Thiết bị đã được đánh dấu ${status === 'OK' ? 'ĐỦ' : 'THIẾU'}.`, 'success');
+
+    const firstMatched = updated[matchingItemsIdx[0]];
+    addSystemAuditLog(
+      'INVENTORY_AUDIT',
+      'Quét mã QR / Barcode kiểm kê',
+      `Quét mã "${cleanCode}" xác nhận trạng thái ${status === 'OK' ? 'ĐẠT CHUẨN (OK)' : 'CẦN XỬ LÝ (THIẾU)'} cho ${matchingItemsIdx.length} thiết bị (vd: ${firstMatched?.name || cleanCode})`,
+      {
+        id: firstMatched?.id,
+        name: firstMatched?.name,
+        sn: firstMatched?.sn,
+        category: firstMatched?.category,
+        newData: `Trạng thái: ${status}`
+      }
+    );
 
     if (syncConfigRef.current.autoSync) {
       setTimeout(() => syncToCloud(), 300);
@@ -970,6 +1145,12 @@ export default function App() {
 
             addToast(`Đã khôi phục ${parsed.length} thiết bị từ backup JSON.`, 'success');
             playScanBeep(1000, 0.25);
+
+            addSystemAuditLog(
+              'DATA_RESTORE',
+              'Khôi phục dữ liệu từ bản sao lưu JSON',
+              `Khôi phục thành công danh sách ${parsed.length} thiết bị từ tệp sao lưu JSON.`
+            );
           } else {
             addToast('Cấu trúc file JSON backup không đúng định dạng!', 'error');
           }
@@ -1165,46 +1346,365 @@ export default function App() {
       addToast('Vui lòng cho phép popup mới!', 'error');
       return;
     }
+
+    const now = new Date();
+    let printDay = String(now.getDate()).padStart(2, '0');
+    let printMonth = String(now.getMonth() + 1).padStart(2, '0');
+    let printYear = String(now.getFullYear());
+
+    if (slip.date) {
+      const match = slip.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (match) {
+        printDay = match[1].padStart(2, '0');
+        printMonth = match[2].padStart(2, '0');
+        printYear = match[3];
+      }
+    }
+
+    const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
+    const giverName = slip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho');
+    const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật';
+    const giverPos = slip.giverPos || 'Kỹ sư phụ trách kho';
+    const receiverName = slip.user || 'Kỹ sư tiếp nhận';
+    const receiverDept = slip.receiverDept || 'Tổ Vận Hành CNS/ATM';
+    const receiverPos = slip.receiverPos || 'Kỹ sư trực ban / Khai thác';
+
     win.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Phiếu Báo Sử Dụng Thiết Bị - ${slip.sn}</title>
+          <meta charset="utf-8" />
+          <title>PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ - ${docNo}</title>
           <style>
-            body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1e293b; margin: 40px; line-height: 1.6; }
-            .header-table { width: 100%; border: none; margin-bottom: 30px; }
-            .header-left { text-align: center; width: 45%; vertical-align: top; font-size: 11px; font-weight: bold; }
-            .header-right { text-align: center; width: 55%; vertical-align: top; font-size: 11px; }
-            .title { text-align: center; font-size: 18px; font-weight: 800; text-transform: uppercase; margin: 30px 0 5px 0; color: #000; }
-            .subtitle { text-align: center; font-size: 12px; font-style: italic; color: #475569; margin-bottom: 30px; }
-            .section-title { font-size: 13px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 4px; margin-bottom: 12px; }
-            .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 20px; font-size: 12.5px; margin-bottom: 15px; }
-            .info-item { display: flex; border-bottom: 1px dashed #cbd5e1; padding-bottom: 3px; }
-            .info-label { font-weight: 600; color: #334155; min-width: 160px; }
-            .info-value { color: #0f172a; font-weight: bold; }
-            .signature-section { margin-top: 50px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; font-size: 12.5px; }
-            .signature-box { font-weight: bold; }
-            .signature-title { margin-bottom: 70px; text-transform: uppercase; font-size: 11.5px; }
+            @page {
+              size: A4 portrait;
+              margin: 15mm 15mm 15mm 20mm;
+            }
+            @media print {
+              html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              color: #000000;
+              line-height: 1.42;
+              font-size: 13pt;
+              background: #ffffff;
+              margin: 0;
+              padding: 0;
+            }
+            .container {
+              width: 100%;
+              max-width: 720px;
+              margin: 0 auto;
+            }
+            .header-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none;
+              margin-bottom: 18px;
+            }
+            .header-table td {
+              border: none;
+              vertical-align: top;
+              padding: 0;
+            }
+            .left-header {
+              width: 46%;
+              text-align: center;
+            }
+            .right-header {
+              width: 54%;
+              text-align: center;
+            }
+            .org-parent {
+              font-size: 10.5pt;
+              text-transform: uppercase;
+              font-weight: normal;
+              margin: 0;
+            }
+            .org-company {
+              font-size: 11pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin: 1px 0;
+            }
+            .org-center {
+              font-size: 11pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin: 1px 0;
+            }
+            .org-dept {
+              font-size: 12pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin: 2px 0 0 0;
+            }
+            .doc-number {
+              font-size: 11.5pt;
+              font-style: italic;
+              margin-top: 6px;
+            }
+            .nat-title {
+              font-size: 11.5pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin: 0;
+            }
+            .nat-subtitle {
+              font-size: 12.5pt;
+              font-weight: bold;
+              margin: 2px 0 0 0;
+            }
+            .date-location {
+              font-size: 12pt;
+              font-style: italic;
+              margin-top: 4px;
+            }
+            .title-box {
+              text-align: center;
+              margin: 22px 0 16px 0;
+            }
+            .main-title {
+              font-size: 16pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin: 0 0 4px 0;
+            }
+            .sub-title {
+              font-size: 11.5pt;
+              font-style: italic;
+              margin: 0;
+            }
+            .section-heading {
+              font-size: 12.5pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin: 14px 0 6px 0;
+            }
+            .info-list {
+              font-size: 12.5pt;
+              line-height: 1.5;
+              margin-bottom: 12px;
+            }
+            .info-row {
+              margin: 4px 0;
+            }
+            .data-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 12px 0 16px 0;
+              font-size: 11.5pt;
+            }
+            .data-table th, .data-table td {
+              border: 1px solid #000000;
+              padding: 6px 6px;
+              vertical-align: middle;
+            }
+            .data-table th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+              text-align: center;
+              text-transform: uppercase;
+              font-size: 11pt;
+            }
+            .data-table td.center {
+              text-align: center;
+            }
+            .data-table td.bold {
+              font-weight: bold;
+            }
+            .data-table td.mono {
+              font-family: 'Courier New', Courier, monospace;
+              font-weight: bold;
+            }
+            .terms-box {
+              font-size: 11.5pt;
+              font-style: italic;
+              line-height: 1.45;
+              margin: 12px 0 18px 0;
+            }
+            .terms-box p {
+              margin: 3px 0;
+            }
+            .signature-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none;
+              margin-top: 22px;
+              page-break-inside: avoid;
+            }
+            .signature-table td {
+              border: none;
+              width: 25%;
+              text-align: center;
+              vertical-align: top;
+              padding: 0 4px;
+            }
+            .sig-role {
+              font-weight: bold;
+              font-size: 11.5pt;
+              text-transform: uppercase;
+              line-height: 1.2;
+            }
+            .sig-note {
+              font-size: 10.5pt;
+              font-style: italic;
+              margin-top: 2px;
+            }
+            .sig-spacing {
+              height: 70px;
+            }
+            .sig-fullname {
+              font-weight: bold;
+              font-size: 12pt;
+              text-transform: uppercase;
+            }
           </style>
         </head>
         <body>
-          <div class="title">PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ</div>
-          <div class="subtitle">(Ngày xuất phiếu: ${slip.date})</div>
-          <div>
-            <div class="section-title">I. Kỹ sư tiếp nhận sử dụng: <strong>${slip.user}</strong></div>
-            <div class="section-title">II. Thiết bị: <strong>${slip.itemName}</strong> (S/N: ${slip.sn}, SL: x${slip.qtyUsed})</div>
-            <div class="section-title">III. Mục đích: <strong>${slip.purpose}</strong> (Vị trí mới: ${slip.targetLocation || 'Hệ thống'})</div>
+          <div class="container">
+            <table class="header-table">
+              <tr>
+                <td class="left-header">
+                  <div class="org-parent">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
+                  <div class="org-company">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+                  <div class="org-center">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
+                  <div class="org-dept"><u>ĐỘI THÔNG TIN CNS/ATM</u></div>
+                  <div class="doc-number">Số: <strong>${docNo}</strong></div>
+                </td>
+                <td class="right-header">
+                  <div class="nat-title">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                  <div class="nat-subtitle"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+                  <div class="date-location">TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}</div>
+                </td>
+              </tr>
+            </table>
+
+            <div class="title-box">
+              <div class="main-title">PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ</div>
+              <div class="sub-title">(V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)</div>
+            </div>
+
+            <div class="section-heading">I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:</div>
+            <div class="info-list">
+              <div class="info-row">
+                <strong>1. Bên Giao (Cấp xuất kho):</strong> ${giverDept}
+              </div>
+              <div class="info-row" style="padding-left: 18px;">
+                - Đại diện: <strong>${giverName}</strong> 
+                &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; 
+                Chức vụ: <strong>${giverPos}</strong>
+              </div>
+              <div class="info-row" style="margin-top: 6px;">
+                <strong>2. Bên Nhận (Tiếp nhận sử dụng):</strong> ${receiverDept}
+              </div>
+              <div class="info-row" style="padding-left: 18px;">
+                - Đại diện: <strong>${receiverName}</strong> 
+                &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; 
+                Chức vụ: <strong>${receiverPos}</strong>
+              </div>
+              <div class="info-row" style="margin-top: 6px;">
+                <strong>3. Thời gian cấp xuất:</strong> ${slip.date}
+              </div>
+              <div class="info-row">
+                <strong>4. Vị trí lắp đặt / Hệ thống đích:</strong> <strong>${slip.targetLocation || 'Hệ thống thiết bị chuyên ngành'}</strong>
+              </div>
+            </div>
+
+            <div class="section-heading">II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ BÀN GIAO:</div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 32px;">STT</th>
+                  <th>Tên Trang Thiết Bị / Vật Tư</th>
+                  <th style="width: 90px;">Chủng Loại</th>
+                  <th style="width: 85px;">Part No.</th>
+                  <th style="width: 105px;">Serial No. (S/N)</th>
+                  <th style="width: 42px;">SL</th>
+                  <th style="width: 48px;">ĐVT</th>
+                  <th style="width: 85px;">Kho Xuất</th>
+                  <th style="width: 85px;">Hiện Trạng</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="center">01</td>
+                  <td class="bold">${slip.itemName}</td>
+                  <td class="center">${slip.category || 'Vật tư CNS'}</td>
+                  <td class="center">${slip.pn || 'N/A'}</td>
+                  <td class="center mono">${slip.sn}</td>
+                  <td class="center bold">${slip.qtyUsed}</td>
+                  <td class="center">${slip.unit || 'Chiếc'}</td>
+                  <td class="center">${slip.warehouse || 'Kho TT'}</td>
+                  <td class="center" style="font-weight: bold;">Tốt (100%)</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="section-heading">III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:</div>
+            <div class="info-list">
+              <div class="info-row">
+                - <strong>Mục đích sử dụng:</strong> ${slip.purpose || 'Thay thế dự phòng / Bảo dưỡng định kỳ'}
+              </div>
+              <div class="info-row">
+                - <strong>Ghi chú & Tham số kỹ thuật:</strong> ${slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định trước khi đưa vào vận hành.'}
+              </div>
+            </div>
+
+            <div class="section-heading">IV. TRÁCH NHIỆM & QUY ĐỊNH BẢO QUẢN:</div>
+            <div class="terms-box">
+              <p>1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không quy định.</p>
+              <p>2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời cho Phụ trách kho và Lãnh đạo Đội để lập biên bản xử lý cập nhật hệ thống.</p>
+              <p>3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị tiếp nhận sử dụng.</p>
+            </div>
+
+            <table class="signature-table">
+              <tr>
+                <td>
+                  <div class="sig-role">KỸ SƯ TIẾP NHẬN</div>
+                  <div class="sig-note">(Ký, ghi rõ họ tên)</div>
+                  <div class="sig-spacing"></div>
+                  <div class="sig-fullname">${receiverName}</div>
+                </td>
+                <td>
+                  <div class="sig-role">NGƯỜI LẬP PHIẾU</div>
+                  <div class="sig-note">(Ký, ghi rõ họ tên)</div>
+                  <div class="sig-spacing"></div>
+                  <div class="sig-fullname">${giverName}</div>
+                </td>
+                <td>
+                  <div class="sig-role">PHỤ TRÁCH KHO</div>
+                  <div class="sig-note">(Ký, ghi rõ họ tên)</div>
+                  <div class="sig-spacing"></div>
+                  <div class="sig-fullname">...............................</div>
+                </td>
+                <td>
+                  <div class="sig-role">LÃNH ĐẠO ĐỘI</div>
+                  <div class="sig-note">(Ký, đóng dấu duyệt)</div>
+                  <div class="sig-spacing"></div>
+                  <div class="sig-fullname">...............................</div>
+                </td>
+              </tr>
+            </table>
           </div>
-          <div class="signature-section">
-            <div class="signature-box"><div class="signature-title">Người lập phiếu</div><div>${role ? role.toUpperCase() : 'Guest'}</div></div>
-            <div class="signature-box"><div class="signature-title">Kỹ sư nhận</div><div>${slip.user}</div></div>
-            <div class="signature-box"><div class="signature-title">Đội Trưởng Duyệt</div><div>Phê duyệt</div></div>
-          </div>
-          <script>window.onload = function() { window.print(); }<\/script>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+            };
+          <\/script>
         </body>
       </html>
     `);
     win.document.close();
-    addToast(`Đã xuất phiếu sử dụng ${slip.sn}!`, 'success');
+    addToast(`Đã xuất phiếu báo sử dụng chuẩn form (${slip.sn})!`, 'success');
   };
 
   const handleSubmitUsage = (newSlip: UsageSlip, deductInv: boolean) => {
@@ -1216,23 +1716,23 @@ export default function App() {
     const newDispatchRecord: DispatchedRecord = {
       id: `disp-u-${Date.now()}`,
       type: 'USAGE_SLIP',
-      docNumber: `PB-${new Date().getFullYear()}/${String(dispatchedRecords.length + 1).padStart(3, '0')}`,
+      docNumber: newSlip.docNumber || `PBSD-${new Date().getFullYear()}/${String(dispatchedRecords.length + 1).padStart(3, '0')}`,
       itemId: newSlip.itemId,
       itemName: newSlip.itemName,
       category: newSlip.category,
       sn: newSlip.sn,
       pn: newSlip.pn,
       qty: newSlip.qtyUsed,
-      unit: 'Bộ',
+      unit: newSlip.unit || 'Chiếc',
       date: newSlip.date,
       warehouse: newSlip.warehouse,
       originalLoc: newSlip.originalLoc,
-      giverDept: 'Đội Thông Tin – TT BĐKT',
-      giverName: currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho',
-      giverPos: 'Kỹ sư quản lý kho',
-      receiverDept: 'Tổ Vận Hành CNS/ATM',
+      giverDept: newSlip.giverDept || 'Đội Thông Tin – TT BĐKT',
+      giverName: newSlip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho'),
+      giverPos: newSlip.giverPos || 'Kỹ sư quản lý kho',
+      receiverDept: newSlip.receiverDept || 'Tổ Vận Hành CNS/ATM',
       receiverName: newSlip.user,
-      receiverPos: 'Kỹ sư tiếp nhận',
+      receiverPos: newSlip.receiverPos || 'Kỹ sư tiếp nhận',
       targetLocation: newSlip.targetLocation || 'Hệ thống thiết bị Đài/Trạm',
       purpose: newSlip.purpose,
       notes: newSlip.notes,
@@ -1272,6 +1772,21 @@ export default function App() {
 
     playScanBeep(1000, 0.2);
     addToast('Đã đăng ký phiếu sử dụng & tổng hợp vào Sổ Theo Dõi!', 'success');
+
+    addSystemAuditLog(
+      'USAGE_DISPATCH',
+      'Xuất phiếu báo sử dụng thiết bị',
+      `Xuất x${newSlip.qtyUsed} bộ "${newSlip.itemName}" (S/N: ${newSlip.sn || 'N/A'}) cho ${newSlip.user} tại vị trí: ${newSlip.targetLocation || 'Hệ thống'}. Mục đích: ${newSlip.purpose}`,
+      {
+        id: newSlip.itemId,
+        name: newSlip.itemName,
+        sn: newSlip.sn,
+        category: newSlip.category,
+        prevData: `Tồn kho trước: ${selectedItemForUsage?.qty || 0}`,
+        newData: `Tồn kho sau: ${Math.max(0, (selectedItemForUsage?.qty || 0) - (deductInv ? newSlip.qtyUsed : 0))}`
+      }
+    );
+
     setSelectedItemForUsage(null);
     setTimeout(() => handlePrintUsageSlip(newSlip), 500);
   };
@@ -1341,6 +1856,16 @@ export default function App() {
     }
 
     addToast(`Đã lưu ${newRecords.length} thiết bị bàn giao vào Sổ Tổng Hợp Theo Dõi!`, 'success');
+
+    addSystemAuditLog(
+      'HANDOVER_CREATE',
+      'Lập biên bản bàn giao thiết bị',
+      `Bàn giao ${handoverRows.length} mục thiết bị theo Biên Bản số ${handoverNo} cho ${handoverReceiverName} (${handoverReceiverDept}) tại ${handoverLocation}. Lý do: ${handoverReason}`,
+      {
+        name: `Biên bản bàn giao ${handoverNo}`,
+        newData: `Bàn giao ${handoverRows.length} thiết bị: ${handoverRows.map(r => `${r.name} (x${r.qty})`).join(', ')}`
+      }
+    );
   };
 
   // Return equipment to stock from dispatched registry
@@ -1425,6 +1950,19 @@ export default function App() {
     setSelectedDispatchedForReturn(null);
     playScanBeep(800, 0.2);
     addToast(`Đã thu hồi & hoàn kho x${returnQty} "${targetRecord.itemName}" thành công!`, 'success');
+
+    addSystemAuditLog(
+      'STOCK_RETURN',
+      'Thu hồi hoàn kho thiết bị',
+      `Thu hồi hoàn kho x${returnQty} "${targetRecord.itemName}" (S/N: ${targetRecord.sn}) từ ${targetRecord.receiverName || targetRecord.targetLocation}. Tình trạng: ${returnCondition}. Người nhận bàn giao lại: ${returnRecipient}`,
+      {
+        id: targetRecord.itemId,
+        name: targetRecord.itemName,
+        sn: targetRecord.sn,
+        category: targetRecord.category,
+        newData: `Đã nhập lại kho x${returnQty} | Tình trạng: ${returnCondition}`
+      }
+    );
   };
 
   // Delete a dispatched record
@@ -1441,6 +1979,19 @@ export default function App() {
         setDispatchedRecords(next);
         localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(next));
         addToast('Đã xóa hồ sơ khỏi Sổ Theo Dõi!', 'success');
+
+        addSystemAuditLog(
+          'ITEM_DELETE',
+          'Xóa hồ sơ theo dõi bàn giao',
+          `Xóa hồ sơ bàn giao/sử dụng của thiết bị "${record.itemName}" (S/N: ${record.sn}, Mã số: ${record.docNumber}) khỏi Sổ Theo Dõi.`,
+          {
+            id: record.id,
+            name: record.itemName,
+            sn: record.sn,
+            category: record.category
+          }
+        );
+
         setConfirmDialog(null);
       }
     });
@@ -1451,6 +2002,7 @@ export default function App() {
     if (record.type === 'USAGE_SLIP') {
       const slip: UsageSlip = {
         id: record.id,
+        docNumber: record.docNumber,
         itemId: record.itemId,
         itemName: record.itemName,
         sn: record.sn,
@@ -1460,10 +2012,16 @@ export default function App() {
         originalLoc: record.originalLoc,
         user: record.receiverName,
         qtyUsed: record.qty,
+        unit: record.unit,
         purpose: record.purpose,
         notes: record.notes,
         targetLocation: record.targetLocation,
-        date: record.date
+        date: record.date,
+        giverDept: record.giverDept,
+        giverName: record.giverName,
+        giverPos: record.giverPos,
+        receiverDept: record.receiverDept,
+        receiverPos: record.receiverPos
       };
       handlePrintUsageSlip(slip);
     } else {
@@ -1918,6 +2476,18 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setIsAuditLogModalOpen(true)}
+                className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-bold text-xs"
+                title="Nhật Ký Kiểm Toán Hệ Thống (System Audit Log)"
+              >
+                <Activity className="w-4 h-4 text-indigo-500" />
+                <span className="hidden sm:inline">Nhật Ký</span>
+                <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                  {auditLogs.length}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer"
                 title="Cấu hình Google Apps Script & Bộ nhớ"
@@ -2165,11 +2735,11 @@ export default function App() {
 
           {/* Primary Workspace Navigation Tabs */}
           <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 rounded-[2.2rem] border border-slate-200/80 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setActiveWorkspaceTab('INVENTORY')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                   activeWorkspaceTab === 'INVENTORY'
                     ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md shadow-slate-200 dark:shadow-none'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -2189,7 +2759,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveWorkspaceTab('DISPATCHED')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                   activeWorkspaceTab === 'DISPATCHED'
                     ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-md shadow-slate-200 dark:shadow-none'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -2205,13 +2775,35 @@ export default function App() {
                   {dispatchedRecords.length} hồ sơ
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveWorkspaceTab('AUDIT_LOG')}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeWorkspaceTab === 'AUDIT_LOG'
+                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-md shadow-slate-200 dark:shadow-none'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Activity className="w-4.5 h-4.5 text-amber-500" />
+                <span>NHẬT KÝ HỆ THỐNG</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  activeWorkspaceTab === 'AUDIT_LOG'
+                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {auditLogs.length} logs
+                </span>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 px-2">
               <span className="text-[11px] font-bold text-slate-400 hidden xl:inline">
                 {activeWorkspaceTab === 'INVENTORY' 
                   ? 'Quản lý hiện vật lưu kho, quét mã kiểm kê & tem nhãn'
-                  : 'Sổ tổng hợp theo dõi trang thiết bị đã đưa ra ngoài hệ thống vận hành'}
+                  : (activeWorkspaceTab === 'DISPATCHED'
+                      ? 'Sổ tổng hợp theo dõi trang thiết bị đã đưa ra ngoài hệ thống vận hành'
+                      : 'Lịch sử kiểm toán, ghi nhận thao tác người dùng và mốc thời gian')}
               </span>
             </div>
           </div>
@@ -2250,6 +2842,17 @@ export default function App() {
                     setHandoverRows(initialRows);
                   }
                 }}
+              />
+            </div>
+          ) : activeWorkspaceTab === 'AUDIT_LOG' ? (
+            /* SYSTEM AUDIT LOG WORKSPACE VIEW */
+            <div className="mt-6">
+              <SystemAuditLogView
+                logs={auditLogs}
+                role={role}
+                currentUsername={currentUsername || 'guest'}
+                onClearLogs={handleClearAuditLogs}
+                onAddToast={addToast}
               />
             </div>
           ) : (
@@ -2815,6 +3418,18 @@ export default function App() {
         users={users}
         onUpdateUsers={handleUpdateUsers}
         currentUsername={currentUsername || 'admin'}
+        onOpenAuditLog={() => setIsAuditLogModalOpen(true)}
+      />
+
+      {/* System Audit Log Center Modal */}
+      <SystemAuditLogModal
+        isOpen={isAuditLogModalOpen}
+        onClose={() => setIsAuditLogModalOpen(false)}
+        logs={auditLogs}
+        role={role}
+        currentUsername={currentUsername || 'guest'}
+        onClearLogs={handleClearAuditLogs}
+        onAddToast={addToast}
       />
 
       {/* Print Preview & Options Center Modal */}

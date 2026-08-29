@@ -1,4 +1,4 @@
-import { InventoryItem, DispatchedRecord } from './types.ts';
+import { InventoryItem, DispatchedRecord, SystemAuditLogEntry } from './types.ts';
 import imgVhf from './assets/images/vhf_transceiver_rack_1787736640747.jpg';
 import imgVccs from './assets/images/vccs_switch_module_1787736655148.jpg';
 import imgGps from './assets/images/gps_ntp_server_1787736673535.jpg';
@@ -398,3 +398,117 @@ export const INITIAL_DISPATCHED_RECORDS: DispatchedRecord[] = [
     returnNote: 'Thiết bị hoạt động hoàn hảo sau kiểm thử, đã niêm phong lưu kho.'
   }
 ];
+
+export const INITIAL_SYSTEM_AUDIT_LOGS: SystemAuditLogEntry[] = [
+  {
+    id: 'log-101',
+    timestamp: '29/08/2026 11:20:15',
+    actionType: 'USAGE_DISPATCH',
+    actionTitle: 'Xuất phiếu báo sử dụng thiết bị',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    targetId: 'cns-01',
+    targetName: 'Khối máy phát VHF AM Jotron TA-7650',
+    targetCategory: 'VHF AM',
+    targetSN: 'JT2024-88410',
+    details: 'Đăng ký xuất x1 Bộ theo Phiếu Báo số PB-2026/089 cho KS. Lê Hoàng Long. Vị trí lắp đặt: Đài Kiểm Soát Tiếp Cận TACC.',
+    prevData: 'Tồn kho: 3 Bộ',
+    newData: 'Tồn kho: 2 Bộ (Đã trừ 1)',
+    ipAddress: '192.168.1.45 (Máy Trạm Kỹ Thuật Đội Thông Tin)'
+  },
+  {
+    id: 'log-102',
+    timestamp: '28/08/2026 15:40:22',
+    actionType: 'HANDOVER_CREATE',
+    actionTitle: 'Lập biên bản bàn giao thiết bị',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    targetId: 'disp-02',
+    targetName: 'Máy phát/thu VHF AM R&S Series 4200 (Biên bản 112/KT-BG)',
+    targetCategory: 'VHF AM',
+    targetSN: 'RS2023-55912',
+    details: 'Bàn giao x1 Bộ cho Tổ Kỹ thuật Không lưu - Đài KSV TACC (Đại diện: Trần Quốc Toản). Lý do: Đảm bảo tần số 120.1MHz.',
+    ipAddress: '192.168.1.45 (Trạm Kỹ Thuật TACC)'
+  },
+  {
+    id: 'log-103',
+    timestamp: '26/08/2026 08:45:10',
+    actionType: 'INVENTORY_AUDIT',
+    actionTitle: 'Kiểm kê định kỳ & quét mã QR',
+    performedBy: 'guest',
+    performedByName: 'Kỹ sư Kiểm kê',
+    userRole: 'guest',
+    targetId: 'cns-02',
+    targetName: 'Khối máy thu VHF AM Jotron RA-7203',
+    targetCategory: 'VHF AM',
+    targetSN: 'JT2024-77312',
+    details: 'Xác nhận trạng thái OK sau khi quét tem QR tại Tủ A1 - Ngăn 2. Ghi chú: Độ nhạy thu tốt, Squelch hoạt động chuẩn.',
+    prevData: 'Trạng thái: Chưa kiểm',
+    newData: 'Trạng thái: ĐẠT CHUẨN (OK)',
+    ipAddress: '192.168.1.88 (Mobile App Barcode Scanner)'
+  },
+  {
+    id: 'log-104',
+    timestamp: '25/08/2026 14:15:30',
+    actionType: 'ITEM_UPDATE',
+    actionTitle: 'Cập nhật thông số kỹ thuật thiết bị',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    targetId: 'cns-03',
+    targetName: 'Bộ chuyển mạch thoại VCCS Frequentis VCS3020X Card IP',
+    targetCategory: 'VCCS',
+    targetSN: 'FQ-8921-0044',
+    details: 'Cập nhật vị trí lưu kho: Chuyển từ "Kệ tạm" sang "Tủ B2 - Ngăn 3". Bổ sung mã P/N: VCS3020X-IPB.',
+    prevData: 'Vị trí: Kệ tạm | P/N: N/A',
+    newData: 'Vị trí: Tủ B2 - Ngăn 3 | P/N: VCS3020X-IPB',
+    ipAddress: '192.168.1.45'
+  },
+  {
+    id: 'log-105',
+    timestamp: '22/08/2026 09:10:05',
+    actionType: 'ITEM_CREATE',
+    actionTitle: 'Thêm mới thiết bị vào kho lưu trữ',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    targetId: 'cns-05',
+    targetName: 'Máy chủ đồng bộ thời gian Meinberg LANTIME M300 GPS',
+    targetCategory: 'GPS & Ăng-ten',
+    targetSN: 'MB2024-11094',
+    details: 'Nhập kho thiết bị mới theo gói dự án nâng cấp hệ thống đồng bộ thời gian GPS/NTP. Số lượng: 2 Bộ tại KHO-GPS-01 (Tủ C1 - Ngăn 1).',
+    newData: 'SL: 2 | Kho: KHO-GPS-01 | SN: MB2024-11094',
+    ipAddress: '192.168.1.45'
+  },
+  {
+    id: 'log-106',
+    timestamp: '18/08/2026 16:20:45',
+    actionType: 'STOCK_RETURN',
+    actionTitle: 'Thu hồi hoàn kho thiết bị từ hệ thống',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    targetId: 'cns-06',
+    targetName: 'Bộ chia tín hiệu RF Cavity Filter VHF 118-137MHz',
+    targetCategory: 'VHF AM',
+    targetSN: 'FL2022-00823',
+    details: 'Thu hồi hoàn trả x1 Bộ từ KS. Đặng Việt Cường (Phòng Thí Nghiệm Lab CNS). Tình trạng: Tốt, hoạt động hoàn hảo sau kiểm thử.',
+    prevData: 'Tồn kho: 0',
+    newData: 'Tồn kho: 1 (Đã hoàn kho)',
+    ipAddress: '192.168.1.45'
+  },
+  {
+    id: 'log-107',
+    timestamp: '15/08/2026 08:00:12',
+    actionType: 'AUTH_LOGIN',
+    actionTitle: 'Đăng nhập phiên làm việc Quản trị viên',
+    performedBy: 'admin',
+    performedByName: 'KS. Nguyễn Văn Khải',
+    userRole: 'admin',
+    details: 'Đăng nhập thành công vào Hệ Thống Quản Lý Kho & Vật Tư Kỹ Thuật CNS/ATM.',
+    ipAddress: '192.168.1.45 (Máy Trạm Kỹ Thuật Đội Thông Tin)'
+  }
+];
+

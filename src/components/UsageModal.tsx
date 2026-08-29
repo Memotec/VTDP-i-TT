@@ -28,12 +28,20 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   onPrintSlip
 }) => {
   // Usage form state
+  const [usageDocNumber, setUsageDocNumber] = useState(() => `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`);
   const [usageUser, setUsageUser] = useState(role === 'admin' ? 'Kỹ sư Đội Thông Tin' : 'Kỹ sư ' + (role || 'Guest'));
+  const [usageReceiverDept, setUsageReceiverDept] = useState('Tổ Vận Hành CNS/ATM');
+  const [usageReceiverPos, setUsageReceiverPos] = useState('Kỹ sư trực ban');
+  const [usageGiverName, setUsageGiverName] = useState(role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Admin Kho');
+  const [usageGiverDept, setUsageGiverDept] = useState('Đội Thông Tin – Trung tâm BĐKT');
+  const [usageGiverPos, setUsageGiverPos] = useState('Kỹ sư phụ trách kho');
   const [usageQty, setUsageQty] = useState(1);
+  const [usageUnit, setUsageUnit] = useState('Chiếc');
   const [usagePurpose, setUsagePurpose] = useState('Bảo dưỡng định kỳ / Thay thế dự phòng');
   const [usageNotes, setUsageNotes] = useState('');
   const [usageTargetLoc, setUsageTargetLoc] = useState('');
   const [deductInventory, setDeductInventory] = useState(true);
+  const [showAdvancedFields, setShowAdvancedFields] = useState(false);
 
   // History search state
   const [usageSearchQuery, setUsageSearchQuery] = useState('');
@@ -46,6 +54,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     const todayStr = new Date().toLocaleString('vi-VN');
     const newSlip: UsageSlip = {
       id: `slip-${Date.now()}`,
+      docNumber: usageDocNumber.trim() || `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`,
       itemId: selectedItemForUsage.id,
       itemName: selectedItemForUsage.name,
       sn: selectedItemForUsage.sn,
@@ -55,6 +64,12 @@ export const UsageModal: React.FC<UsageModalProps> = ({
       originalLoc: selectedItemForUsage.loc || '',
       user: usageUser.trim(),
       qtyUsed: usageQty,
+      unit: usageUnit.trim() || 'Chiếc',
+      giverDept: usageGiverDept.trim(),
+      giverName: usageGiverName.trim(),
+      giverPos: usageGiverPos.trim(),
+      receiverDept: usageReceiverDept.trim(),
+      receiverPos: usageReceiverPos.trim(),
       purpose: usagePurpose,
       notes: usageNotes.trim(),
       targetLocation: usageTargetLoc.trim(),
@@ -114,24 +129,39 @@ export const UsageModal: React.FC<UsageModalProps> = ({
             </div>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
-                  Kỹ sư thực hiện tiếp nhận *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={usageUser}
-                  onChange={(e) => setUsageUser(e.target.value)}
-                  placeholder="Nhập tên kỹ sư nhận bàn giao"
-                  className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
-                    Số lượng sử dụng *
+                    Số hiệu phiếu xuất
+                  </label>
+                  <input
+                    type="text"
+                    value={usageDocNumber}
+                    onChange={(e) => setUsageDocNumber(e.target.value)}
+                    placeholder="VD: PBSD-2026/025"
+                    className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 text-xs text-slate-800 dark:text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
+                    Kỹ sư tiếp nhận sử dụng *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={usageUser}
+                    onChange={(e) => setUsageUser(e.target.value)}
+                    placeholder="Họ tên kỹ sư nhận"
+                    className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
+                    Số lượng xuất ({usageUnit}) *
                   </label>
                   <div className="relative">
                     <input
@@ -141,17 +171,25 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                       max={selectedItemForUsage.qty}
                       value={usageQty}
                       onChange={(e) => setUsageQty(Math.min(selectedItemForUsage.qty, Math.max(1, parseInt(e.target.value) || 1)))}
-                      className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 pl-4 pr-12 py-3 text-xs text-slate-800 dark:text-white font-bold focus:outline-none focus:border-amber-500"
+                      className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 pl-3.5 pr-14 py-2.5 text-xs text-slate-800 dark:text-white font-bold focus:outline-none focus:border-amber-500"
                     />
-                    <span className="absolute right-4 top-3 text-[11px] text-slate-400 font-extrabold uppercase">
-                      Chiếc
-                    </span>
+                    <select
+                      value={usageUnit}
+                      onChange={(e) => setUsageUnit(e.target.value)}
+                      className="absolute right-1 top-1.5 bottom-1.5 bg-slate-100 dark:bg-slate-700 text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 rounded-xl px-1.5 focus:outline-none cursor-pointer"
+                    >
+                      <option value="Chiếc">Chiếc</option>
+                      <option value="Bộ">Bộ</option>
+                      <option value="Card">Card</option>
+                      <option value="Khay">Khay</option>
+                      <option value="Cái">Cái</option>
+                    </select>
                   </div>
-                  <div className="flex gap-1.5 mt-1.5">
+                  <div className="flex gap-1.5 mt-1">
                     <button
                       type="button"
                       onClick={() => setUsageQty(1)}
-                      className="text-[10px] font-bold px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
+                      className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
                     >
                       x1
                     </button>
@@ -159,7 +197,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setUsageQty(2)}
-                        className="text-[10px] font-bold px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
+                        className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
                       >
                         x2
                       </button>
@@ -168,7 +206,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setUsageQty(selectedItemForUsage.qty)}
-                        className="text-[10px] font-bold px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
+                        className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer"
                       >
                         Max
                       </button>
@@ -178,17 +216,72 @@ export const UsageModal: React.FC<UsageModalProps> = ({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
-                    Địa điểm lắp đặt mới *
+                    Vị trí lắp đặt / Hệ thống *
                   </label>
                   <input
                     type="text"
                     required
                     value={usageTargetLoc}
                     onChange={(e) => setUsageTargetLoc(e.target.value)}
-                    placeholder="Ví dụ: Phòng máy ATM / Đài KSV"
-                    className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold"
+                    placeholder="VD: Phòng máy ATM / Đài KSV"
+                    className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold"
                   />
                 </div>
+              </div>
+
+              {/* Collapsible Administrative Section */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedFields(!showAdvancedFields)}
+                  className="w-full flex items-center justify-between text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase cursor-pointer hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <span>Thông tin hành chính & chữ ký phiếu</span>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-900">
+                    {showAdvancedFields ? 'Thu gọn ▲' : 'Mở rộng chi tiết ▼'}
+                  </span>
+                </button>
+
+                {showAdvancedFields && (
+                  <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <div className="space-y-1">
+                      <label className="text-[9.5px] font-bold text-slate-400 uppercase block">Đơn vị nhận</label>
+                      <input
+                        type="text"
+                        value={usageReceiverDept}
+                        onChange={(e) => setUsageReceiverDept(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9.5px] font-bold text-slate-400 uppercase block">Chức vụ người nhận</label>
+                      <input
+                        type="text"
+                        value={usageReceiverPos}
+                        onChange={(e) => setUsageReceiverPos(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9.5px] font-bold text-slate-400 uppercase block">Người giao / Kho</label>
+                      <input
+                        type="text"
+                        value={usageGiverName}
+                        onChange={(e) => setUsageGiverName(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9.5px] font-bold text-slate-400 uppercase block">Đơn vị cấp xuất</label>
+                      <input
+                        type="text"
+                        value={usageGiverDept}
+                        onChange={(e) => setUsageGiverDept(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -198,7 +291,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 <select
                   value={usagePurpose}
                   onChange={(e) => setUsagePurpose(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-amber-500 font-semibold resize-none"
+                  className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-amber-500 font-semibold resize-none"
                 >
                   <option value="Thay thế dự phòng khẩn cấp">Thay thế dự phòng khẩn cấp</option>
                   <option value="Bảo dưỡng định kỳ / Sửa chữa căn chỉnh">Bảo dưỡng định kỳ / Sửa chữa căn chỉnh</option>
@@ -217,7 +310,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                   value={usageNotes}
                   onChange={(e) => setUsageNotes(e.target.value)}
                   placeholder="Kiểm tra các tham số kỹ thuật đạt chuẩn trước khi thay thế lắp đặt..."
-                  className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold resize-none"
+                  className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-semibold resize-none"
                 />
               </div>
 
@@ -234,7 +327,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                     Đăng ký cập nhật trừ kho vật tư
                   </span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
-                    Tự động giảm tồn kho thiết bị này và chèn vào nhật ký lịch sử kỹ thuật.
+                    Tự động giảm tồn kho thiết bị này và lưu vào Sổ Theo Dõi Thiết Bị Đã Bàn Giao.
                   </span>
                 </div>
               </label>
@@ -249,10 +342,10 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3 rounded-2xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-500/15"
+                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  Xác nhận & Xuất PDF
+                  <Printer className="w-4 h-4" />
+                  XUẤT IN PHIẾU CHUẨN FORM
                 </button>
               </div>
             </form>

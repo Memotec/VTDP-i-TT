@@ -447,15 +447,18 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
           <table className="audit-national-header">
             <tbody>
               <tr>
-                <td className="audit-header-left" style={{ width: '45%' }}>
+                <td className="audit-header-left" style={{ width: '46%' }}>
                   <div className="audit-org-parent">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
                   <div className="audit-org-child">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
                   <div className="audit-org-dept">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-                  <div className="audit-org-sub">ĐỘI THÔNG TIN CNS/ATM</div>
+                  <div className="audit-org-sub" style={{ textDecoration: 'underline' }}>ĐỘI THÔNG TIN CNS/ATM</div>
+                  <div style={{ fontSize: '11.5px', marginTop: '6px', fontStyle: 'italic' }}>
+                    Số: <strong>{selectedDispatchedRecord.docNumber || `${selectedDispatchedRecord.id.slice(-6)}/PBSD-ĐTT`}</strong>
+                  </div>
                 </td>
-                <td className="audit-header-right" style={{ width: '55%' }}>
+                <td className="audit-header-right" style={{ width: '54%' }}>
                   <div className="audit-motto-country">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                  <div className="audit-motto-desc">Độc lập - Tự do - Hạnh phúc</div>
+                  <div className="audit-motto-desc" style={{ textDecoration: 'underline' }}>Độc lập - Tự do - Hạnh phúc</div>
                   <div className="audit-doc-place">TP. Hồ Chí Minh, ngày {selectedDispatchedRecord.date}</div>
                 </td>
               </tr>
@@ -464,80 +467,102 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
 
           <div className="audit-title-box">
             <h1 className="audit-main-title">
-              {selectedDispatchedRecord.type === 'HANDOVER_DOC' ? 'BIÊN BẢN BÀN GIAO THIẾT BỊ KỸ THUẬT' : 'PHIẾU BÁO SỬ DỤNG THIẾT BỊ VẬT TƯ DỰ PHÒNG'}
+              {selectedDispatchedRecord.type === 'HANDOVER_DOC' ? 'BIÊN BẢN BÀN GIAO THIẾT BỊ KỸ THUẬT' : 'PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ'}
             </h1>
             <div className="audit-sub-title">
-              Số hiệu: <strong>{selectedDispatchedRecord.docNumber || `#${selectedDispatchedRecord.id.slice(-6)}`}</strong>
+              (V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)
             </div>
           </div>
 
           <div className="audit-intro-box">
-            <p><strong>1. THÔNG TIN BÊN GIAO (ĐƠN VỊ CẤP XUẤT):</strong></p>
-            <p>• Đơn vị: <strong>{selectedDispatchedRecord.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật'}</strong></p>
-            <p>• Đại diện: <strong>{selectedDispatchedRecord.giverName || 'Admin / Kỹ sư trực ban'}</strong> {selectedDispatchedRecord.giverPos && `(Chức vụ: ${selectedDispatchedRecord.giverPos})`}</p>
+            <p><strong>I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:</strong></p>
+            <p>• <strong>1. Bên Giao (Cấp xuất kho):</strong> {selectedDispatchedRecord.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật'}</p>
+            <p style={{ paddingLeft: '16px' }}>
+              - Đại diện: <strong>{selectedDispatchedRecord.giverName || inspectorName || 'Kỹ sư Quản trị Kho'}</strong> &nbsp;|&nbsp; 
+              Chức vụ: <strong>{selectedDispatchedRecord.giverPos || 'Kỹ sư quản lý kho'}</strong>
+            </p>
             
-            <p className="mt-2"><strong>2. THÔNG TIN BÊN NHẬN (ĐƠN VỊ TIẾP NHẬN SỬ DỤNG):</strong></p>
-            <p>• Đơn vị: <strong>{selectedDispatchedRecord.receiverDept || 'Tổ Kỹ Thuật Tiếp Nhận Khai Thác'}</strong></p>
-            <p>• Kỹ sư tiếp nhận: <strong>{selectedDispatchedRecord.receiverName}</strong> {selectedDispatchedRecord.receiverPos && `(Chức vụ: ${selectedDispatchedRecord.receiverPos})`}</p>
+            <p className="mt-2">• <strong>2. Bên Nhận (Tiếp nhận sử dụng):</strong> {selectedDispatchedRecord.receiverDept || 'Tổ Vận Hành CNS/ATM'}</p>
+            <p style={{ paddingLeft: '16px' }}>
+              - Đại diện: <strong>{selectedDispatchedRecord.receiverName}</strong> &nbsp;|&nbsp; 
+              Chức vụ: <strong>{selectedDispatchedRecord.receiverPos || 'Kỹ sư trực ban / Khai thác'}</strong>
+            </p>
+            <p className="mt-2">• <strong>3. Vị trí lắp đặt mới / Hệ thống đích:</strong> <strong className="text-black">{selectedDispatchedRecord.targetLocation}</strong></p>
           </div>
 
           <div className="audit-table-container">
-            <div className="audit-table-title">3. DANH MỤC THIẾT BỊ KỸ THUẬT BÀN GIAO / SỬ DỤNG:</div>
+            <div className="audit-table-title">II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ BÀN GIAO:</div>
             <table className="audit-data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '35px' }}>STT</th>
-                  <th>Tên Thiết Bị / Module Kỹ Thuật</th>
-                  <th style={{ width: '100px' }}>Chủng Loại</th>
-                  <th style={{ width: '110px' }}>Part Number</th>
-                  <th style={{ width: '120px' }}>Serial Number</th>
-                  <th style={{ width: '50px' }}>SL</th>
-                  <th>Vị Trí Lắp Đặt Mới</th>
+                  <th style={{ width: '32px' }}>STT</th>
+                  <th>Tên Trang Thiết Bị / Vật Tư</th>
+                  <th style={{ width: '95px' }}>Chủng Loại</th>
+                  <th style={{ width: '90px' }}>Part Number</th>
+                  <th style={{ width: '110px' }}>Serial (S/N)</th>
+                  <th style={{ width: '45px' }}>SL</th>
+                  <th style={{ width: '50px' }}>ĐVT</th>
+                  <th style={{ width: '85px' }}>Kho Xuất</th>
+                  <th style={{ width: '85px' }}>Hiện Trạng</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="text-center font-bold">1</td>
+                  <td className="text-center font-bold">01</td>
                   <td className="font-bold text-left">{selectedDispatchedRecord.itemName}</td>
                   <td className="text-center">{selectedDispatchedRecord.category}</td>
-                  <td className="text-center font-mono">{selectedDispatchedRecord.pn || '-'}</td>
+                  <td className="text-center font-mono">{selectedDispatchedRecord.pn || 'N/A'}</td>
                   <td className="text-center font-mono font-bold">{selectedDispatchedRecord.sn}</td>
-                  <td className="text-center font-bold text-sm">{selectedDispatchedRecord.qty} {selectedDispatchedRecord.unit || 'bộ'}</td>
-                  <td className="text-left font-bold">{selectedDispatchedRecord.targetLocation}</td>
+                  <td className="text-center font-bold">{selectedDispatchedRecord.qty}</td>
+                  <td className="text-center">{selectedDispatchedRecord.unit || 'Chiếc'}</td>
+                  <td className="text-center">{selectedDispatchedRecord.warehouse || 'Kho TT'}</td>
+                  <td className="text-center font-bold">Tốt (100%)</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div className="audit-summary-box">
-            <div className="audit-table-title">4. MỤC ĐÍCH SỬ DỤNG & GHI CHÚ KỸ THUẬT:</div>
+            <div className="audit-table-title">III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:</div>
             <p className="text-xs">
-              • <strong>Mục đích / Lý do:</strong> {selectedDispatchedRecord.purpose}
+              • <strong>Mục đích sử dụng:</strong> {selectedDispatchedRecord.purpose}
             </p>
             {selectedDispatchedRecord.notes && (
               <p className="text-xs mt-1">
                 • <strong>Ghi chú kỹ thuật:</strong> {selectedDispatchedRecord.notes}
               </p>
             )}
-            <p className="text-xs mt-1">
-              • <strong>Cam kết:</strong> Bên nhận cam kết quản lý, vận hành thiết bị đúng quy trình kỹ thuật hàng không và chịu trách nhiệm bảo quản tài sản được giao.
+            <p className="text-xs mt-1 italic">
+              • <strong>Cam kết:</strong> Bên nhận cam kết quản lý, bảo quản và vận hành thiết bị đúng quy trình kỹ thuật hàng không quy định, chịu trách nhiệm về an toàn tài sản được giao.
             </p>
           </div>
 
-          <table className="audit-signatures-table mt-6">
+          <table className="audit-signatures-table mt-6" style={{ width: '100%' }}>
             <tbody>
               <tr>
-                <td style={{ width: '50%' }}>
-                  <div className="sig-header">ĐẠI DIỆN BÊN GIAO</div>
+                <td style={{ width: '25%', verticalAlign: 'top', textAlign: 'center' }}>
+                  <div className="sig-header">KỸ SƯ TIẾP NHẬN</div>
                   <div className="sig-sub">(Ký, ghi rõ họ tên)</div>
-                  <div className="sig-space"></div>
-                  <div className="sig-name">{selectedDispatchedRecord.giverName || inspectorName}</div>
-                </td>
-                <td style={{ width: '50%' }}>
-                  <div className="sig-header">ĐẠI DIỆN BÊN NHẬN</div>
-                  <div className="sig-sub">(Ký, ghi rõ họ tên)</div>
-                  <div className="sig-space"></div>
+                  <div className="sig-space" style={{ height: '65px' }}></div>
                   <div className="sig-name">{selectedDispatchedRecord.receiverName}</div>
+                </td>
+                <td style={{ width: '25%', verticalAlign: 'top', textAlign: 'center' }}>
+                  <div className="sig-header">NGƯỜI LẬP PHIẾU</div>
+                  <div className="sig-sub">(Ký, ghi rõ họ tên)</div>
+                  <div className="sig-space" style={{ height: '65px' }}></div>
+                  <div className="sig-name">{selectedDispatchedRecord.giverName || inspectorName || 'Kỹ sư quản lý kho'}</div>
+                </td>
+                <td style={{ width: '25%', verticalAlign: 'top', textAlign: 'center' }}>
+                  <div className="sig-header">PHỤ TRÁCH KHO</div>
+                  <div className="sig-sub">(Ký, ghi rõ họ tên)</div>
+                  <div className="sig-space" style={{ height: '65px' }}></div>
+                  <div className="sig-name">...........................</div>
+                </td>
+                <td style={{ width: '25%', verticalAlign: 'top', textAlign: 'center' }}>
+                  <div className="sig-header">LÃNH ĐẠO ĐỘI</div>
+                  <div className="sig-sub">(Ký, đóng dấu)</div>
+                  <div className="sig-space" style={{ height: '65px' }}></div>
+                  <div className="sig-name">...........................</div>
                 </td>
               </tr>
             </tbody>

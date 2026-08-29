@@ -8,8 +8,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount } from './types.ts';
-import { INITIAL_INVENTORY, CATEGORIES } from './initialData.ts';
+import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord } from './types.ts';
+import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
 import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
 import { PrintPreviewModal, PrintMode } from './components/PrintPreviewModal.tsx';
@@ -23,6 +23,9 @@ import { InventoryTable } from './components/InventoryTable.tsx';
 import { AdminAccountModal } from './components/AdminAccountModal.tsx';
 import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
 import { MobileAppInstallModal } from './components/MobileAppInstallModal.tsx';
+import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
+import { ReturnStockModal } from './components/ReturnStockModal.tsx';
+import { DispatchedDetailModal } from './components/DispatchedDetailModal.tsx';
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
   {
@@ -137,6 +140,21 @@ export default function App() {
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
   const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED'>('INVENTORY');
+
+  // Dispatched & Deployed Equipment Registry state
+  const [dispatchedRecords, setDispatchedRecords] = useState<DispatchedRecord[]>(() => {
+    const saved = localStorage.getItem('cns_dispatched_records_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch { /* fallback */ }
+    }
+    return INITIAL_DISPATCHED_RECORDS;
+  });
+  const [selectedDispatchedDetail, setSelectedDispatchedDetail] = useState<DispatchedRecord | null>(null);
+  const [selectedDispatchedForReturn, setSelectedDispatchedForReturn] = useState<DispatchedRecord | null>(null);
 
   // Handover document state
   const [handoverNo, setHandoverNo] = useState(() => `${Math.floor(100 + Math.random() * 900)}/KT`);
@@ -209,6 +227,7 @@ export default function App() {
   const syncConfigRef = useRef<SyncConfig>(syncConfig);
   const roleRef = useRef<Role>('guest');
   const usageSlipsRef = useRef<UsageSlip[]>([]);
+  const dispatchedRecordsRef = useRef<DispatchedRecord[]>([]);
   const categoriesRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -218,6 +237,10 @@ export default function App() {
   useEffect(() => {
     usageSlipsRef.current = usageSlips;
   }, [usageSlips]);
+
+  useEffect(() => {
+    dispatchedRecordsRef.current = dispatchedRecords;
+  }, [dispatchedRecords]);
 
   useEffect(() => {
     categoriesRef.current = categories;
@@ -243,6 +266,9 @@ export default function App() {
         }
         if (usageSlipsRef.current) {
           localStorage.setItem('cns_usage_slips_v1', JSON.stringify(usageSlipsRef.current));
+        }
+        if (dispatchedRecordsRef.current) {
+          localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(dispatchedRecordsRef.current));
         }
         if (categoriesRef.current) {
           localStorage.setItem('cns_categories_v30', JSON.stringify(categoriesRef.current));
@@ -271,6 +297,9 @@ export default function App() {
         }
         if (usageSlipsRef.current) {
           localStorage.setItem('cns_usage_slips_v1', JSON.stringify(usageSlipsRef.current));
+        }
+        if (dispatchedRecordsRef.current) {
+          localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(dispatchedRecordsRef.current));
         }
         if (categoriesRef.current) {
           localStorage.setItem('cns_categories_v30', JSON.stringify(categoriesRef.current));
@@ -1183,11 +1212,42 @@ export default function App() {
     setUsageSlips(nextSlips);
     localStorage.setItem('cns_usage_slips_v1', JSON.stringify(nextSlips));
 
+    // Also register into the centralized Dispatched Equipment Registry
+    const newDispatchRecord: DispatchedRecord = {
+      id: `disp-u-${Date.now()}`,
+      type: 'USAGE_SLIP',
+      docNumber: `PB-${new Date().getFullYear()}/${String(dispatchedRecords.length + 1).padStart(3, '0')}`,
+      itemId: newSlip.itemId,
+      itemName: newSlip.itemName,
+      category: newSlip.category,
+      sn: newSlip.sn,
+      pn: newSlip.pn,
+      qty: newSlip.qtyUsed,
+      unit: 'Bộ',
+      date: newSlip.date,
+      warehouse: newSlip.warehouse,
+      originalLoc: newSlip.originalLoc,
+      giverDept: 'Đội Thông Tin – TT BĐKT',
+      giverName: currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho',
+      giverPos: 'Kỹ sư quản lý kho',
+      receiverDept: 'Tổ Vận Hành CNS/ATM',
+      receiverName: newSlip.user,
+      receiverPos: 'Kỹ sư tiếp nhận',
+      targetLocation: newSlip.targetLocation || 'Hệ thống thiết bị Đài/Trạm',
+      purpose: newSlip.purpose,
+      notes: newSlip.notes,
+      status: 'DEPLOYED'
+    };
+
+    const nextDispatches = [newDispatchRecord, ...dispatchedRecords];
+    setDispatchedRecords(nextDispatches);
+    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(nextDispatches));
+
     if (deductInv && selectedItemForUsage) {
       let resultedQty = selectedItemForUsage.qty;
       const updatedInv = inventory.map(item => {
         if (item.id === selectedItemForUsage.id) {
-          const newQty = item.qty - newSlip.qtyUsed;
+          const newQty = Math.max(0, item.qty - newSlip.qtyUsed);
           resultedQty = newQty;
           const updatedHistory = item.history ? [...item.history] : [];
           updatedHistory.unshift({
@@ -1211,9 +1271,459 @@ export default function App() {
     }
 
     playScanBeep(1000, 0.2);
-    addToast('Đã đăng ký phiếu sử dụng thành công!', 'success');
+    addToast('Đã đăng ký phiếu sử dụng & tổng hợp vào Sổ Theo Dõi!', 'success');
     setSelectedItemForUsage(null);
     setTimeout(() => handlePrintUsageSlip(newSlip), 500);
+  };
+
+  // Handover document saving to centralized registry
+  const handleSaveHandoverToRegistry = (deductStock: boolean) => {
+    if (handoverRows.length === 0) {
+      addToast('Danh sách thiết bị bàn giao đang trống!', 'error');
+      return;
+    }
+
+    const docDateStr = `${handoverDay}/${handoverMonth}/${handoverYear}`;
+    const newRecords: DispatchedRecord[] = handoverRows.map((row, idx) => {
+      const matchedInv = inventory.find(i => i.id === row.id || (row.sn && i.sn.toLowerCase() === row.sn.toLowerCase()));
+      return {
+        id: `disp-h-${Date.now()}-${idx}`,
+        type: 'HANDOVER_DOC',
+        docNumber: handoverNo || `${Math.floor(100 + Math.random() * 900)}/KT`,
+        itemId: row.id,
+        itemName: row.name,
+        category: matchedInv?.category || 'Vật tư CNS',
+        sn: row.sn || 'N/A',
+        pn: row.specs || matchedInv?.pn || '',
+        qty: row.qty,
+        unit: row.unit || 'Cái',
+        date: docDateStr,
+        warehouse: matchedInv?.warehouse || 'Kho Trung tâm',
+        originalLoc: matchedInv?.loc || '',
+        giverDept: handoverGiverDept,
+        giverName: handoverGiverName,
+        giverPos: handoverGiverPos,
+        receiverDept: handoverReceiverDept,
+        receiverName: handoverReceiverName,
+        receiverPos: handoverReceiverPos,
+        targetLocation: handoverLocation || 'Trung tâm BĐKT',
+        purpose: handoverReason,
+        notes: row.note || '',
+        status: 'DEPLOYED'
+      };
+    });
+
+    const updatedDispatches = [...newRecords, ...dispatchedRecords];
+    setDispatchedRecords(updatedDispatches);
+    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(updatedDispatches));
+
+    // Deduct stock if requested
+    if (deductStock) {
+      let updatedInv = [...inventory];
+      handoverRows.forEach(row => {
+        updatedInv = updatedInv.map(invItem => {
+          if (invItem.id === row.id || (row.sn && invItem.sn.toLowerCase() === row.sn.toLowerCase())) {
+            const newQty = Math.max(0, invItem.qty - row.qty);
+            const history = invItem.history ? [...invItem.history] : [];
+            history.unshift({
+              id: `h-ho-${Date.now()}-${row.id}`,
+              status: 'OK',
+              date: docDateStr,
+              note: `Bàn giao x${row.qty} theo BB số ${handoverNo} cho ${handoverReceiverName} (${handoverReceiverDept})`,
+              user: role || 'guest'
+            });
+            return { ...invItem, qty: newQty, history };
+          }
+          return invItem;
+        });
+      });
+      saveInventoryLocally(updatedInv);
+    }
+
+    addToast(`Đã lưu ${newRecords.length} thiết bị bàn giao vào Sổ Tổng Hợp Theo Dõi!`, 'success');
+  };
+
+  // Return equipment to stock from dispatched registry
+  const handleConfirmReturnStock = (
+    recordId: string,
+    returnQty: number,
+    returnCondition: string,
+    returnRecipient: string,
+    returnNote: string
+  ) => {
+    const targetRecord = dispatchedRecords.find(r => r.id === recordId);
+    if (!targetRecord) {
+      addToast('Không tìm thấy bản ghi cần thu hồi!', 'error');
+      return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('vi-VN');
+
+    // 1. Update dispatched record
+    const updatedDispatches = dispatchedRecords.map(r => {
+      if (r.id === recordId) {
+        return {
+          ...r,
+          status: 'RETURNED' as const,
+          returnedDate: todayStr,
+          returnedBy: returnRecipient,
+          returnedQty: returnQty,
+          returnNote: `Tình trạng: ${returnCondition}. Ghi chú: ${returnNote}`
+        };
+      }
+      return r;
+    });
+
+    setDispatchedRecords(updatedDispatches);
+    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(updatedDispatches));
+
+    // 2. Increment inventory stock
+    let updatedInv = [...inventory];
+    let matchedIndex = updatedInv.findIndex(i => i.id === targetRecord.itemId || (targetRecord.sn && targetRecord.sn !== 'N/A' && i.sn.toLowerCase() === targetRecord.sn.toLowerCase()));
+
+    if (matchedIndex >= 0) {
+      const existingItem = updatedInv[matchedIndex];
+      const history = existingItem.history ? [...existingItem.history] : [];
+      history.unshift({
+        id: `h-ret-${Date.now()}`,
+        status: returnCondition.includes('Hỏng') || returnCondition.includes('Lỗi') ? 'MISSING' : 'OK',
+        date: todayStr,
+        note: `Thu hồi/Nhập trả kho x${returnQty} từ ${targetRecord.receiverName || targetRecord.targetLocation}. Tình trạng: ${returnCondition}. Người nhận: ${returnRecipient}`,
+        user: role || 'guest'
+      });
+
+      updatedInv[matchedIndex] = {
+        ...existingItem,
+        qty: existingItem.qty + returnQty,
+        history
+      };
+    } else {
+      // If item was previously deleted from stock, re-create it in inventory
+      const newItem: InventoryItem = {
+        id: targetRecord.itemId || `inv-ret-${Date.now()}`,
+        name: targetRecord.itemName,
+        category: targetRecord.category || 'Vật tư CNS',
+        sn: targetRecord.sn || `SN-RET-${Date.now().toString().slice(-4)}`,
+        pn: targetRecord.pn || '',
+        warehouse: targetRecord.warehouse || 'Kho Trung tâm',
+        loc: targetRecord.originalLoc || 'Kệ Thu Hồi / Dự phòng',
+        qty: returnQty,
+        auditStatus: returnCondition.includes('Hỏng') || returnCondition.includes('Lỗi') ? 'MISSING' : 'OK',
+        auditDate: todayStr,
+        history: [{
+          id: `h-ret-${Date.now()}`,
+          status: returnCondition.includes('Hỏng') || returnCondition.includes('Lỗi') ? 'MISSING' : 'OK',
+          date: todayStr,
+          note: `Thu hồi hoàn kho thiết bị từ sổ theo dõi (${targetRecord.docNumber}). Tình trạng: ${returnCondition}`,
+          user: role || 'guest'
+        }]
+      };
+      updatedInv.unshift(newItem);
+    }
+
+    saveInventoryLocally(updatedInv);
+    setSelectedDispatchedForReturn(null);
+    playScanBeep(800, 0.2);
+    addToast(`Đã thu hồi & hoàn kho x${returnQty} "${targetRecord.itemName}" thành công!`, 'success');
+  };
+
+  // Delete a dispatched record
+  const handleDeleteDispatchedRecord = (recordId: string) => {
+    const record = dispatchedRecords.find(r => r.id === recordId);
+    if (!record) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'XÓA HỒ SƠ THEO DÕI',
+      message: `Bạn có chắc chắn muốn xóa hồ sơ bàn giao/sử dụng của thiết bị "${record.itemName}" (S/N: ${record.sn}, Mã số: ${record.docNumber}) khỏi sổ theo dõi?`,
+      onConfirm: () => {
+        const next = dispatchedRecords.filter(r => r.id !== recordId);
+        setDispatchedRecords(next);
+        localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(next));
+        addToast('Đã xóa hồ sơ khỏi Sổ Theo Dõi!', 'success');
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  // Print a single dispatched record doc
+  const handlePrintDispatchedRecord = (record: DispatchedRecord) => {
+    if (record.type === 'USAGE_SLIP') {
+      const slip: UsageSlip = {
+        id: record.id,
+        itemId: record.itemId,
+        itemName: record.itemName,
+        sn: record.sn,
+        pn: record.pn,
+        category: record.category,
+        warehouse: record.warehouse,
+        originalLoc: record.originalLoc,
+        user: record.receiverName,
+        qtyUsed: record.qty,
+        purpose: record.purpose,
+        notes: record.notes,
+        targetLocation: record.targetLocation,
+        date: record.date
+      };
+      handlePrintUsageSlip(slip);
+    } else {
+      // Handover doc print
+      const win = window.open('', '_blank');
+      if (!win) {
+        addToast('Vui lòng cho phép popup mới!', 'error');
+        return;
+      }
+      win.document.write(`
+        <html>
+          <head>
+            <title>BIÊN BẢN BÀN GIAO THIẾT BỊ - ${record.docNumber}</title>
+            <style>
+              @page { size: A4; margin: 20mm 15mm 20mm 20mm; }
+              body { font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.5; margin: 0; padding: 0; background-color: #fff; }
+              .container { width: 100%; max-width: 680px; margin: 0 auto; }
+              .header-table { width: 100%; border-collapse: collapse; border: none; margin-bottom: 25px; }
+              .header-table td { border: none; padding: 0; vertical-align: top; }
+              .national-brand { text-align: center; font-size: 12.5px; width: 58%; }
+              .national-title { font-weight: bold; text-transform: uppercase; font-size: 12px; }
+              .national-subtitle { font-weight: bold; font-size: 13px; margin-top: 3px; }
+              .company-brand { text-align: center; font-size: 12px; width: 42%; }
+              .company-name { text-transform: uppercase; font-size: 11px; font-weight: bold; }
+              .dept-name { text-transform: uppercase; font-weight: bold; font-size: 12px; margin-top: 3px; }
+              .doc-number { font-size: 12.5px; margin-top: 5px; text-align: center; }
+              .location-date { font-size: 13px; text-align: center; font-style: italic; margin-top: 6px; }
+              .doc-title { text-align: center; font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 30px 0 6px 0; letter-spacing: 0.5px; }
+              .doc-intro { text-align: left; font-size: 14px; margin-bottom: 18px; }
+              .section-title { font-size: 14px; font-weight: bold; text-transform: uppercase; margin-top: 15px; margin-bottom: 8px; }
+              .info-table { width: 100%; border-collapse: collapse; border: none; margin-bottom: 12px; }
+              .info-table td { border: none; padding: 4px 0; font-size: 14.5px; }
+              .table-main { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 20px; }
+              .table-main th { border: 1px solid #000; background-color: #fff; padding: 8px 5px; text-align: center; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+              .table-main td { border: 1px solid #000; padding: 7px 6px; font-size: 13.5px; }
+              .footer-note { font-size: 14px; margin: 15px 0 25px 0; text-align: left; }
+              .signature-table { width: 100%; border-collapse: collapse; border: none; margin-top: 25px; page-break-inside: avoid; }
+              .signature-table td { border: none; width: 50%; text-align: center; vertical-align: top; padding: 0; }
+              .sig-title { font-weight: bold; text-transform: uppercase; font-size: 13.5px; margin-bottom: 5px; }
+              .sig-name { font-weight: bold; font-size: 14px; text-transform: uppercase; margin-top: 80px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <table class="header-table">
+                <tr>
+                  <td class="company-brand">
+                    <div class="company-name">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+                    <div class="dept-name"><u>TRUNG TÂM BĐKT</u></div>
+                    <div style="margin-top: 12px;" class="doc-number">Số: ${record.docNumber}</div>
+                  </td>
+                  <td class="national-brand">
+                    <div class="national-title">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                    <div class="national-subtitle"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+                    <div class="location-date">Ngày bàn giao: ${record.date}</div>
+                  </td>
+                </tr>
+              </table>
+
+              <div class="doc-title">BIÊN BẢN BÀN GIAO THIẾT BỊ CNS/ATM</div>
+              <div class="doc-intro">
+                Địa điểm bàn giao: ${record.targetLocation || 'Trung tâm Bảo đảm Kỹ thuật'}
+              </div>
+
+              <div class="section-title">THÀNH PHẦN BÀN GIAO:</div>
+              <table class="info-table">
+                <tr>
+                  <td style="font-weight: bold; width: 100%;" colspan="2">
+                    1. Đại diện bên giao: ${record.giverDept || 'Đội Thông tin – Trung tâm BĐKT'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 55%; padding-left: 20px;">
+                    Ông (bà): <span style="font-weight: bold;">${record.giverName || 'Admin Kho'}</span>
+                  </td>
+                  <td style="width: 45%;">
+                    Chức vụ: <span style="font-weight: bold;">${record.giverPos || 'Kỹ sư'}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; width: 100%;" colspan="2">
+                    2. Đại diện bên nhận: ${record.receiverDept || 'Tổ Kỹ thuật Không lưu'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 55%; padding-left: 20px;">
+                    Ông (bà): <span style="font-weight: bold;">${record.receiverName || 'Kỹ sư tiếp nhận'}</span>
+                  </td>
+                  <td style="width: 45%;">
+                    Chức vụ: <span style="font-weight: bold;">${record.receiverPos || 'Kỹ sư trực ban'}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <table class="table-main">
+                <thead>
+                  <tr>
+                    <th style="width: 45px;">STT</th>
+                    <th>Tên tài sản, thiết bị</th>
+                    <th style="width: 55px;">ĐVT</th>
+                    <th style="width: 60px;">SL</th>
+                    <th>Quy cách / P/N</th>
+                    <th style="width: 110px;">S/N</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="text-align: center;">1</td>
+                    <td style="font-weight: bold;">${record.itemName}</td>
+                    <td style="text-align: center;">${record.unit || 'Bộ'}</td>
+                    <td style="text-align: center; font-weight: bold;">${record.qty}</td>
+                    <td>${record.pn || 'N/A'}</td>
+                    <td style="text-align: center; font-family: monospace; font-weight: bold;">${record.sn}</td>
+                    <td style="text-align: center;">${record.status === 'DEPLOYED' ? 'Đang hoạt động' : 'Đã thu hồi hoàn kho'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style="font-size: 14px; margin-top: 10px; margin-bottom: 5px;">
+                Mục đích / Lý do: <strong>${record.purpose || 'Đảm bảo hoạt động ổn định hệ thống CNS'}</strong>
+              </div>
+
+              ${record.notes ? `<div style="font-size: 13.5px; margin-bottom: 5px;">Ghi chú: ${record.notes}</div>` : ''}
+
+              ${record.status === 'RETURNED' ? `
+                <div style="margin-top: 15px; padding: 10px; border: 1px solid #000; font-size: 13px; background-color: #f9f9f9;">
+                  <strong>HỒ SƠ THU HỒI HOÀN KHO:</strong><br/>
+                  - Ngày thu hồi: ${record.returnedDate || 'N/A'}<br/>
+                  - Người tiếp nhận: ${record.returnedBy || 'N/A'}<br/>
+                  - Số lượng đã hoàn kho: ${record.returnedQty || record.qty} ${record.unit || 'Bộ'}<br/>
+                  - Tình trạng: ${record.returnNote || 'Tốt'}
+                </div>
+              ` : ''}
+
+              <div class="footer-note">
+                Biên bản này được lập thành hai bản, mỗi bên giữ một bản, các bản có giá trị như nhau.
+              </div>
+
+              <table class="signature-table">
+                <tr>
+                  <td>
+                    <div class="sig-title">ĐẠI DIỆN BÊN GIAO</div>
+                    <div class="sig-name">${record.giverName || ''}</div>
+                  </td>
+                  <td>
+                    <div class="sig-title">ĐẠI DIỆN BÊN NHẬN</div>
+                    <div class="sig-name">${record.receiverName || ''}</div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <script>window.onload = function() { window.print(); }<\/script>
+          </body>
+        </html>
+      `);
+      win.document.close();
+      addToast(`Đã in biên bản bàn giao ${record.docNumber}!`, 'success');
+    }
+  };
+
+  // Print all Dispatched Records Registry
+  const handlePrintDispatchedRegistry = () => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      addToast('Vui lòng cho phép popup mới!', 'error');
+      return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('vi-VN');
+    const rowsHtml = dispatchedRecords.map((r, idx) => `
+      <tr>
+        <td style="border: 1px solid #000; padding: 6px 4px; text-align: center; font-size: 12px;">${idx + 1}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: monospace; font-size: 11.5px; font-weight: bold;">${r.docNumber}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: left; font-size: 12px; font-weight: bold;">${r.itemName}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: monospace; font-size: 11.5px; font-weight: bold;">${r.sn}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 12px; font-weight: bold;">${r.qty} ${r.unit || 'Bộ'}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 11.5px;">${r.date}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: left; font-size: 12px;">${r.receiverName} (${r.receiverDept || 'Tổ Vận Hành'})</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: left; font-size: 11.5px;">${r.targetLocation || 'Hệ thống'}</td>
+        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 11.5px; font-weight: bold;">${r.status === 'DEPLOYED' ? 'ĐANG SỬ DỤNG' : 'ĐÃ THU HỒI'}</td>
+      </tr>
+    `).join('');
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>SỔ TỔNG HỢP THEO DÕI THIẾT BỊ BÀN GIAO & SỬ DỤNG</title>
+          <style>
+            @page { size: A4 landscape; margin: 15mm 15mm 15mm 15mm; }
+            body { font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.4; margin: 0; padding: 0; }
+            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            .header-table td { border: none; vertical-align: top; }
+            .title { text-align: center; font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 15px 0 5px 0; }
+            .subtitle { text-align: center; font-size: 12px; font-style: italic; margin-bottom: 15px; }
+            .table-main { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            .table-main th { border: 1px solid #000; background-color: #f2f2f2; padding: 7px 4px; text-align: center; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+            .sig-section { width: 100%; border-collapse: collapse; margin-top: 30px; page-break-inside: avoid; }
+            .sig-section td { border: none; width: 50%; text-align: center; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td style="width: 45%; text-align: center;">
+                <div style="font-size: 11px; font-weight: bold; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+                <div style="font-size: 12px; font-weight: bold; text-transform: uppercase;"><u>TRUNG TÂM BẢO ĐẢM KỸ THUẬT</u></div>
+              </td>
+              <td style="width: 55%; text-align: center;">
+                <div style="font-size: 11px; font-weight: bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                <div style="font-size: 12px; font-weight: bold;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+                <div style="font-size: 12px; font-style: italic; margin-top: 4px;">Ngày trích xuất: ${todayStr}</div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="title">SỔ TỔNG HỢP THEO DÕI THIẾT BỊ ĐÃ BÀN GIAO & ĐƯA VÀO SỬ DỤNG</div>
+          <div class="subtitle">(Tổng số: ${dispatchedRecords.length} hồ sơ | Đang hoạt động ngoài hệ thống: ${dispatchedRecords.filter(r => r.status === 'DEPLOYED').length} thiết bị)</div>
+
+          <table class="table-main">
+            <thead>
+              <tr>
+                <th style="width: 35px;">STT</th>
+                <th style="width: 90px;">Mã Số / Số PB</th>
+                <th>Tên Thiết Bị / Vật Tư</th>
+                <th style="width: 110px;">S/N</th>
+                <th style="width: 65px;">Số Lượng</th>
+                <th style="width: 80px;">Ngày Xuất</th>
+                <th>Người / Đơn Vị Nhận</th>
+                <th>Vị Trí Lắp Đặt / Sử Dụng</th>
+                <th style="width: 95px;">Tình Trạng</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <table class="sig-section">
+            <tr>
+              <td>
+                <div style="font-weight: bold; font-size: 12.5px; text-transform: uppercase;">NGƯỜI LẬP BÁO CÁO</div>
+                <div style="font-size: 12px; font-style: italic; margin-top: 4px;">(Ký, ghi rõ họ tên)</div>
+                <div style="font-weight: bold; font-size: 13px; margin-top: 70px;">${currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Kỹ sư Quản lý Kho'}</div>
+              </td>
+              <td>
+                <div style="font-weight: bold; font-size: 12.5px; text-transform: uppercase;">LÃNH ĐẠO PHÊ DUYỆT</div>
+                <div style="font-size: 12px; font-style: italic; margin-top: 4px;">(Ký, ghi rõ họ tên)</div>
+                <div style="font-weight: bold; font-size: 13px; margin-top: 70px;">ĐỘI TRƯỞNG</div>
+              </td>
+            </tr>
+          </table>
+
+          <script>window.onload = function() { window.print(); }<\/script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    addToast('Đã khởi tạo in Sổ Theo Dõi Bàn Giao & Sử Dụng!', 'success');
   };
 
   return (
@@ -1653,8 +2163,100 @@ export default function App() {
             </div>
           )}
 
-          {/* Stats Cards and Charts */}
-          <div className="mt-6">
+          {/* Primary Workspace Navigation Tabs */}
+          <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 rounded-[2.2rem] border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setActiveWorkspaceTab('INVENTORY')}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeWorkspaceTab === 'INVENTORY'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md shadow-slate-200 dark:shadow-none'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Database className="w-4.5 h-4.5 text-indigo-500" />
+                <span>KHO DỰ PHÒNG TẠI CHỖ</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  activeWorkspaceTab === 'INVENTORY'
+                    ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {inventory.length} mã
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveWorkspaceTab('DISPATCHED')}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeWorkspaceTab === 'DISPATCHED'
+                    ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-md shadow-slate-200 dark:shadow-none'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Layers className="w-4.5 h-4.5 text-rose-500" />
+                <span>ĐÃ BÀN GIAO & SỬ DỤNG</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  activeWorkspaceTab === 'DISPATCHED'
+                    ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {dispatchedRecords.length} hồ sơ
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 px-2">
+              <span className="text-[11px] font-bold text-slate-400 hidden xl:inline">
+                {activeWorkspaceTab === 'INVENTORY' 
+                  ? 'Quản lý hiện vật lưu kho, quét mã kiểm kê & tem nhãn'
+                  : 'Sổ tổng hợp theo dõi trang thiết bị đã đưa ra ngoài hệ thống vận hành'}
+              </span>
+            </div>
+          </div>
+
+          {activeWorkspaceTab === 'DISPATCHED' ? (
+            /* DISPATCHED & DEPLOYED REGISTRY TABLE VIEW */
+            <div className="mt-6">
+              <DeployedRegistryTable
+                records={dispatchedRecords}
+                role={role}
+                onViewDetail={(record) => setSelectedDispatchedDetail(record)}
+                onReturnRecord={(record) => setSelectedDispatchedForReturn(record)}
+                onDeleteRecord={handleDeleteDispatchedRecord}
+                onPrintRecord={handlePrintDispatchedRecord}
+                onPrintRegistry={handlePrintDispatchedRegistry}
+                onCreateUsageSlip={() => {
+                  if (inventory.length > 0) {
+                    setSelectedItemForUsage(inventory[0]);
+                  } else {
+                    addToast('Kho vật tư chưa có thiết bị để xuất sử dụng!', 'error');
+                  }
+                }}
+                onCreateHandoverDoc={() => {
+                  setIsHandoverModalOpen(true);
+                  if (handoverRows.length === 0 && inventory.length > 0) {
+                    const initialRows: HandoverRow[] = inventory.slice(0, 1).map(item => ({
+                      id: item.id,
+                      name: item.name,
+                      unit: 'Cái',
+                      qty: 1,
+                      quality: 'Tốt (Mới 100%)',
+                      specs: `${item.pn ? 'P/N: ' + item.pn + '. ' : ''}Quy cách chuẩn`,
+                      sn: item.sn,
+                      note: ''
+                    }));
+                    setHandoverRows(initialRows);
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            /* STANDARD INVENTORY WORKSPACE VIEW */
+            <>
+              {/* Stats Cards and Charts */}
+              <div className="mt-6">
             <StatsCards
               stats={stats}
               inventory={inventory}
@@ -2065,6 +2667,8 @@ export default function App() {
               />
             </div>
           </div>
+            </>
+          )}
         </div>
       )}
 
@@ -2152,7 +2756,29 @@ export default function App() {
         handoverRows={handoverRows}
         setHandoverRows={setHandoverRows}
         onPrintHandover={handlePrintOfficialHandover}
+        onSaveHandoverToRegistry={handleSaveHandoverToRegistry}
         onAddToast={addToast}
+      />
+
+      {/* Return Dispatched Equipment To Stock Modal */}
+      <ReturnStockModal
+        isOpen={!!selectedDispatchedForReturn}
+        onClose={() => setSelectedDispatchedForReturn(null)}
+        record={selectedDispatchedForReturn}
+        onConfirmReturn={handleConfirmReturnStock}
+      />
+
+      {/* Dispatched Record Detail Modal */}
+      <DispatchedDetailModal
+        isOpen={!!selectedDispatchedDetail}
+        onClose={() => setSelectedDispatchedDetail(null)}
+        record={selectedDispatchedDetail}
+        role={role}
+        onReturn={(rec) => {
+          setSelectedDispatchedDetail(null);
+          setSelectedDispatchedForReturn(rec);
+        }}
+        onPrint={(rec) => handlePrintDispatchedRecord(rec)}
       />
 
       {/* Settings Modal */}

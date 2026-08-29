@@ -44,6 +44,7 @@ interface HandoverModalProps {
   handoverRows: HandoverRow[];
   setHandoverRows: React.Dispatch<React.SetStateAction<HandoverRow[]>>;
   onPrintHandover: () => void;
+  onSaveHandoverToRegistry?: (deductStock: boolean) => void;
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -78,8 +79,10 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   handoverRows,
   setHandoverRows,
   onPrintHandover,
+  onSaveHandoverToRegistry,
   onAddToast
 }) => {
+  const [deductStock, setDeductStock] = React.useState(true);
   if (!isOpen) return null;
 
   return (
@@ -475,35 +478,66 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-150 dark:border-slate-800 mt-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setHandoverRows([]);
-              onAddToast('Đã xóa sạch danh sách biên bản!', 'info');
-            }}
-            disabled={handoverRows.length === 0}
-            className="text-[10px] font-black uppercase text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 px-4 py-2.5 rounded-2xl border border-rose-500/10 disabled:opacity-40 transition-all cursor-pointer"
-          >
-            Xóa tất cả mặt hàng
-          </button>
+        <div className="flex flex-col gap-3 pt-4 border-t border-slate-150 dark:border-slate-800 mt-auto shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={deductStock}
+                onChange={(e) => setDeductStock(e.target.checked)}
+                className="w-4 h-4 text-rose-600 rounded-md border-slate-300 dark:border-slate-600 focus:ring-rose-500 cursor-pointer"
+              />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Cập nhật trừ tồn kho tương ứng & lưu vào <span className="text-rose-600 dark:text-rose-400 font-black">Sổ Theo Dõi Thiết Bị Đã Bàn Giao</span>
+              </span>
+            </label>
 
-          <div className="flex gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setHandoverRows([]);
+                onAddToast('Đã xóa sạch danh sách biên bản!', 'info');
+              }}
+              disabled={handoverRows.length === 0}
+              className="text-[10px] font-black uppercase text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/10 disabled:opacity-40 transition-all cursor-pointer"
+            >
+              Xóa tất cả mặt hàng
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 w-full">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold px-6 py-3 rounded-2xl text-xs transition-colors cursor-pointer text-center"
+              className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold px-6 py-3 rounded-2xl text-xs transition-colors cursor-pointer text-center"
             >
               Bỏ qua
             </button>
+
+            {onSaveHandoverToRegistry && (
+              <button
+                type="button"
+                onClick={() => onSaveHandoverToRegistry(deductStock)}
+                disabled={handoverRows.length === 0}
+                className="w-full sm:w-auto bg-slate-900 hover:bg-black dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-extrabold px-6 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 shadow-xs"
+              >
+                LƯU VÀO SỔ THEO DÕI
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={onPrintHandover}
+              onClick={() => {
+                if (onSaveHandoverToRegistry) {
+                  onSaveHandoverToRegistry(deductStock);
+                }
+                onPrintHandover();
+              }}
               disabled={handoverRows.length === 0}
-              className="flex-1 sm:flex-none bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-8 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-rose-600/15 disabled:opacity-40"
+              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-8 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-rose-600/15 disabled:opacity-40"
             >
               <Printer className="w-3.5 h-3.5" />
-              XUẤT IN BIÊN BẢN CHUẨN FORM
+              LƯU & XUẤT IN BIÊN BẢN CHUẨN FORM
             </button>
           </div>
         </div>

@@ -90,3 +90,40 @@ export interface UsageSlip {
   targetLocation: string;
   date: string;
 }
+
+export type DispatchType = 'USAGE_SLIP' | 'HANDOVER_DOC';
+export type DispatchStatus = 'DEPLOYED' | 'RETURNED';
+
+export interface DispatchedRecord {
+  id: string;
+  type: DispatchType;
+  docNumber?: string; // Số hiệu phiếu hoặc biên bản (VD: 125/KT, SLIP-892)
+  itemId?: string;
+  itemName: string;
+  category: string;
+  sn: string;
+  pn?: string;
+  qty: number;
+  unit?: string;
+  date: string; // Ngày bàn giao/xuất sử dụng
+  warehouse?: string;
+  originalLoc?: string;
+  
+  // Bên giao & Bên nhận
+  giverDept?: string;
+  giverName?: string;
+  giverPos?: string;
+  receiverDept?: string;
+  receiverName: string; // Kỹ sư tiếp nhận hoặc Tổ/Đài nhận
+  receiverPos?: string;
+  
+  targetLocation: string; // Vị trí lắp đặt mới / Hệ thống đích
+  purpose: string; // Mục đích sử dụng / Lý do bàn giao
+  notes?: string; // Ghi chú kỹ thuật
+  
+  status: DispatchStatus; // 'DEPLOYED' (Đang vận hành/sử dụng) | 'RETURNED' (Đã thu hồi về kho)
+  returnedDate?: string;
+  returnedBy?: string;
+  returnedQty?: number;
+  returnNote?: string;
+}

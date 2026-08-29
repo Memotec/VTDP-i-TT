@@ -11,7 +11,8 @@ import {
   Hash,
   Layers,
   Edit3,
-  Send
+  Send,
+  Printer
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, Role } from '../types.ts';
@@ -22,6 +23,8 @@ interface ItemDetailDrawerProps {
   onClose: () => void;
   onEdit: (item: InventoryItem) => void;
   onUsage: (item: InventoryItem) => void;
+  onPrintQr?: (item: InventoryItem) => void;
+  onPrintLabel?: (item: InventoryItem) => void;
 }
 
 export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
@@ -30,11 +33,13 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onClose,
   onEdit,
   onUsage,
+  onPrintQr,
+  onPrintLabel,
 }) => {
   if (!item) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex justify-end z-[80000] animate-fade-in">
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex justify-end z-[80000] animate-fade-in no-print">
       <div className="bg-white dark:bg-slate-900 w-full max-w-md h-screen shadow-2xl flex flex-col border-l border-slate-150 dark:border-slate-800 animate-slide-left">
         {/* Drawer Header */}
         <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
@@ -62,11 +67,11 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
 
         {/* Scrollable details contents */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
-          {/* QR Code Identification Card */}
+          {/* QR Code Identification Card with Print Buttons */}
           <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 dark:from-slate-800/60 dark:to-slate-800/30 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center space-y-3.5">
-            {item.warehouse ? (
+            {item.warehouse || item.sn ? (
               <div className="p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <QRCodeSVG value={item.warehouse} size={160} level="M" />
+                <QRCodeSVG value={item.warehouse || item.sn} size={160} level="M" />
               </div>
             ) : (
               <div className="w-40 h-40 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex items-center justify-center text-xs text-slate-400">
@@ -76,11 +81,35 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-2 text-sm font-mono font-black text-indigo-600 dark:text-indigo-400">
                 <QrCode className="w-4 h-4" />
-                <span>{item.warehouse || 'N/A'}</span>
+                <span>{item.warehouse || item.sn || 'N/A'}</span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Mã QR định danh quản lý & vị trí kho dự phòng tại chỗ
               </p>
+            </div>
+
+            {/* In nhãn / In QR nhanh cho 1 thiết bị */}
+            <div className="flex items-center gap-2 pt-1 w-full">
+              {onPrintQr && (
+                <button
+                  type="button"
+                  onClick={() => onPrintQr(item)}
+                  className="flex-1 py-2 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In Mã QR</span>
+                </button>
+              )}
+              {onPrintLabel && (
+                <button
+                  type="button"
+                  onClick={() => onPrintLabel(item)}
+                  className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>In Tem Nhãn</span>
+                </button>
+              )}
             </div>
           </div>
 

@@ -4,14 +4,15 @@ import {
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Key, AlertTriangle,
-  Smartphone, Download, Sparkles
+  Smartphone, Download, Sparkles, Tag
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount } from './types.ts';
 import { INITIAL_INVENTORY, CATEGORIES } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
-import { PrintTemplates } from './components/PrintTemplates.tsx';
+import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
+import { PrintPreviewModal, PrintMode } from './components/PrintPreviewModal.tsx';
 import { StatsCards } from './components/StatsCards.tsx';
 import { ScannerModal } from './components/ScannerModal.tsx';
 import { ItemDetailDrawer } from './components/ItemDetailDrawer.tsx';
@@ -133,6 +134,8 @@ export default function App() {
   const [isUsageHistoryOpen, setIsUsageHistoryOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+  const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
   const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
 
   // Handover document state
@@ -950,104 +953,24 @@ export default function App() {
     e.target.value = '';
   };
 
-  const startPrintSession = (type: 'QR' | 'LABEL') => {
+  const handleOpenPrintCenter = (mode: PrintMode = 'QR') => {
+    setActivePrintMode(mode);
+    setPrintLayout(mode);
+    setIsPrintPreviewOpen(true);
+  };
+
+  const startPrintSession = (type: 'QR' | 'LABEL' | 'AUDIT_REPORT') => {
     setPrintLayout(type);
-    addToast('Đang tạo form in... Sẽ tự động mở hộp thoại in.', 'info');
+    setActivePrintMode(type);
+    addToast('Đang kết nối máy in và chuẩn bị biểu mẫu...', 'info');
     setTimeout(() => {
       window.print();
-      setTimeout(() => setPrintLayout('NONE'), 1000);
-    }, 600);
+      setTimeout(() => setPrintLayout('NONE'), 1200);
+    }, 400);
   };
 
   const handleExportWebBill = () => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      addToast('Vui lòng cho phép trình duyệt hiển thị popup mới!', 'error');
-      return;
-    }
-    const today = new Date().toLocaleDateString('vi-VN');
-    const rowsHtml = inventory.map((item, idx) => `
-      <tr style="border-bottom: 1px solid #ddd;">
-        <td style="padding: 10px; text-align: center;">${idx + 1}</td>
-        <td style="padding: 10px; font-weight: bold; text-align: left;">${item.name}</td>
-        <td style="padding: 10px;">${item.category || '-'}</td>
-        <td style="padding: 10px; font-family: monospace;">${item.sn}</td>
-        <td style="padding: 10px; text-align: center; font-weight: bold;">${item.warehouse || '-'}</td>
-        <td style="padding: 10px; text-align: center; font-weight: bold;">${item.qty}</td>
-        <td style="padding: 10px; text-align: center;">
-          <span style="font-weight: bold; color: ${item.auditStatus === 'OK' ? '#10b981' : (item.auditStatus === 'MISSING' ? '#ef4444' : '#6b7280')};">
-            ${item.auditStatus === 'OK' ? 'ĐỦ/TỐT' : (item.auditStatus === 'MISSING' ? 'THIẾU/HỎNG' : 'CHƯA KIỂM')}
-          </span>
-        </td>
-        <td style="padding: 10px; text-align: left; font-size: 11px; max-width: 155px;">${item.auditNote || ''}</td>
-      </tr>
-    `).join('');
-
-    win.document.write(`
-      <html>
-        <head>
-          <title>Biên Bản Kiểm Kê Kho CNS/ATM</title>
-          <style>
-            body { font-family: 'Segoe UI', system-ui, sans-serif; color: #333; margin: 30px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .title { font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
-            .subtitle { font-size: 13px; color: #666; font-style: italic; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
-            th { background-color: #f3f4f6; border: 1px solid #cbd5e1; padding: 12px 10px; text-align: center; font-weight: bold; }
-            td { border: 1px solid #e2e8f0; }
-            .summary { margin-top: 30px; font-size: 13px; display: flex; justify-content: space-between; }
-            .signs { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; font-size: 13px; page-break-inside: avoid; }
-            .sign-box { width: 250px; font-weight: bold; }
-            .sign-title { margin-bottom: 60px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">ĐỘI THÔNG TIN - KHO VẬT TƯ DỰ PHÒNG TẠI CHỖ</div>
-            <div class="title">BIÊN BẢN KIỂM KÊ THIẾT BỊ VÀ VẬT TƯ DỰ PHÒNG</div>
-            <div class="subtitle">Ngày tạo: ${today} - Người lập: ${role ? role.toUpperCase() : 'Guest'}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 40px;">STT</th>
-                <th>Tên Thiết Bị / Linh Kiện</th>
-                <th style="width: 100px;">Phân Loại</th>
-                <th style="width: 120px;">Serial Number</th>
-                <th style="width: 100px;">Mã Kho (QR)</th>
-                <th style="width: 50px;">SL</th>
-                <th style="width: 100px;">Trạng Thái</th>
-                <th style="width: 180px;">Ghi Chú Kiểm Kê</th>
-              </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-          <div class="summary">
-            <div>
-              <p>Số thiết bị đạt (ĐỦ/ỔN ĐỊNH): <strong>${stats.okCount}</strong></p>
-              <p>Số thiết bị lệch (THIẾU/HỎNG): <strong style="color:red">${stats.missingCount}</strong></p>
-            </div>
-            <div style="text-align: right;">
-              <p>Đơn vị: Đội Thông Tin Hàng Không</p>
-              <p>Giờ xuất: ${new Date().toLocaleTimeString('vi-VN')}</p>
-            </div>
-          </div>
-          <div class="signs">
-            <div class="sign-box">
-              <div class="sign-title">Đại Diện Tổ Kiểm Kê</div>
-              <div>(Ký, ghi rõ họ tên)</div>
-            </div>
-            <div class="sign-box">
-              <div class="sign-title">Đội Trưởng Đội Thông Tin</div>
-              <div>(Ký, đóng dấu xác nhận)</div>
-            </div>
-          </div>
-          <script>window.onload = function() { window.print(); }<\/script>
-        </body>
-      </html>
-    `);
-    win.document.close();
-    addToast('Đã khởi tạo bản in biên bản kiểm kê!', 'success');
+    handleOpenPrintCenter('AUDIT_REPORT');
   };
 
   const handlePrintOfficialHandover = () => {
@@ -1476,6 +1399,15 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setIsInstallModalOpen(true)}
+                className="p-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center gap-1 text-indigo-700 dark:text-indigo-400 font-bold text-xs"
+                title="Cài đặt App trên điện thoại (PWA)"
+              >
+                <Smartphone className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="hidden sm:inline">Cài App Mobile</span>
+              </button>
+
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer"
                 title="Cấu hình Google Apps Script & Bộ nhớ"
@@ -1787,18 +1719,19 @@ export default function App() {
 
               <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50">
                 <button
-                  onClick={() => startPrintSession('QR')}
+                  onClick={() => handleOpenPrintCenter('QR')}
                   className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="In bộ mã QR"
+                  title="Mở xem trước & In bảng mã QR định danh"
                 >
                   <Printer className="w-4 h-4 text-indigo-500" />
                   MÃ QR
                 </button>
                 <button
-                  onClick={() => startPrintSession('LABEL')}
+                  onClick={() => handleOpenPrintCenter('LABEL')}
                   className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="In tem nhãn kỹ thuật"
+                  title="Mở xem trước & In tem nhãn kỹ thuật"
                 >
+                  <Tag className="w-4 h-4 text-indigo-500" />
                   TEM NHÃN
                 </button>
               </div>
@@ -1813,9 +1746,9 @@ export default function App() {
                   EXCEL
                 </button>
                 <button
-                  onClick={handleExportWebBill}
+                  onClick={() => handleOpenPrintCenter('AUDIT_REPORT')}
                   className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-indigo-700 dark:text-indigo-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Xuất biên bản kiểm định PDF"
+                  title="In Biên bản kiểm kê chuẩn form hành chính"
                 >
                   <FileText className="w-4 h-4 text-indigo-500" />
                   BIÊN BẢN
@@ -2154,6 +2087,14 @@ export default function App() {
         onClose={() => setSelectedItemDetail(null)}
         onEdit={(item) => handleEditClick(item)}
         onUsage={(item) => setSelectedItemForUsage(item)}
+        onPrintQr={(item) => {
+          setPrintLayout('QR');
+          setIsPrintPreviewOpen(true);
+        }}
+        onPrintLabel={(item) => {
+          setPrintLayout('LABEL');
+          setIsPrintPreviewOpen(true);
+        }}
       />
 
       {/* Usage Slips Modal */}
@@ -2250,21 +2191,69 @@ export default function App() {
         currentUsername={currentUsername || 'admin'}
       />
 
-      {/* Mobile Floating Camera Action Button */}
+      {/* Print Preview & Options Center Modal */}
+      <PrintPreviewModal
+        isOpen={isPrintPreviewOpen}
+        onClose={() => {
+          setIsPrintPreviewOpen(false);
+          setPrintLayout('NONE');
+        }}
+        inventory={inventory}
+        filteredInventory={filteredInventory}
+        stats={stats}
+        currentUsername={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName || currentUsername || 'Kiểm kê viên'}
+        onAddToast={addToast}
+      />
+
+      {/* Printable Area: rendered in DOM for standard browser @media print */}
+      <PrintTemplates
+        printLayout={printLayout}
+        inventory={filteredInventory.length > 0 ? filteredInventory : inventory}
+        stats={stats}
+        inspectorName={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName || 'Kỹ sư trực ban Đội TT'}
+      />
+
+      {/* Mobile Bottom Navigation Dock */}
       {role && (
-        <button
-          onClick={() => {
+        <MobileAppDock
+          currentTab={mobileTab}
+          onSelectTab={(tab) => {
+            setMobileTab(tab);
+            if (tab === 'inventory') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (tab === 'stats') {
+              const el = document.getElementById('stats-section');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                window.scrollTo({ top: 180, behavior: 'smooth' });
+              }
+            } else if (tab === 'reports') {
+              handleOpenPrintCenter('AUDIT_REPORT');
+            } else if (tab === 'admin') {
+              if (role === 'admin') {
+                setIsAdminAccountModalOpen(true);
+              } else {
+                setIsSettingsOpen(true);
+              }
+            }
+          }}
+          onOpenScanner={() => {
             setScanTargetItem(null);
             setIsScannerOpen(true);
             playScanBeep(1000, 0.1);
           }}
-          className="fixed bottom-6 right-6 z-40 md:hidden w-14 h-14 bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 text-white rounded-full shadow-2xl transition-all active:scale-90 flex flex-col items-center justify-center border border-indigo-500 cursor-pointer"
-          title="Quét camera nhanh thiết bị"
-        >
-          <Camera className="w-5 h-5 text-white" />
-          <span className="text-[7.5px] uppercase font-black tracking-widest leading-none mt-1">SCAN</span>
-        </button>
+          lowStockCount={lowStockItems.length}
+          missingCount={stats.missingCount}
+          role={role}
+        />
       )}
+
+      {/* Mobile PWA Installation Modal */}
+      <MobileAppInstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </div>
   );
 }

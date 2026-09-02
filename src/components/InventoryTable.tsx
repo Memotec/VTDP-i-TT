@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Layers, MapPin, AlertCircle, Clock, CheckSquare, XCircle,
-  History, FileText, Edit, Trash2, Camera, Box, Cpu
+  History, FileText, Edit, Trash2, Camera, Box, Cpu, Download, Plus
 } from 'lucide-react';
 import { InventoryItem, Role } from '../types.ts';
 
@@ -15,6 +15,8 @@ interface InventoryTableProps {
   onEditItem: (item: InventoryItem) => void;
   onDeleteItem: (item: InventoryItem) => void;
   onOpenScanTarget: (item: InventoryItem) => void;
+  onExportCsv: () => void;
+  onAddNewItem?: () => void;
 }
 
 export const InventoryTable: React.FC<InventoryTableProps> = ({
@@ -26,11 +28,13 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   onOpenUsage,
   onEditItem,
   onDeleteItem,
-  onOpenScanTarget
+  onOpenScanTarget,
+  onExportCsv,
+  onAddNewItem
 }) => {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[2.2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col min-h-[400px] w-full">
-      <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex justify-between items-center px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-3">
         <div className="flex items-center gap-2.5">
           <Layers className="w-5 h-5 text-indigo-500" />
           <span className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">
@@ -38,15 +42,37 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
           </span>
         </div>
 
-        {role === 'admin' && (
+        <div className="flex items-center gap-2">
+          {role === 'admin' && onAddNewItem && (
+            <button
+              onClick={onAddNewItem}
+              className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-blue-500/20"
+              title="Mở form thêm thiết bị mới vào kho"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm Mới Thiết Bị</span>
+            </button>
+          )}
+
           <button
-            onClick={onResetAuditStatus}
-            className="text-xs font-bold text-slate-500 hover:text-rose-600 flex items-center gap-1.5 transition-colors cursor-pointer border border-dashed border-slate-300 dark:border-slate-700 hover:border-rose-400 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/40"
-            title="Hủy kiểm kê toàn bộ thiết bị về ban đầu"
+            onClick={onExportCsv}
+            className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[#2563EB] dark:text-blue-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200 dark:border-blue-900 shadow-xs"
+            title="Xuất danh sách thiết bị đang hiển thị ra file CSV"
           >
-            Reset Kiểm kê
+            <Download className="w-4 h-4" />
+            <span>Xuất CSV</span>
           </button>
-        )}
+
+          {role === 'admin' && (
+            <button
+              onClick={onResetAuditStatus}
+              className="text-xs font-bold text-slate-500 hover:text-rose-600 flex items-center gap-1.5 transition-colors cursor-pointer border border-dashed border-slate-300 dark:border-slate-700 hover:border-rose-400 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/40"
+              title="Hủy kiểm kê toàn bộ thiết bị về ban đầu"
+            >
+              Reset Kiểm kê
+            </button>
+          )}
+        </div>
       </div>
 
       {/* DESKTOP TABLE VIEW */}

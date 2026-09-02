@@ -14,7 +14,8 @@ import {
   Save,
   Database,
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  Download
 } from 'lucide-react';
 import { SyncConfig, StorageConfig } from '../types.ts';
 import { playScanBeep } from '../utils/audio.ts';
@@ -102,6 +103,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       checked ? 'Sẽ hiển thị thông báo khi tự động lưu.' : 'Đã ẩn thông báo khi tự động lưu.',
       'info'
     );
+  };
+
+  const handleToggleAutoBackup24h = (checked: boolean) => {
+    setStorageConfig(prev => ({ ...prev, autoBackup24h: checked }));
+    localStorage.setItem('cns_auto_backup_24h', String(checked));
+    onAddToast(
+      checked
+        ? 'Đã kích hoạt: Tự động tải về bản sao lưu JSON định kỳ 24 giờ.'
+        : 'Đã tắt tính năng tự động tải về bản sao lưu JSON 24 giờ.',
+      checked ? 'success' : 'info'
+    );
+  };
+
+  const formatLastBackup = (timestamp?: number) => {
+    if (!timestamp) return 'Chưa ghi nhận lượt sao lưu nào';
+    const d = new Date(timestamp);
+    return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+  };
+
+  const formatNextBackup = (timestamp?: number) => {
+    if (!timestamp) return 'Sẽ tự động sao lưu sau 24h hoạt động';
+    const nextMs = timestamp + 24 * 60 * 60 * 1000;
+    const diffMs = nextMs - Date.now();
+    if (diffMs <= 0) return 'Đang đến hạn sao lưu tiếp theo';
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `Khoảng ${hours} giờ ${mins} phút nữa`;
   };
 
   const handleManualSave = () => {
@@ -335,6 +363,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                     <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                   </label>
+                </div>
+
+                {/* 24-Hour Periodic Auto-Backup JSON */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 dark:from-slate-800/80 dark:via-slate-800/50 dark:to-slate-900 border border-indigo-200/80 dark:border-slate-700 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 pr-2">
+                      <span className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
+                        <Download className="w-3.5 h-3.5 text-indigo-500" />
+                        Tự động tải về bản sao lưu JSON định kỳ (24 giờ)
+                      </span>
+                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Tự động kích hoạt tải xuống tệp JSON kho vật tư mỗi 24 giờ khi ứng dụng đang hoạt động để lưu trữ ngoại tuyến.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={storageConfig.autoBackup24h !== false}
+                        onChange={(e) => handleToggleAutoBackup24h(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px] pt-1 border-t border-indigo-100 dark:border-slate-700/60">
+                    <div className="p-2.5 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-150 dark:border-slate-700">
+                      <span className="text-slate-400 block mb-0.5 font-medium">Lần sao lưu gần nhất:</span>
+                      <strong className="text-slate-800 dark:text-slate-200 font-mono text-[11px] block truncate">
+                        {formatLastBackup(storageConfig.lastAutoBackupTime)}
+                      </strong>
+                    </div>
+                    <div className="p-2.5 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-150 dark:border-slate-700">
+                      <span className="text-slate-400 block mb-0.5 font-medium">Kỳ sao lưu kế tiếp:</span>
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-[11px] block truncate">
+                        {storageConfig.autoBackup24h === false ? 'Đang tạm dừng' : formatNextBackup(storageConfig.lastAutoBackupTime)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onExportJSON();
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 font-bold py-2.5 px-3 rounded-xl text-[11px] transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    Kích hoạt tải ngay bản sao lưu JSON (Đặt lại chu kỳ 24h)
+                  </button>
                 </div>
               </div>
 
@@ -600,6 +678,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="sr-only"
                     />
                   </label>
+                </div>
+
+                <div className="pt-2 border-t border-indigo-150/40 dark:border-slate-700 flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Download className="w-3 h-3 text-indigo-500" />
+                    Tự động tải về mỗi 24 giờ:
+                  </span>
+                  <span className={`font-bold ${storageConfig.autoBackup24h !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {storageConfig.autoBackup24h !== false ? 'Đang kích hoạt' : 'Tạm tắt'}
+                  </span>
                 </div>
               </div>
             </div>

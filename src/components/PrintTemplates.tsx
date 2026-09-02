@@ -20,7 +20,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
   printLayout,
   inventory,
   stats,
-  inspectorName = 'Kỹ sư trực ban Đội TT',
+  inspectorName = 'Nhân Viên Ca Trực Đội TT',
   auditDate = new Date().toLocaleDateString('vi-VN'),
   auditLocation = 'Kho Vật tư Dự phòng Đội Thông Tin - Trung tâm BĐKT',
   auditNote = 'Tất cả trang thiết bị được kiểm tra đối chiếu trực tiếp giữa hiện vật tại kho và dữ liệu mã định danh.',
@@ -337,7 +337,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                   <div className="audit-org-parent">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
                   <div className="audit-org-child">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
                   <div className="audit-org-dept">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-                  <div className="audit-org-sub">ĐỘI THÔNG TIN CNS/ATM</div>
+                  <div className="audit-org-sub">ĐỘI THÔNG TIN</div>
                 </td>
                 <td className="audit-header-right" style={{ width: '55%' }}>
                   <div className="audit-motto-country">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
@@ -375,7 +375,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                   <th>Tên Trang Thiết Bị</th>
                   <th style={{ width: '90px' }}>Serial (S/N)</th>
                   <th style={{ width: '45px' }}>SL</th>
-                  <th style={{ width: '130px' }}>Kỹ Sư / Đơn Vị Nhận</th>
+                  <th style={{ width: '130px' }}>Nhân Viên / Đơn Vị Nhận</th>
                   <th style={{ width: '150px' }}>Vị Trí Lắp Đặt / Hệ Thống</th>
                   <th style={{ width: '75px' }}>Ngày Xuất</th>
                   <th style={{ width: '85px' }}>Hiện Trạng</th>
@@ -451,7 +451,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                   <div className="audit-org-parent">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
                   <div className="audit-org-child">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
                   <div className="audit-org-dept">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-                  <div className="audit-org-sub" style={{ textDecoration: 'underline' }}>ĐỘI THÔNG TIN CNS/ATM</div>
+                  <div className="audit-org-sub" style={{ textDecoration: 'underline' }}>ĐỘI THÔNG TIN</div>
                   <div style={{ fontSize: '11.5px', marginTop: '6px', fontStyle: 'italic' }}>
                     Số: <strong>{selectedDispatchedRecord.docNumber || `${selectedDispatchedRecord.id.slice(-6)}/PBSD-ĐTT`}</strong>
                   </div>
@@ -467,10 +467,10 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
 
           <div className="audit-title-box">
             <h1 className="audit-main-title">
-              {selectedDispatchedRecord.type === 'HANDOVER_DOC' ? 'BIÊN BẢN BÀN GIAO THIẾT BỊ KỸ THUẬT' : 'PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ'}
+              {selectedDispatchedRecord.type === 'HANDOVER_DOC' ? 'BIÊN BẢN BÀN GIAO VẬT TỰ, THIẾT BỊ' : 'PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ'}
             </h1>
             <div className="audit-sub-title">
-              (V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)
+              (V/v trích xuất, cấp phát và bàn giao vật tư dự phòng tại kho Đội Thông tin)
             </div>
           </div>
 
@@ -478,8 +478,8 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
             <p><strong>I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:</strong></p>
             <p>• <strong>1. Bên Giao (Cấp xuất kho):</strong> {selectedDispatchedRecord.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật'}</p>
             <p style={{ paddingLeft: '16px' }}>
-              - Đại diện: <strong>{selectedDispatchedRecord.giverName || inspectorName || 'Kỹ sư Quản trị Kho'}</strong> &nbsp;|&nbsp; 
-              Chức vụ: <strong>{selectedDispatchedRecord.giverPos || 'Kỹ sư quản lý kho'}</strong>
+              - Đại diện: <strong>{selectedDispatchedRecord.giverName || inspectorName || 'Nhân Viên Kho'}</strong> &nbsp;|&nbsp; 
+              Chức vụ: <strong>{selectedDispatchedRecord.giverPos || 'Nhân Viên Kho'}</strong>
             </p>
             
             <p className="mt-2">• <strong>2. Bên Nhận (Tiếp nhận sử dụng):</strong> {selectedDispatchedRecord.receiverDept || 'Tổ Vận Hành CNS/ATM'}</p>

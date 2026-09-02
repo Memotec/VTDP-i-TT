@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   RotateCcw,
   LogIn,
+  Send,
   CheckCircle2,
   X,
   ExternalLink,
@@ -120,6 +121,20 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
           bg: 'bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800',
           icon: RotateCcw,
           iconColor: 'text-orange-500',
+        };
+      case 'AUTO_BACKUP':
+        return {
+          label: 'SAO LƯU JSON',
+          bg: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+          icon: Download,
+          iconColor: 'text-emerald-500',
+        };
+      case 'REPORT_DISPATCH':
+        return {
+          label: 'GỬI BÁO CÁO',
+          bg: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+          icon: Send,
+          iconColor: 'text-violet-500',
         };
       case 'AUTH_LOGIN':
         return {
@@ -488,6 +503,8 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
                 <option value="INVENTORY_AUDIT">Kiểm kê & Quét QR ({stats.audits})</option>
                 <option value="DATA_IMPORT">Nhập dữ liệu Excel</option>
                 <option value="DATA_RESTORE">Khôi phục Snapshot</option>
+                <option value="AUTO_BACKUP">Sao lưu JSON tự động 24h</option>
+                <option value="REPORT_DISPATCH">Gửi báo cáo qua GAS</option>
                 <option value="AUTH_LOGIN">Đăng nhập tài khoản</option>
               </select>
             </div>

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   QrCode, Search, Database, RefreshCw, Plus, Edit,
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag, Activity
+  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -28,18 +28,25 @@ import { ReturnStockModal } from './components/ReturnStockModal.tsx';
 import { DispatchedDetailModal } from './components/DispatchedDetailModal.tsx';
 import { SystemAuditLogView } from './components/SystemAuditLogView.tsx';
 import { SystemAuditLogModal } from './components/SystemAuditLogModal.tsx';
+import { ItemFormModal } from './components/ItemFormModal.tsx';
+import { LocalDatabase } from './database/localDatabase.ts';
+import { syncService } from './services/syncService.ts';
+import { CloudService } from './services/cloudService.ts';
+import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
+import { ConflictResolutionModal } from './components/ConflictResolutionModal.tsx';
+import { ConflictItem } from './types.ts';
 
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
   {
     id: 'u-admin',
     username: 'admin',
-    fullName: 'Trưởng ca Kỹ thuật CNS',
+    fullName: 'admin',
     role: 'admin',
     password: 'admin',
     createdAt: '2026-01-01',
     status: 'active',
-    notes: 'Quản trị viên trưởng hệ thống (Super Admin)'
+    notes: 'Quản trị Hệ Thống)'
   },
   {
     id: 'u-guest',
@@ -120,15 +127,9 @@ export default function App() {
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
 
-  // Item form editor state
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formPn, setFormPn] = useState('');
-  const [formSn, setFormSn] = useState('');
-  const [formWarehouse, setFormWarehouse] = useState('');
-  const [formLoc, setFormLoc] = useState('');
-  const [formQty, setFormQty] = useState(1);
-  const [formCategory, setFormCategory] = useState('VHF AM');
+  // Item form modal state
+  const [isItemFormModalOpen, setIsItemFormModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   // Modals & Drawers state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -138,6 +139,8 @@ export default function App() {
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
   const [selectedItemForUsage, setSelectedItemForUsage] = useState<InventoryItem | null>(null);
   const [isUsageHistoryOpen, setIsUsageHistoryOpen] = useState(false);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictItem[]>(() => LocalDatabase.getConflicts());
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
@@ -213,22 +216,40 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncStatusDetail, setSyncStatusDetail] = useState('');
 
+  const handleConflictResolved = (conflictId: string, choice: 'keep_local' | 'keep_cloud', resolvedItem: InventoryItem) => {
+    const updatedInv = inventory.map(item => item.id === resolvedItem.id ? resolvedItem : item);
+    saveInventoryLocally(updatedInv);
+    setConflicts(prev => prev.filter(c => c.id !== conflictId));
+  };
+
   // LocalStorage Auto-Save & Data Loss Prevention Configuration
   const [storageConfig, setStorageConfig] = useState<StorageConfig>(() => {
     const savedInterval = localStorage.getItem('cns_autosave_interval');
     const savedWarn = localStorage.getItem('cns_autosave_warn_close');
     const savedShowToast = localStorage.getItem('cns_autosave_show_toast');
     const savedTime = localStorage.getItem('cns_last_saved_time');
+    const savedAutoBackup24h = localStorage.getItem('cns_auto_backup_24h');
+    const savedLastAutoBackup = localStorage.getItem('cns_last_auto_backup_timestamp');
     return {
       autoSaveInterval: savedInterval !== null ? Number(savedInterval) : 0, // default 0: realtime
       warnOnClose: savedWarn !== 'false', // default: true
       showAutoSaveToast: savedShowToast === 'true', // default: false
-      lastSavedTime: savedTime || undefined
+      lastSavedTime: savedTime || undefined,
+      autoBackup24h: savedAutoBackup24h !== 'false', // default: true
+      lastAutoBackupTime: savedLastAutoBackup ? Number(savedLastAutoBackup) : undefined,
     };
   });
 
   // UI state
   const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' | 'info' }[]>([]);
+
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Math.random().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -236,7 +257,13 @@ export default function App() {
     onConfirm: () => void;
   } | null>(null);
   const [printLayout, setPrintLayout] = useState<'NONE' | 'QR' | 'LABEL'>('NONE');
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cns_theme');
+      return saved !== 'light';
+    }
+    return true;
+  });
 
   // Refs for current values
   const inventoryRef = useRef<InventoryItem[]>([]);
@@ -365,12 +392,15 @@ export default function App() {
   // Initialization
   useEffect(() => {
     const savedTheme = localStorage.getItem('cns_theme');
-    if (savedTheme === 'dark') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    } else {
+    if (savedTheme === 'light') {
       setDarkMode(false);
       document.documentElement.classList.remove('dark');
+    } else {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+      if (!savedTheme) {
+        localStorage.setItem('cns_theme', 'dark');
+      }
     }
 
     const localInv = localStorage.getItem('cns_inventory_v30_stable');
@@ -406,16 +436,33 @@ export default function App() {
     };
   }, []);
 
+  // Configure SyncService with current cloud URL and actor
+  useEffect(() => {
+    syncService.configure(syncConfig.webAppUrl, currentUsername || 'guest');
+  }, [syncConfig.webAppUrl, currentUsername]);
+
+  // Subscribe to SyncService notifications & conflict events
+  useEffect(() => {
+    const unsub = syncService.subscribe(syncState => {
+      setConflicts(syncState.conflicts);
+      if (syncState.conflicts.length > 0) {
+        setIsConflictModalOpen(true);
+      }
+    });
+    return unsub;
+  }, []);
+
   const saveInventoryLocally = (newInv: InventoryItem[]) => {
     setInventory(newInv);
-    try {
-      localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(newInv));
-      const nowStr = new Date().toLocaleTimeString('vi-VN');
-      localStorage.setItem('cns_last_saved_time', nowStr);
-      setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
-    } catch (err) {
-      console.warn('LocalStorage save error:', err);
-    }
+    LocalDatabase.saveInventory(newInv);
+    const nowStr = new Date().toLocaleTimeString('vi-VN');
+    localStorage.setItem('cns_last_saved_time', nowStr);
+    setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
+  };
+
+  const saveDispatchedRecordsLocally = (newRecords: DispatchedRecord[]) => {
+    setDispatchedRecords(newRecords);
+    LocalDatabase.saveDispatchedRecords(newRecords);
   };
 
   const saveAuditLogsLocally = (newLogs: SystemAuditLogEntry[]) => {
@@ -479,7 +526,7 @@ export default function App() {
     setConfirmDialog({
       isOpen: true,
       title: 'DỌN DẸP / XÓA TOÀN BỘ NHẬT KÝ',
-      message: 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử nhật ký kiểm toán hệ thống? Hành động này sẽ làm mới danh sách nhật ký.',
+      message: 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử nhật ký hệ thống? Hành động này sẽ làm mới danh sách nhật ký.',
       onConfirm: () => {
         saveAuditLogsLocally([]);
         addToast('Đã dọn dẹp sạch toàn bộ nhật ký hệ thống!', 'info');
@@ -487,6 +534,104 @@ export default function App() {
       }
     });
   };
+
+  // Periodic 24-Hour Automatic JSON Backup Function
+  const triggerAutoBackupJSON = useCallback((isManual = false) => {
+    try {
+      const currentInv = inventoryRef.current && inventoryRef.current.length > 0 ? inventoryRef.current : inventory;
+      if (!currentInv || currentInv.length === 0) {
+        if (isManual) {
+          addToast('Kho hiện tại chưa có dữ liệu để sao lưu!', 'info');
+        }
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+      const fileName = isManual
+        ? `CNS_ATM_Backup_${dateStr}_${timeStr}.json`
+        : `CNS_ATM_AutoBackup_24H_${dateStr}_${timeStr}.json`;
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentInv, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', fileName);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      const nowMs = Date.now();
+      localStorage.setItem('cns_last_auto_backup_timestamp', String(nowMs));
+      setStorageConfig(prev => ({ ...prev, lastAutoBackupTime: nowMs }));
+
+      if (isManual) {
+        addToast(`Xuất tệp sao lưu JSON thành công (${currentInv.length} thiết bị)!`, 'success');
+      } else {
+        addToast(`Hệ thống đã tự động tải về bản sao lưu JSON định kỳ 24h (${currentInv.length} thiết bị).`, 'success');
+      }
+      playScanBeep(1000, 0.15);
+
+      addSystemAuditLog(
+        'AUTO_BACKUP',
+        isManual ? 'Xuất sao lưu JSON thủ công' : 'Tự động tải về bản sao lưu JSON định kỳ (24 giờ)',
+        `Hệ thống tải về tệp sao lưu JSON kho thiết bị gồm ${currentInv.length} bản ghi: ${fileName}`
+      );
+    } catch (err) {
+      console.error('Lỗi khi tải bản sao lưu JSON:', err);
+      if (isManual) {
+        addToast('Không thể tạo tệp sao lưu JSON!', 'error');
+      }
+    }
+  }, [inventory, addToast, addSystemAuditLog]);
+
+  // Periodic Auto-Backup Timer: Trigger every 24 hours while active
+  useEffect(() => {
+    if (storageConfig.autoBackup24h === false) return;
+
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+    const checkAndTriggerBackup = () => {
+      const savedTimestampStr = localStorage.getItem('cns_last_auto_backup_timestamp');
+      const now = Date.now();
+
+      if (!savedTimestampStr) {
+        // Initial setup: set anchor timestamp so the 24h countdown starts
+        localStorage.setItem('cns_last_auto_backup_timestamp', String(now));
+        setStorageConfig(prev => ({ ...prev, lastAutoBackupTime: now }));
+        return;
+      }
+
+      const lastBackup = Number(savedTimestampStr);
+      if (isNaN(lastBackup) || lastBackup <= 0) {
+        localStorage.setItem('cns_last_auto_backup_timestamp', String(now));
+        setStorageConfig(prev => ({ ...prev, lastAutoBackupTime: now }));
+        return;
+      }
+
+      // Check if 24 hours (or more) have passed since the last backup
+      if (now - lastBackup >= TWENTY_FOUR_HOURS) {
+        if (inventoryRef.current && inventoryRef.current.length > 0) {
+          triggerAutoBackupJSON(false);
+        }
+      }
+    };
+
+    // Initial check after 4 seconds to let app finish hydration
+    const initialTimer = setTimeout(() => {
+      checkAndTriggerBackup();
+    }, 4000);
+
+    // Periodic check interval: checks every 60 seconds while app is active
+    const intervalTimer = setInterval(() => {
+      checkAndTriggerBackup();
+    }, 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, [storageConfig.autoBackup24h, triggerAutoBackupJSON]);
 
 
   const handleManualSaveLocalStorage = () => {
@@ -526,14 +671,6 @@ export default function App() {
   const saveCategoriesLocally = (newCats: string[]) => {
     setCategories(newCats);
     localStorage.setItem('cns_categories_v30', JSON.stringify(newCats));
-  };
-
-  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Math.random().toString();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
   };
 
   const lowStockItems = useMemo(() => {
@@ -661,7 +798,8 @@ export default function App() {
     localStorage.removeItem('cns_current_username');
     setRole(null);
     setCurrentUsername('');
-    setEditingItemId(null);
+    setEditingItem(null);
+    setIsItemFormModalOpen(false);
     clearForm();
     addToast('Đã đăng xuất tài khoản.', 'info');
   };
@@ -679,14 +817,17 @@ export default function App() {
   };
 
   const clearForm = () => {
-    setEditingItemId(null);
-    setFormName('');
-    setFormPn('');
-    setFormSn('');
-    setFormWarehouse('');
-    setFormLoc('');
-    setFormQty(1);
-    setFormCategory('VHF AM');
+    setEditingItem(null);
+    setIsItemFormModalOpen(false);
+  };
+
+  const handleOpenAddNewModal = () => {
+    if (role !== 'admin') {
+      addToast('Chỉ quản lý (Admin) mới có quyền thêm thiết bị mới.', 'error');
+      return;
+    }
+    setEditingItem(null);
+    setIsItemFormModalOpen(true);
   };
 
   const handleEditClick = (item: InventoryItem) => {
@@ -694,96 +835,94 @@ export default function App() {
       addToast('Chỉ quản lý (Admin) mới được phép chỉnh sửa thiết bị.', 'error');
       return;
     }
-    setEditingItemId(item.id);
-    setFormName(item.name || '');
-    setFormPn(item.pn || '');
-    setFormSn(item.sn || '');
-    setFormWarehouse(item.warehouse || '');
-    setFormLoc(item.loc || '');
-    setFormQty(item.qty || 1);
-    setFormCategory(item.category || 'VHF AM');
-
-    const el = document.getElementById('editor-panel');
-    el?.scrollIntoView({ behavior: 'smooth' });
-    addToast('Đã tải thông tin thiết bị lên biểu mẫu.', 'info');
+    setEditingItem(item);
+    setIsItemFormModalOpen(true);
+    addToast('Đã mở cửa sổ biểu mẫu chỉnh sửa thiết bị.', 'info');
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim() || !formSn.trim()) {
+  const handleItemFormSubmit = (formData: {
+    name: string;
+    pn: string;
+    sn: string;
+    warehouse: string;
+    loc: string;
+    qty: number;
+    category: string;
+  }) => {
+    if (!formData.name.trim() || !formData.sn.trim()) {
       addToast('Vui lòng điền các thông tin bắt buộc (*)', 'error');
       return;
     }
 
-    if (editingItemId) {
-      const existingItem = inventory.find(i => i.id === editingItemId);
-      const updated = inventory.map(item => {
-        if (item.id === editingItemId) {
-          return {
-            ...item,
-            name: formName.trim(),
-            pn: formPn.trim(),
-            sn: formSn.trim(),
-            warehouse: formWarehouse.trim().toUpperCase(),
-            loc: formLoc.trim(),
-            qty: Number(formQty) || 1,
-            category: formCategory
-          };
-        }
-        return item;
-      });
+    if (editingItem) {
+      const existingItem = inventory.find(i => i.id === editingItem.id);
+      const updatedItem = LocalDatabase.applyMetadata({
+        ...(existingItem || editingItem),
+        name: formData.name.trim(),
+        pn: formData.pn.trim(),
+        sn: formData.sn.trim(),
+        warehouse: formData.warehouse.trim().toUpperCase(),
+        loc: formData.loc.trim(),
+        qty: Number(formData.qty) || 1,
+        category: formData.category
+      }, currentUsername || 'guest', false);
+
+      const updated = inventory.map(item => item.id === editingItem.id ? updatedItem : item);
       saveInventoryLocally(updated);
+      syncService.enqueue('equipment', updatedItem.id, 'UPDATE', updatedItem, currentUsername);
       addToast('Cập nhật dữ liệu thiết bị thành công!', 'success');
       playScanBeep(900, 0.1);
 
       addSystemAuditLog(
         'ITEM_UPDATE',
         'Chỉnh sửa thông tin thiết bị',
-        `Cập nhật thiết bị "${formName.trim()}": Kho ${formWarehouse.trim().toUpperCase()}, Vị trí ${formLoc.trim()}, SL ${formQty}, Loại ${formCategory}`,
+        `Cập nhật thiết bị "${formData.name.trim()}": Kho ${formData.warehouse.trim().toUpperCase()}, Vị trí ${formData.loc.trim()}, SL ${formData.qty}, Loại ${formData.category}`,
         {
-          id: editingItemId,
-          name: formName.trim(),
-          sn: formSn.trim(),
-          category: formCategory,
+          id: editingItem.id,
+          name: formData.name.trim(),
+          sn: formData.sn.trim(),
+          category: formData.category,
           prevData: `SL: ${existingItem?.qty || 1} | Kho: ${existingItem?.warehouse || 'Chưa gán'} | Vị trí: ${existingItem?.loc || 'Chưa gán'}`,
-          newData: `SL: ${formQty} | Kho: ${formWarehouse.trim().toUpperCase()} | Vị trí: ${formLoc.trim()}`
+          newData: `SL: ${formData.qty} | Kho: ${formData.warehouse.trim().toUpperCase()} | Vị trí: ${formData.loc.trim()}`
         }
       );
 
-      const newQtyNum = Number(formQty) || 0;
+      const newQtyNum = Number(formData.qty) || 0;
       if (newQtyNum <= 1) {
         setTimeout(() => {
-          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formName.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formData.name.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
         }, 350);
       }
     } else {
-      const isDuplicate = inventory.some(item => item.sn.toLowerCase() === formSn.trim().toLowerCase());
+      const isDuplicate = inventory.some(item => item.sn.toLowerCase() === formData.sn.trim().toLowerCase());
       if (isDuplicate) {
-        addToast(`Cảnh báo: S/N "${formSn}" đã tồn tại trong hệ thống!`, 'error');
+        addToast(`Cảnh báo: S/N "${formData.sn}" đã tồn tại trong hệ thống!`, 'error');
         return;
       }
 
-      const newItem: InventoryItem = {
+      const rawItem: InventoryItem = {
         id: `item-${Date.now()}`,
-        name: formName.trim(),
-        pn: formPn.trim(),
-        sn: formSn.trim(),
-        warehouse: formWarehouse.trim().toUpperCase(),
-        loc: formLoc.trim(),
-        qty: Number(formQty) || 1,
+        name: formData.name.trim(),
+        pn: formData.pn.trim(),
+        sn: formData.sn.trim(),
+        warehouse: formData.warehouse.trim().toUpperCase(),
+        loc: formData.loc.trim(),
+        qty: Number(formData.qty) || 1,
         auditStatus: null,
         auditNote: '',
-        category: formCategory,
+        category: formData.category,
         history: []
       };
+      const newItem = LocalDatabase.applyMetadata(rawItem, currentUsername || 'guest', true);
       saveInventoryLocally([...inventory, newItem]);
+      syncService.enqueue('equipment', newItem.id, 'CREATE', newItem, currentUsername);
       addToast('Đã thêm thiết bị mới vào kho thành công!', 'success');
       playScanBeep(880, 0.15);
 
       addSystemAuditLog(
         'ITEM_CREATE',
         'Thêm mới thiết bị vào kho',
-        `Nhập mới thiết bị "${formName.trim()}" (S/N: ${formSn.trim()}, P/N: ${formPn.trim() || 'N/A'}, SL: ${formQty}) tại Kho ${formWarehouse.trim().toUpperCase()}`,
+        `Nhập mới thiết bị "${formData.name.trim()}" (S/N: ${formData.sn.trim()}, P/N: ${formData.pn.trim() || 'N/A'}, SL: ${formData.qty}) tại Kho ${formData.warehouse.trim().toUpperCase()}`,
         {
           id: newItem.id,
           name: newItem.name,
@@ -793,10 +932,10 @@ export default function App() {
         }
       );
 
-      const newQtyNum = Number(formQty) || 0;
+      const newQtyNum = Number(formData.qty) || 0;
       if (newQtyNum <= 1) {
         setTimeout(() => {
-          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formName.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Thiết bị "${formData.name.trim()}" có số lượng là ${newQtyNum} (Dưới ngưỡng an toàn <= 1 cái)!`, newQtyNum === 0 ? 'error' : 'info');
         }, 350);
       }
     }
@@ -815,6 +954,7 @@ export default function App() {
       onConfirm: () => {
         const nextInv = inventory.filter(i => i.id !== item.id);
         saveInventoryLocally(nextInv);
+        syncService.enqueue('equipment', item.id, 'DELETE', { id: item.id }, currentUsername);
         addToast('Đã xóa thiết bị khỏi cơ sở dữ liệu.', 'success');
         playScanBeep(400, 0.3);
 
@@ -837,6 +977,7 @@ export default function App() {
   };
 
   const handleQuickStatusClick = (item: InventoryItem, nextStatus: 'OK' | 'MISSING' | null) => {
+    let touchedItem: InventoryItem | null = null;
     const updated = inventory.map(i => {
       if (i.id === item.id) {
         const nowStr = new Date().toLocaleString('vi-VN');
@@ -847,19 +988,23 @@ export default function App() {
             status: nextStatus,
             date: nowStr,
             note: 'Kiểm bằng nhấp chọn nhanh trên danh sách',
-            user: role || 'guest'
+            user: currentUsername || role || 'guest'
           });
         }
-        return {
+        touchedItem = LocalDatabase.applyMetadata({
           ...i,
           auditStatus: nextStatus,
           auditDate: nextStatus ? nowStr : null,
           history: updatedHistory
-        };
+        }, currentUsername || 'guest', false);
+        return touchedItem;
       }
       return i;
     });
     saveInventoryLocally(updated);
+    if (touchedItem) {
+      syncService.enqueue('equipment', (touchedItem as InventoryItem).id, 'STATUS_CHANGE', touchedItem, currentUsername);
+    }
     addToast(`Đã cập nhật trạng thái cho S/N: ${item.sn}`, 'success');
     playScanBeep(nextStatus === 'OK' ? 950 : 350, 0.12);
 
@@ -884,13 +1029,14 @@ export default function App() {
       title: 'Đặt lại trạng thái kiểm kê',
       message: 'Hành động này sẽ XÓA TOÀN BỘ trạng thái kiểm kê hiện tại của tất cả thiết bị về trạng thái CHƯA KIỂM. Bạn có đồng ý thực hiện?',
       onConfirm: () => {
-        const reseted = inventory.map(item => ({
+        const reseted = inventory.map(item => LocalDatabase.applyMetadata({
           ...item,
           auditStatus: null,
           auditDate: null,
           auditNote: ''
-        }));
+        }, currentUsername || 'guest', false));
         saveInventoryLocally(reseted);
+        syncService.enqueue('inventory_batch', `RESET_ALL_${Date.now()}`, 'BATCH_UPSERT', { action: 'RESET_ALL_AUDIT' }, currentUsername);
         addToast('Đã đặt toàn bộ thiết bị về trạng thái Chưa Kiểm kê.', 'info');
         playScanBeep(300, 0.4);
 
@@ -903,6 +1049,46 @@ export default function App() {
         setConfirmDialog(null);
       }
     });
+  };
+
+  const handleExportCsv = () => {
+    if (filteredInventory.length === 0) {
+      addToast('Không có dữ liệu trong danh sách lọc để xuất CSV!', 'error');
+      return;
+    }
+
+    const headers = ['STT', 'Tên Thiết Bị', 'Chủng Loại', 'Part Number (P/N)', 'Serial Number (S/N)', 'Số Lượng', 'Mã Kho', 'Vị Trí', 'Trạng Thái Kiểm Kê', 'Ngày Kiểm Kê', 'Ghi Chú'];
+    const rows = filteredInventory.map((item, idx) => [
+      idx + 1,
+      `"${(item.name || '').replace(/"/g, '""')}"`,
+      `"${(item.category || '').replace(/"/g, '""')}"`,
+      `"${(item.pn || '').replace(/"/g, '""')}"`,
+      `"${(item.sn || '').replace(/"/g, '""')}"`,
+      item.qty,
+      `"${(item.warehouse || '').replace(/"/g, '""')}"`,
+      `"${(item.loc || '').replace(/"/g, '""')}"`,
+      `"${item.auditStatus === 'OK' ? 'Đủ/Tốt' : item.auditStatus === 'MISSING' ? 'Thiếu/Thất lạc' : 'Chưa kiểm kê'}"`,
+      `"${(item.auditDate || '').replace(/"/g, '""')}"`,
+      `"${(item.notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `danh_sach_vat_tu_cns_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addToast(`Đã xuất thành công ${filteredInventory.length} thiết bị ra file CSV!`, 'success');
+
+    addSystemAuditLog(
+      'DATA_IMPORT',
+      'Xuất dữ liệu kho CSV',
+      `Đã xuất ${filteredInventory.length} mục thiết bị ra file CSV với bộ lọc hiện tại.`
+    );
   };
 
   // Scanning logic
@@ -935,19 +1121,23 @@ export default function App() {
         status: status,
         date: nowStr,
         note: note.trim() || 'Kiểm kê tự động bằng hệ thống quét QR',
-        user: roleRef.current || 'guest'
+        user: currentUsername || roleRef.current || 'guest'
       };
 
-      updated[idx] = {
+      updated[idx] = LocalDatabase.applyMetadata({
         ...i,
         auditStatus: status,
         auditDate: nowStr,
         auditNote: note.trim() || 'Quét mã xác nhận Đủ',
         history: i.history ? [entry, ...i.history] : [entry]
-      };
+      }, currentUsername || 'guest', false);
     });
 
     saveInventoryLocally(updated);
+    matchingItemsIdx.forEach(idx => {
+      const item = updated[idx];
+      syncService.enqueue('equipment', item.id, 'STATUS_CHANGE', item, currentUsername);
+    });
     playScanBeep(status === 'OK' ? 1047 : 330, 0.16);
     addToast(`Quét thành công! Thiết bị đã được đánh dấu ${status === 'OK' ? 'ĐỦ' : 'THIẾU'}.`, 'success');
 
@@ -965,9 +1155,6 @@ export default function App() {
       }
     );
 
-    if (syncConfigRef.current.autoSync) {
-      setTimeout(() => syncToCloud(), 300);
-    }
     return true;
   };
 
@@ -986,16 +1173,13 @@ export default function App() {
 
     try {
       const activeUrl = targetUrl || syncConfig.webAppUrl;
-      const url = `${activeUrl}?t=${Date.now()}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Yêu cầu dữ liệu thất bại từ Google Apps Script.');
+      const res = await CloudService.pullFromCloud(activeUrl);
 
-      const resText = await res.text();
-      if (resText.trim().startsWith('<!DOCTYPE') || resText.trim().startsWith('<html')) {
-        throw new Error('Đường dẫn Apps Script phản hồi HTML. Vui lòng kiểm tra quyền truy cập (Anyone).');
+      if (!res.success) {
+        throw new Error(res.error || 'Yêu cầu dữ liệu thất bại từ Google Apps Script.');
       }
 
-      const data = JSON.parse(resText);
+      const data = res.items;
       if (data && Array.isArray(data)) {
         if (data.length > 0) {
           const formatted: InventoryItem[] = data.map((item: Partial<InventoryItem>, index: number) => ({
@@ -1010,14 +1194,49 @@ export default function App() {
             auditDate: item.auditDate || null,
             auditNote: item.auditNote || '',
             category: item.category || 'Khác',
-            history: item.history || []
+            history: item.history || [],
+            version: item.version || 1,
+            updatedAt: item.updatedAt || new Date().toISOString()
           }));
-          saveInventoryLocally(formatted);
+
+          // Run conflict check with existing local inventory
+          const detectedConflicts = syncService.checkForConflicts(formatted, inventory);
+          if (detectedConflicts.length > 0) {
+            setConflicts(detectedConflicts);
+            setIsConflictModalOpen(true);
+            addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
+          }
+
+          // Merge items that have no conflicts
+          const conflictIds = new Set(detectedConflicts.map(c => c.entityId));
+          const localMap = new Map<string, InventoryItem>(inventory.map(i => [i.id, i]));
+          const merged: InventoryItem[] = [];
+
+          // Keep cloud items or resolved items
+          formatted.forEach(cloudItem => {
+            if (conflictIds.has(cloudItem.id)) {
+              // keep local until user resolves
+              const localVersion = localMap.get(cloudItem.id);
+              if (localVersion) merged.push(localVersion);
+              else merged.push(cloudItem);
+            } else {
+              merged.push(cloudItem);
+            }
+          });
+
+          // Add any strictly local new items not on cloud yet
+          inventory.forEach(localItem => {
+            if (!formatted.some(ci => ci.id === localItem.id)) {
+              merged.push(localItem);
+            }
+          });
+
+          saveInventoryLocally(merged);
           const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
           setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
           setSyncStatus('success');
           setSyncStatusDetail(`Đã tải xuống thành công ${formatted.length} thiết bị.`);
-          addToast(`Đồng bộ thành công! Đã tải xuống ${formatted.length} thiết bị.`, 'success');
+          addToast(`Đồng bộ thành công! Đã xử lý ${formatted.length} thiết bị từ Cloud.`, 'success');
           playScanBeep(1000, 0.2);
         } else {
           setSyncStatus('success');
@@ -1045,31 +1264,27 @@ export default function App() {
     }
 
     setSyncStatus('syncing');
-    setSyncStatusDetail('Đang tải dữ liệu lên Cloud...');
+    setSyncStatusDetail('Đang đồng bộ dữ liệu lên Cloud...');
 
     try {
-      const params = new URLSearchParams();
-      params.append('data', JSON.stringify(inventory));
-      params.append('timestamp', Date.now().toString());
-      params.append('user', role || 'anonymous');
+      // First process any pending queue
+      await syncService.processQueue(true);
 
-      await fetch(syncConfig.webAppUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        cache: 'no-cache',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params
-      });
+      // Perform a full inventory push to ensure Google Sheet matches state
+      const res = await CloudService.pushToCloud(syncConfig.webAppUrl, inventory, syncService.getQueue(), currentUsername || role || 'anonymous');
+      if (!res.success) {
+        throw new Error(res.error || 'Đẩy dữ liệu thất bại');
+      }
 
       const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
       setSyncStatus('success');
-      setSyncStatusDetail('Đã đẩy dữ liệu thành công lên Apps Script.');
-      addToast('Đã đẩy toàn bộ danh sách lên Cloud thành công!', 'success');
+      setSyncStatusDetail('Đã đồng bộ dữ liệu thành công lên Apps Script.');
+      addToast('Đã đồng bộ toàn bộ dữ liệu lên Cloud thành công!', 'success');
       playScanBeep(980, 0.15);
-    } catch {
+    } catch (err: any) {
       setSyncStatus('error');
-      setSyncStatusDetail('Đẩy dữ liệu thất bại. Hãy kiểm tra kết nối mạng.');
+      setSyncStatusDetail(err?.message || 'Đẩy dữ liệu thất bại. Hãy kiểm tra kết nối mạng.');
       addToast('Không thể đẩy dữ liệu lên Cloud. Hãy thử lại.', 'error');
     }
   };
@@ -1110,19 +1325,7 @@ export default function App() {
   };
 
   const handleExportJSON = () => {
-    try {
-      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(inventory, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', `CNS_ATM_Backup_${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-      addToast('Xuất tệp sao lưu JSON thành công!', 'success');
-      playScanBeep(1000, 0.1);
-    } catch {
-      addToast('Không thể xuất tệp sao lưu!', 'error');
-    }
+    triggerAutoBackupJSON(true);
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1713,7 +1916,7 @@ export default function App() {
     localStorage.setItem('cns_usage_slips_v1', JSON.stringify(nextSlips));
 
     // Also register into the centralized Dispatched Equipment Registry
-    const newDispatchRecord: DispatchedRecord = {
+    const rawDispatchRecord: DispatchedRecord = {
       id: `disp-u-${Date.now()}`,
       type: 'USAGE_SLIP',
       docNumber: newSlip.docNumber || `PBSD-${new Date().getFullYear()}/${String(dispatchedRecords.length + 1).padStart(3, '0')}`,
@@ -1738,10 +1941,11 @@ export default function App() {
       notes: newSlip.notes,
       status: 'DEPLOYED'
     };
+    const newDispatchRecord = LocalDatabase.applyMetadata(rawDispatchRecord, currentUsername || 'guest', true);
 
     const nextDispatches = [newDispatchRecord, ...dispatchedRecords];
-    setDispatchedRecords(nextDispatches);
-    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(nextDispatches));
+    saveDispatchedRecordsLocally(nextDispatches);
+    syncService.enqueue('dispatched_record', newDispatchRecord.id, 'CREATE', newDispatchRecord, currentUsername);
 
     if (deductInv && selectedItemForUsage) {
       let resultedQty = selectedItemForUsage.qty;
@@ -1755,9 +1959,11 @@ export default function App() {
             status: 'OK',
             date: newSlip.date,
             note: `Xuất sử dụng x${newSlip.qtyUsed} bộ tại: ${newSlip.targetLocation || 'Hệ thống'} (Người nhận: ${newSlip.user})`,
-            user: role || 'guest'
+            user: currentUsername || role || 'guest'
           });
-          return { ...item, qty: newQty, history: updatedHistory };
+          const withMeta = LocalDatabase.applyMetadata({ ...item, qty: newQty, history: updatedHistory }, currentUsername || 'guest', false);
+          syncService.enqueue('equipment', withMeta.id, 'UPDATE', withMeta, currentUsername);
+          return withMeta;
         }
         return item;
       });
@@ -1801,7 +2007,7 @@ export default function App() {
     const docDateStr = `${handoverDay}/${handoverMonth}/${handoverYear}`;
     const newRecords: DispatchedRecord[] = handoverRows.map((row, idx) => {
       const matchedInv = inventory.find(i => i.id === row.id || (row.sn && i.sn.toLowerCase() === row.sn.toLowerCase()));
-      return {
+      const rawRec: DispatchedRecord = {
         id: `disp-h-${Date.now()}-${idx}`,
         type: 'HANDOVER_DOC',
         docNumber: handoverNo || `${Math.floor(100 + Math.random() * 900)}/KT`,
@@ -1826,11 +2032,14 @@ export default function App() {
         notes: row.note || '',
         status: 'DEPLOYED'
       };
+      return LocalDatabase.applyMetadata(rawRec, currentUsername || 'guest', true);
     });
 
     const updatedDispatches = [...newRecords, ...dispatchedRecords];
-    setDispatchedRecords(updatedDispatches);
-    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(updatedDispatches));
+    saveDispatchedRecordsLocally(updatedDispatches);
+    newRecords.forEach(r => {
+      syncService.enqueue('dispatched_record', r.id, 'CREATE', r, currentUsername);
+    });
 
     // Deduct stock if requested
     if (deductStock) {
@@ -1845,9 +2054,11 @@ export default function App() {
               status: 'OK',
               date: docDateStr,
               note: `Bàn giao x${row.qty} theo BB số ${handoverNo} cho ${handoverReceiverName} (${handoverReceiverDept})`,
-              user: role || 'guest'
+              user: currentUsername || role || 'guest'
             });
-            return { ...invItem, qty: newQty, history };
+            const withMeta = LocalDatabase.applyMetadata({ ...invItem, qty: newQty, history }, currentUsername || 'guest', false);
+            syncService.enqueue('equipment', withMeta.id, 'UPDATE', withMeta, currentUsername);
+            return withMeta;
           }
           return invItem;
         });
@@ -1887,20 +2098,21 @@ export default function App() {
     // 1. Update dispatched record
     const updatedDispatches = dispatchedRecords.map(r => {
       if (r.id === recordId) {
-        return {
+        const withMeta = LocalDatabase.applyMetadata({
           ...r,
           status: 'RETURNED' as const,
           returnedDate: todayStr,
           returnedBy: returnRecipient,
           returnedQty: returnQty,
           returnNote: `Tình trạng: ${returnCondition}. Ghi chú: ${returnNote}`
-        };
+        }, currentUsername || 'guest', false);
+        syncService.enqueue('dispatched_record', withMeta.id, 'UPDATE', withMeta, currentUsername);
+        return withMeta;
       }
       return r;
     });
 
-    setDispatchedRecords(updatedDispatches);
-    localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(updatedDispatches));
+    saveDispatchedRecordsLocally(updatedDispatches);
 
     // 2. Increment inventory stock
     let updatedInv = [...inventory];
@@ -1914,17 +2126,19 @@ export default function App() {
         status: returnCondition.includes('Hỏng') || returnCondition.includes('Lỗi') ? 'MISSING' : 'OK',
         date: todayStr,
         note: `Thu hồi/Nhập trả kho x${returnQty} từ ${targetRecord.receiverName || targetRecord.targetLocation}. Tình trạng: ${returnCondition}. Người nhận: ${returnRecipient}`,
-        user: role || 'guest'
+        user: currentUsername || role || 'guest'
       });
 
-      updatedInv[matchedIndex] = {
+      const withMeta = LocalDatabase.applyMetadata({
         ...existingItem,
         qty: existingItem.qty + returnQty,
         history
-      };
+      }, currentUsername || 'guest', false);
+      updatedInv[matchedIndex] = withMeta;
+      syncService.enqueue('equipment', withMeta.id, 'UPDATE', withMeta, currentUsername);
     } else {
       // If item was previously deleted from stock, re-create it in inventory
-      const newItem: InventoryItem = {
+      const rawNewItem: InventoryItem = {
         id: targetRecord.itemId || `inv-ret-${Date.now()}`,
         name: targetRecord.itemName,
         category: targetRecord.category || 'Vật tư CNS',
@@ -1940,10 +2154,12 @@ export default function App() {
           status: returnCondition.includes('Hỏng') || returnCondition.includes('Lỗi') ? 'MISSING' : 'OK',
           date: todayStr,
           note: `Thu hồi hoàn kho thiết bị từ sổ theo dõi (${targetRecord.docNumber}). Tình trạng: ${returnCondition}`,
-          user: role || 'guest'
+          user: currentUsername || role || 'guest'
         }]
       };
+      const newItem = LocalDatabase.applyMetadata(rawNewItem, currentUsername || 'guest', true);
       updatedInv.unshift(newItem);
+      syncService.enqueue('equipment', newItem.id, 'CREATE', newItem, currentUsername);
     }
 
     saveInventoryLocally(updatedInv);
@@ -1976,8 +2192,8 @@ export default function App() {
       message: `Bạn có chắc chắn muốn xóa hồ sơ bàn giao/sử dụng của thiết bị "${record.itemName}" (S/N: ${record.sn}, Mã số: ${record.docNumber}) khỏi sổ theo dõi?`,
       onConfirm: () => {
         const next = dispatchedRecords.filter(r => r.id !== recordId);
-        setDispatchedRecords(next);
-        localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(next));
+        saveDispatchedRecordsLocally(next);
+        syncService.enqueue('dispatched_record', recordId, 'DELETE', { id: recordId }, currentUsername);
         addToast('Đã xóa hồ sơ khỏi Sổ Theo Dõi!', 'success');
 
         addSystemAuditLog(
@@ -2285,7 +2501,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col antialiased">
+    <div className="min-h-screen bg-[#D2D3D6] dark:bg-[#1E2430] text-slate-100 flex flex-col antialiased">
       {/* Toast notifications */}
       <div className="fixed top-6 right-6 z-[99999] flex flex-col gap-3 w-full max-w-sm">
         {toasts.map(t => (
@@ -2340,7 +2556,7 @@ export default function App() {
 
       {/* NOT LOGGED IN SCREEN */}
       {!role ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[#1E2430] dark:bg-[#1E2430]">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 px-8 py-10 sm:px-10 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-500/20">
@@ -2424,389 +2640,243 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* MAIN LOGGED IN APP */
-        <div className="flex-1 flex flex-col w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
-          {/* Header */}
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-md shadow-indigo-600/15 flex items-center justify-center">
-                  <Database className="w-7 h-7" />
-                </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5 flex-wrap">
-                    VẬT TƯ DỰ PHÒNG TẠI CHỖ
-                    <span className="text-xs font-black bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full uppercase tracking-wider border border-indigo-200 dark:border-indigo-900">
-                      Đội Thông Tin
-                    </span>
-                  </h1>
-                  <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
-                    Hệ thống quản lý định danh & kiểm định hiện vật nội bộ CNS/ATM
-                  </p>
-                </div>
+        /* MODERN ENTERPRISE DASHBOARD LAYOUT */
+        <div className="min-h-screen bg-[#1E2430] dark:bg-[#1E2430] text-slate-100 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
+          {/* Left Sidebar */}
+          <aside className="w-full md:w-72 bg-white dark:bg-[#131B2E] border-r border-[#E2E8F0] dark:border-slate-800 flex flex-col shrink-0">
+            {/* Sidebar Brand Header */}
+            <div className="p-5 border-b border-[#E2E8F0] dark:border-slate-800 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/25">
+                <Database className="w-5.5 h-5.5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white truncate">CNS/ATM</h2>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Đội Thông Tin • Bảo Đảm Kỹ Thuật</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-2xl shadow-sm text-xs sm:text-sm font-semibold">
-                <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'syncing' ? 'bg-indigo-500 animate-ping' : syncStatus === 'success' ? 'bg-emerald-500' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-slate-400'}`}></span>
-                <span className="text-slate-700 dark:text-slate-200 font-extrabold uppercase text-xs">
-                  {syncStatus === 'syncing' ? 'Đang sync...' : syncStatus === 'success' ? 'Đã Sync Cloud' : 'Offline'}
-                </span>
-                {syncConfig.lastSynced && (
-                  <span className="text-xs text-slate-400 ml-1 font-normal">({syncConfig.lastSynced})</span>
-                )}
-              </div>
-
-              <button
-                onClick={toggleTheme}
-                className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer"
-                aria-label="Đổi giao diện"
-              >
-                {darkMode ? <Sun className="w-4.5 h-4.5 text-amber-400" /> : <Moon className="w-4.5 h-4.5 text-slate-600" />}
-              </button>
-
-              <button
-                onClick={() => setIsInstallModalOpen(true)}
-                className="p-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center gap-1 text-indigo-700 dark:text-indigo-400 font-bold text-xs"
-                title="Cài đặt App trên điện thoại (PWA)"
-              >
-                <Smartphone className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span className="hidden sm:inline">Cài App Mobile</span>
-              </button>
-
-              <button
-                onClick={() => setIsAuditLogModalOpen(true)}
-                className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-bold text-xs"
-                title="Nhật Ký Kiểm Toán Hệ Thống (System Audit Log)"
-              >
-                <Activity className="w-4 h-4 text-indigo-500" />
-                <span className="hidden sm:inline">Nhật Ký</span>
-                <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
-                  {auditLogs.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all focus:outline-none cursor-pointer"
-                title="Cấu hình Google Apps Script & Bộ nhớ"
-              >
-                <Settings className="w-4.5 h-4.5 text-slate-500 hover:text-indigo-500 transition-colors" />
-              </button>
-
-              {/* Low Stock Warning Header Button & Dropdown */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsLowStockDropdownOpen(!isLowStockDropdownOpen)}
-                  className={`relative p-2 rounded-2xl border shadow-sm transition-all focus:outline-none cursor-pointer ${
-                    lowStockItems.length > 0
-                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/80 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                  title={`Cảnh báo an toàn tồn kho (${lowStockItems.length} thiết bị có số lượng <= 1)`}
-                >
-                  <AlertTriangle className={`w-4.5 h-4.5 ${lowStockItems.length > 0 ? 'animate-bounce text-amber-600 dark:text-amber-400' : ''}`} />
-                  {lowStockItems.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white rounded-full text-[9.5px] font-black flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow-sm animate-pulse">
-                      {lowStockItems.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* Dropdown Menu */}
-                {isLowStockDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-4 z-[9999] animate-scale-in">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500" />
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                          Cảnh Báo Tồn Kho (≤ 1 bộ)
-                        </h4>
-                      </div>
-                      <span className="text-[10px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/80 dark:border-amber-800">
-                        {lowStockItems.length} mã
-                      </span>
-                    </div>
-
-                    <div className="max-h-64 overflow-y-auto custom-scrollbar my-2 divide-y divide-slate-100 dark:divide-slate-800">
-                      {lowStockItems.length === 0 ? (
-                        <p className="py-6 text-center text-xs text-slate-400 font-medium">
-                          Tất cả thiết bị trong kho đều đạt mức an toàn (&gt; 1 cái).
-                        </p>
-                      ) : (
-                        lowStockItems.map(item => (
-                          <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl transition-colors">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={item.name}>
-                                {item.name}
-                              </p>
-                              <div className="flex items-center gap-1.5 text-[9.5px] text-slate-400 mt-0.5 font-mono">
-                                <span>S/N: {item.sn}</span>
-                                {item.loc && <span>• {item.loc}</span>}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
-                                item.qty === 0
-                                  ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
-                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
-                              }`}>
-                                {item.qty === 0 ? '0 cái (Hết)' : `x${item.qty} cái`}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedItemDetail(item);
-                                  setIsLowStockDropdownOpen(false);
-                                }}
-                                className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
-                              >
-                                Xem
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStatusFilter('LOW_STOCK');
-                          setIsLowStockDropdownOpen(false);
-                        }}
-                        className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold text-center transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
-                      >
-                        Lọc danh sách thiết bị sắp hết
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* UPGRADED ADMIN & ROLE CONTROLS */}
-              {role === 'admin' ? (
-                <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-transparent pl-2.5 pr-1 py-1 rounded-2xl border border-amber-300/80 dark:border-amber-700/60 shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIsAdminAccountModalOpen(true)}
-                    className="flex items-center gap-2 hover:opacity-85 transition-opacity cursor-pointer text-left"
-                    title="Mở Trung Tâm Quản Trị Admin (Thêm/Bớt Người Dùng, Phân Quyền, Mật Khẩu, Snapshot)"
-                  >
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-xs">
-                      <Crown className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1">
-                        <span className="font-black text-[11px] uppercase tracking-wider text-amber-900 dark:text-amber-300 leading-none">
-                          {users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase())?.fullName || 'SUPER ADMIN'}
-                        </span>
-                        <span className="text-[7.5px] font-black uppercase bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200 px-1 rounded">
-                          ADMIN
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono text-amber-700/80 dark:text-amber-400/80 leading-none mt-0.5">
-                        @{currentUsername || 'admin'} • Quản trị hệ thống
-                      </span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsAdminAccountModalOpen(true)}
-                    className="p-1 px-2 bg-amber-200/70 dark:bg-amber-900/60 hover:bg-amber-300/80 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 rounded-xl text-[10px] font-extrabold transition-colors cursor-pointer flex items-center gap-1 ml-1"
-                    title="Quản lý Người dùng & Bảo mật"
-                  >
-                    <Key className="w-3 h-3" />
-                    <span className="hidden sm:inline">Quản lý User</span>
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="p-1 px-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/30 text-rose-600 font-bold rounded-xl transition-all cursor-pointer"
-                    title="Đăng xuất tài khoản"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 pl-3 pr-1 py-1 rounded-2xl border border-slate-200/50 dark:border-slate-800 text-xs font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-500 text-white flex items-center justify-center shadow-xs">
-                      <User className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200 text-xs leading-none">
-                        {users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase())?.fullName || 'Kiểm kê viên'}
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-400 leading-none mt-0.5">
-                        @{currentUsername || 'guest'} (Kiểm kê viên)
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="p-1 px-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/30 text-rose-600 font-bold rounded-xl transition-all cursor-pointer ml-1"
-                    title="Đăng xuất"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </header>
-
-          {/* LOW STOCK SAFETY ALERT BANNER */}
-          {!isLowStockBannerDismissed && lowStockItems.length > 0 && (
-            <div className="mt-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-rose-500/10 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-rose-950/30 border border-amber-300 dark:border-amber-700/70 rounded-[2rem] p-5 shadow-sm">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20 mt-0.5">
-                    <AlertTriangle className="w-5 h-5 animate-bounce" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-black text-amber-950 dark:text-amber-200 uppercase tracking-wide">
-                        Cảnh Báo Mức An Toàn: Có {lowStockItems.length} Thiết Bị Dưới Ngưỡng Dự Phòng (SL ≤ 1 cái)
-                      </h3>
-                      <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-black uppercase animate-pulse">
-                        Cần Tiếp Liệu
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-1 font-medium leading-relaxed">
-                      Số lượng vật tư dự phòng tại chỗ của các thiết bị này đang ở mức tối thiểu (≤ 1 bộ). Đề xuất kiểm tra thực tế và lập kế hoạch bổ sung để đảm bảo dự phòng cho hệ thống CNS/ATM.
-                    </p>
-
-                    {/* Quick list of low stock items chips */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                      {lowStockItems.slice(0, 6).map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setSelectedItemDetail(item)}
-                          className="inline-flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 border border-amber-300 dark:border-amber-700/80 px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
-                          title="Nhấp để xem chi tiết thiết bị này"
-                        >
-                          <span className="truncate max-w-[140px]">{item.name}</span>
-                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-black ${item.qty === 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
-                            {item.qty === 0 ? '0 cái (Hết)' : `x${item.qty} cái`}
-                          </span>
-                        </button>
-                      ))}
-                      {lowStockItems.length > 6 && (
-                        <span className="text-[11px] font-extrabold text-amber-800 dark:text-amber-300 self-center">
-                          +{lowStockItems.length - 6} thiết bị khác...
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(statusFilter === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
-                    }}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
-                      statusFilter === 'LOW_STOCK'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'bg-amber-600 hover:bg-amber-700 text-white'
-                    }`}
-                  >
-                    <Filter className="w-3.5 h-3.5" />
-                    {statusFilter === 'LOW_STOCK' ? 'Hiện tất cả' : 'Lọc thiết bị sắp hết'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsLowStockBannerDismissed(true)}
-                    className="p-2 text-amber-800 hover:text-amber-950 dark:text-amber-300 dark:hover:text-white rounded-xl hover:bg-amber-200/50 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
-                    title="Tạm ẩn cảnh báo này"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Primary Workspace Navigation Tabs */}
-          <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 rounded-[2.2rem] border border-slate-200/80 dark:border-slate-800 shadow-sm">
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl w-full sm:w-auto">
+            {/* Navigation Menu */}
+            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+              <div className="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Hệ Thống Chính</div>
+              
               <button
                 type="button"
                 onClick={() => setActiveWorkspaceTab('INVENTORY')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'INVENTORY'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md shadow-slate-200 dark:shadow-none'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Database className="w-4.5 h-4.5 text-indigo-500" />
-                <span>KHO DỰ PHÒNG TẠI CHỖ</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  activeWorkspaceTab === 'INVENTORY'
-                    ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}>
-                  {inventory.length} mã
+                <Database className="w-4.5 h-4.5" />
+                <span className="flex-1 text-left">Kho Vật Tư Dự Phòng Tại Chỗ Đội TT</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'INVENTORY' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  {inventory.length}
                 </span>
               </button>
+
+              {role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddNewModal}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#2563EB] dark:text-blue-400 bg-blue-50/50 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 transition-colors cursor-pointer border border-blue-200/80 dark:border-blue-900/60"
+                  title="Mở form thêm mới thiết bị vào kho"
+                >
+                  <PlusCircle className="w-4.5 h-4.5 text-[#2563EB] dark:text-blue-400" />
+                  <span className="flex-1 text-left font-black">Thêm Mới Thiết Bị</span>
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => setActiveWorkspaceTab('DISPATCHED')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'DISPATCHED'
-                    ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-md shadow-slate-200 dark:shadow-none'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Layers className="w-4.5 h-4.5 text-rose-500" />
-                <span>ĐÃ BÀN GIAO & SỬ DỤNG</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  activeWorkspaceTab === 'DISPATCHED'
-                    ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}>
-                  {dispatchedRecords.length} hồ sơ
+                <Layers className="w-4.5 h-4.5" />
+                <span className="flex-1 text-left">Thiết Bị Bàn Giao & Sử Dụng</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'DISPATCHED' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  {dispatchedRecords.length}
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveWorkspaceTab('AUDIT_LOG')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'AUDIT_LOG'
-                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-md shadow-slate-200 dark:shadow-none'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Activity className="w-4.5 h-4.5 text-amber-500" />
-                <span>NHẬT KÝ HỆ THỐNG</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  activeWorkspaceTab === 'AUDIT_LOG'
-                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}>
-                  {auditLogs.length} logs
+                <Activity className="w-4.5 h-4.5" />
+                <span className="flex-1 text-left">Nhật Ký Kiểm Toán (Logs)</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'AUDIT_LOG' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  {auditLogs.length}
                 </span>
               </button>
-            </div>
 
-            <div className="flex items-center gap-2 px-2">
-              <span className="text-[11px] font-bold text-slate-400 hidden xl:inline">
-                {activeWorkspaceTab === 'INVENTORY' 
-                  ? 'Quản lý hiện vật lưu kho, quét mã kiểm kê & tem nhãn'
-                  : (activeWorkspaceTab === 'DISPATCHED'
-                      ? 'Sổ tổng hợp theo dõi trang thiết bị đã đưa ra ngoài hệ thống vận hành'
-                      : 'Lịch sử kiểm toán, ghi nhận thao tác người dùng và mốc thời gian')}
-              </span>
+              <div className="pt-4 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Tiện Ích & Quản Trị</div>
+
+              {role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setIsAdminAccountModalOpen(true)}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                >
+                  <Crown className="w-4.5 h-4.5 text-[#F59E0B]" />
+                  <span className="flex-1 text-left">Quản Trị Người Dùng & Admin</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <Settings className="w-4.5 h-4.5 text-slate-400" />
+                <span className="flex-1 text-left">Cấu Hình GAS & Cloud Sync</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsInstallModalOpen(true)}
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <Smartphone className="w-4.5 h-4.5 text-[#2563EB]" />
+                <span className="flex-1 text-left">Cài App Mobile (PWA)</span>
+              </button>
+            </nav>
+
+            {/* Sidebar Footer Profile */}
+            <div className="p-4 border-t border-[#E2E8F0] dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-black shrink-0 shadow-xs">
+                  {role === 'admin' ? <Crown className="w-4.5 h-4.5" /> : <User className="w-4.5 h-4.5" />}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-slate-900 dark:text-white truncate">
+                    {users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase())?.fullName || currentUsername}
+                  </p>
+                  <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                    {role === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-[#DC2626] hover:bg-red-50 dark:hover:bg-red-950/50 rounded-xl transition-colors cursor-pointer shrink-0"
+                title="Đăng xuất"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
-          </div>
+          </aside>
+
+          {/* Right Main Content Area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Top Enterprise Header */}
+            <header className="bg-white dark:bg-[#131B2E] border-b border-[#E2E8F0] dark:border-slate-800 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao Thiết Bị' : 'Nhật Ký Hệ Thống'}
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-[#2563EB] dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-900 hidden sm:inline">
+              
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Đội Thông Tin  • Trung Tâm Bảo Đảm Kỹ Thuật
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Advanced Local-First Cloud Auto-Sync Indicator & Popover */}
+                <SyncStatusIndicator
+                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onOpenConflictModal={() => setIsConflictModalOpen(true)}
+                />
+
+                {/* Low Stock Warning Button */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsLowStockDropdownOpen(!isLowStockDropdownOpen)}
+                    className={`relative p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                      lowStockItems.length > 0
+                        ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
+                        : 'bg-slate-50 dark:bg-slate-900 border-[#E2E8F0] dark:border-slate-800 text-slate-400'
+                    }`}
+                    title="Cảnh báo an toàn tồn kho"
+                  >
+                    <AlertTriangle className={`w-4.5 h-4.5 ${lowStockItems.length > 0 ? 'animate-bounce text-[#F59E0B]' : ''}`} />
+                    {lowStockItems.length > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#DC2626] text-white rounded-full text-[9.5px] font-black flex items-center justify-center shadow-sm">
+                        {lowStockItems.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isLowStockDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-[#E2E8F0] dark:border-slate-800 rounded-2xl shadow-2xl p-4 z-[9999] animate-scale-in">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-[#F59E0B]" />
+                          <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                            Cảnh Báo Tồn Kho (≤ 1 bộ)
+                          </h4>
+                        </div>
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                          {lowStockItems.length} mã
+                        </span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar my-2 divide-y divide-slate-100 dark:divide-slate-800">
+                        {lowStockItems.length === 0 ? (
+                          <p className="py-6 text-center text-xs text-slate-400">Tất cả thiết bị đều an toàn (&gt; 1 cái).</p>
+                        ) : (
+                          lowStockItems.map(item => (
+                            <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.name}</p>
+                                <p className="text-[9.5px] text-slate-400 font-mono">S/N: {item.sn}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedItemDetail(item);
+                                  setIsLowStockDropdownOpen(false);
+                                }}
+                                className="px-2 py-1 bg-blue-50 text-[#2563EB] hover:bg-blue-100 rounded-lg text-[10px] font-bold cursor-pointer"
+                              >
+                                Xem
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-[#E2E8F0] dark:border-slate-800 rounded-xl transition-all cursor-pointer"
+                  title="Đổi giao diện Sáng / Tối"
+                >
+                  {darkMode ? <Sun className="w-4.5 h-4.5 text-amber-400" /> : <Moon className="w-4.5 h-4.5 text-slate-600" />}
+                </button>
+              </div>
+            </header>
+
+            {/* Dashboard Content Body */}
+            <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
+
 
           {activeWorkspaceTab === 'DISPATCHED' ? (
             /* DISPATCHED & DEPLOYED REGISTRY TABLE VIEW */
@@ -2910,6 +2980,18 @@ export default function App() {
               </div>
 
               <div className="w-px h-7 bg-slate-200 dark:bg-slate-800 hidden xl:block mx-1"></div>
+
+              {role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddNewModal}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-extrabold py-3 px-5 rounded-2xl shadow-md shadow-blue-500/25 transition-all text-xs sm:text-sm tracking-wide cursor-pointer"
+                  title="Mở biểu mẫu thêm mới thiết bị vào kho"
+                >
+                  <PlusCircle className="w-4.5 h-4.5" />
+                  THÊM THIẾT BỊ
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -3061,217 +3143,47 @@ export default function App() {
             </div>
           </div>
 
-          {/* Admin Editor Form & Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
-            {role === 'admin' ? (
-              <div id="editor-panel" className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.2rem] p-6 shadow-sm h-fit">
-                <div className="flex items-center gap-2 mb-5">
-                  <span className="p-1 px-3 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-lg uppercase">
-                    Admin Form
-                  </span>
-                  <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    {editingItemId ? 'Cập Nhật Thiết Bị' : 'Thêm Mới Thiết Bị'}
-                  </h2>
-                </div>
-
-                <form onSubmit={handleFormSubmit} className="space-y-4.5">
+          {/* Main Inventory Table & Actions */}
+          <div className="mt-6">
+            {role !== 'admin' && (
+              <div className="mb-4 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
                   <div>
-                    <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Tên thiết bị *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      placeholder="VD: Máy thu phát VHF Jotron"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div>
-                      <div className="flex justify-between items-center mb-1.5 ml-1">
-                        <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">Phân loại</label>
-                        {!isAddingNewCat ? (
-                          <button
-                            type="button"
-                            onClick={() => setIsAddingNewCat(true)}
-                            className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3" /> Thêm
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => { setIsAddingNewCat(false); setNewCatInput(''); }}
-                            className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
-                          >
-                            Hủy
-                          </button>
-                        )}
-                      </div>
-                      {!isAddingNewCat ? (
-                        <select
-                          value={formCategory}
-                          onChange={(e) => setFormCategory(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-extrabold"
-                        >
-                          {categories.filter(cat => cat !== 'Tất cả loại').map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="text"
-                            placeholder="Phân loại..."
-                            value={newCatInput}
-                            onChange={(e) => setNewCatInput(e.target.value)}
-                            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-indigo-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-xs font-bold"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const trimmed = newCatInput.trim();
-                              if (trimmed) {
-                                if (!categories.includes(trimmed)) {
-                                  const updated = [...categories, trimmed];
-                                  saveCategoriesLocally(updated);
-                                  setFormCategory(trimmed);
-                                  addToast(`Đã thêm loại: ${trimmed}`, 'success');
-                                  playScanBeep(1000, 0.1);
-                                } else {
-                                  setFormCategory(trimmed);
-                                }
-                                setIsAddingNewCat(false);
-                                setNewCatInput('');
-                              } else {
-                                addToast('Tên loại không được trống!', 'error');
-                              }
-                            }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-[36px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0"
-                          >
-                            Lưu
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Số lượng</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={formQty}
-                        onChange={(e) => setFormQty(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-extrabold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">P/N (Model)</label>
-                      <input
-                        type="text"
-                        value={formPn}
-                        onChange={(e) => setFormPn(e.target.value)}
-                        placeholder="Mã Model"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">S/N *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formSn}
-                        onChange={(e) => setFormSn(e.target.value)}
-                        placeholder="Số Sê-ri"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-mono font-bold placeholder:text-slate-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Mã Kho (QR)</label>
-                      <input
-                        type="text"
-                        value={formWarehouse}
-                        onChange={(e) => setFormWarehouse(e.target.value)}
-                        placeholder="VD: KHO-01"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-bold placeholder:text-slate-400 uppercase"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">Vị trí tủ / ngăn</label>
-                      <input
-                        type="text"
-                        value={formLoc}
-                        onChange={(e) => setFormLoc(e.target.value)}
-                        placeholder="Tủ 2 - Ngăn B"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-sm font-semibold placeholder:text-slate-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-3 flex gap-2.5">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-600/15 cursor-pointer text-center"
-                    >
-                      {editingItemId ? 'LƯU CHỈNH SỬA' : 'THÊM MỚI KHO'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearForm}
-                      className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-colors cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null}
-
-            {/* Inventory Table & Cards */}
-            <div className={role === 'admin' ? 'lg:col-span-8 xl:col-span-9' : 'col-span-12'}>
-              {role !== 'admin' && (
-                <div className="mb-4 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                        Chế độ Kiểm kê viên (Guest): <span className="font-normal text-slate-600 dark:text-slate-400">Bạn có toàn quyền tra cứu, quét mã QR/mã vạch kiểm kê hiện vật và xuất báo cáo PDF/Excel.</span>
-                      </p>
-                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Chế độ Kiểm kê viên (Guest): <span className="font-normal text-slate-600 dark:text-slate-400">Bạn có toàn quyền tra cứu, quét mã QR/mã vạch kiểm kê hiện vật và xuất báo cáo PDF/Excel.</span>
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              <InventoryTable
-                filteredInventory={filteredInventory}
-                role={role}
-                onResetAuditStatus={handleResetAuditStatus}
-                onQuickAuditStatus={handleQuickStatusClick}
-                onSelectDetail={(item) => setSelectedItemDetail(item)}
-                onOpenUsage={(item) => {
-                  setSelectedItemForUsage(item);
-                }}
-                onEditItem={handleEditClick}
-                onDeleteItem={handleDeleteClick}
-                onOpenScanTarget={(item) => {
-                  setScanTargetItem(item);
-                  setIsScannerOpen(true);
-                  playScanBeep(1000, 0.1);
-                }}
-              />
-            </div>
+            <InventoryTable
+              filteredInventory={filteredInventory}
+              role={role}
+              onResetAuditStatus={handleResetAuditStatus}
+              onQuickAuditStatus={handleQuickStatusClick}
+              onSelectDetail={(item) => setSelectedItemDetail(item)}
+              onOpenUsage={(item) => {
+                setSelectedItemForUsage(item);
+              }}
+              onEditItem={handleEditClick}
+              onDeleteItem={handleDeleteClick}
+              onOpenScanTarget={(item) => {
+                setScanTargetItem(item);
+                setIsScannerOpen(true);
+                playScanBeep(1000, 0.1);
+              }}
+              onExportCsv={handleExportCsv}
+              onAddNewItem={handleOpenAddNewModal}
+            />
           </div>
             </>
           )}
+            </main>
+          </div>
         </div>
       )}
 
@@ -3287,12 +3199,33 @@ export default function App() {
         onScanned={handleScannedCode}
       />
 
+      {/* Item Form Modal (Add & Edit) */}
+      <ItemFormModal
+        isOpen={isItemFormModalOpen}
+        onClose={() => {
+          setIsItemFormModalOpen(false);
+          setEditingItem(null);
+        }}
+        editingItem={editingItem}
+        categories={categories}
+        onSaveCategory={(newCat) => {
+          const updated = [...categories, newCat];
+          saveCategoriesLocally(updated);
+          addToast(`Đã thêm loại: ${newCat}`, 'success');
+          playScanBeep(1000, 0.1);
+        }}
+        onSubmit={handleItemFormSubmit}
+      />
+
       {/* Item Detail Drawer */}
       <ItemDetailDrawer
         item={selectedItemDetail}
         role={role}
         onClose={() => setSelectedItemDetail(null)}
-        onEdit={(item) => handleEditClick(item)}
+        onEdit={(item) => {
+          setSelectedItemDetail(null);
+          handleEditClick(item);
+        }}
         onUsage={(item) => setSelectedItemForUsage(item)}
         onPrintQr={(item) => {
           setPrintLayout('QR');
@@ -3489,6 +3422,15 @@ export default function App() {
           role={role}
         />
       )}
+
+      {/* Conflict Resolution Modal for Cloud vs Local Concurrency */}
+      <ConflictResolutionModal
+        isOpen={isConflictModalOpen}
+        onClose={() => setIsConflictModalOpen(false)}
+        conflicts={conflicts}
+        onResolved={handleConflictResolved}
+        onAddToast={addToast}
+      />
 
       {/* Mobile PWA Installation Modal */}
       <MobileAppInstallModal

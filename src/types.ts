@@ -23,6 +23,12 @@ export interface InventoryItem {
   imageUrl?: string;
   imagePrompt?: string;
   history?: AuditHistoryEntry[];
+  // Cloud & Auto-Sync Tracking Metadata
+  syncStatus?: 'synced' | 'pending' | 'syncing' | 'failed' | 'conflict';
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  version?: number;
 }
 
 export interface SyncConfig {
@@ -37,6 +43,8 @@ export interface StorageConfig {
   warnOnClose: boolean;
   showAutoSaveToast: boolean;
   lastSavedTime?: string;
+  autoBackup24h?: boolean; // periodic 24-hour auto download of inventory JSON
+  lastAutoBackupTime?: number; // timestamp in milliseconds
 }
 
 export interface UserAccount {
@@ -133,6 +141,12 @@ export interface DispatchedRecord {
   returnedBy?: string;
   returnedQty?: number;
   returnNote?: string;
+  // Cloud & Auto-Sync Tracking Metadata
+  syncStatus?: 'synced' | 'pending' | 'syncing' | 'failed' | 'conflict';
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  version?: number;
 }
 
 export type AuditActionType =
@@ -145,8 +159,47 @@ export type AuditActionType =
   | 'STOCK_RETURN'
   | 'DATA_IMPORT'
   | 'DATA_RESTORE'
+  | 'AUTO_BACKUP'
+  | 'REPORT_DISPATCH'
   | 'AUTH_LOGIN'
-  | 'CATEGORY_CHANGE';
+  | 'CATEGORY_CHANGE'
+  | 'CLOUD_AUTO_SYNC'
+  | 'CLOUD_CONFLICT';
+
+export type SyncActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'BATCH_UPSERT' | 'STATUS_CHANGE';
+export type SyncItemStatus = 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict';
+export type SyncEntityType = 'equipment' | 'dispatched_record' | 'inventory_batch' | 'category' | 'usage_slip';
+export type GlobalSyncState = 'synced' | 'syncing' | 'pending' | 'failed' | 'conflict' | 'offline';
+
+export interface SyncQueueItem {
+  id: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  action: SyncActionType;
+  payload: any;
+  timestamp: number;
+  formattedTime?: string;
+  retryCount: number;
+  maxRetries: number;
+  nextRetryTime?: number;
+  syncStatus: SyncItemStatus;
+  error?: string;
+  user?: string;
+}
+
+export interface ConflictItem {
+  id: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  entityName: string;
+  localData: any;
+  cloudData: any;
+  detectedAt: string;
+  localUpdatedAt?: string;
+  cloudUpdatedAt?: string;
+  localVersion?: number;
+  cloudVersion?: number;
+}
 
 export interface SystemAuditLogEntry {
   id: string;

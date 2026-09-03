@@ -40,6 +40,7 @@ interface SettingsModalProps {
   onResetToDefault: () => void;
   itemCount: number;
   usageCount: number;
+  onOpenGoogleDriveModal?: () => void;
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -62,6 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetToDefault,
   itemCount,
   usageCount,
+  onOpenGoogleDriveModal,
   onAddToast
 }) => {
   const [activeTab, setActiveTab] = useState<'STORAGE' | 'CLOUD' | 'CATEGORIES'>('STORAGE');
@@ -415,6 +417,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Kích hoạt tải ngay bản sao lưu JSON (Đặt lại chu kỳ 24h)
                   </button>
                 </div>
+
+                {/* Google Drive Integration Card */}
+                {onOpenGoogleDriveModal && (
+                  <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                          Google Drive Backup Cloud
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-md">
+                        Mới
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Lưu trữ bản sao lưu kho thiết bị JSON & Báo cáo Excel trực tiếp vào Google Drive cá nhân của bạn.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenGoogleDriveModal();
+                      }}
+                      className="w-full mt-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      <HardDrive className="w-4 h-4" />
+                      <span>Mở Quản Lý Sao Lưu Google Drive</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Actions: Save Now & Reset Defaults */}

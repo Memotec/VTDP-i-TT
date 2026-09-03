@@ -4,7 +4,7 @@ import {
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle
+  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +19,7 @@ import { ItemDetailDrawer } from './components/ItemDetailDrawer.tsx';
 import { UsageModal } from './components/UsageModal.tsx';
 import { HandoverModal, HandoverRow } from './components/HandoverModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
+import { GoogleDriveModal } from './components/GoogleDriveModal.tsx';
 import { InventoryTable } from './components/InventoryTable.tsx';
 import { AdminAccountModal } from './components/AdminAccountModal.tsx';
 import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
@@ -143,6 +144,7 @@ export default function App() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictItem[]>(() => LocalDatabase.getConflicts());
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [isGoogleDriveModalOpen, setIsGoogleDriveModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
@@ -2898,6 +2900,15 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Google Drive Quick Action */}
+                <button
+                  onClick={() => setIsGoogleDriveModalOpen(true)}
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 border border-[#E2E8F0] dark:border-slate-800 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all cursor-pointer"
+                  title="Sao Lưu & Đồng Bộ Google Drive"
+                >
+                  <HardDrive className="w-4.5 h-4.5" />
+                </button>
+
                 {/* Theme Toggle */}
                 <button
                   onClick={toggleTheme}
@@ -3372,6 +3383,26 @@ export default function App() {
         onResetToDefault={handleResetToDefault}
         itemCount={inventory.length}
         usageCount={usageSlips.length}
+        onOpenGoogleDriveModal={() => setIsGoogleDriveModalOpen(true)}
+        onAddToast={addToast}
+      />
+
+      {/* Google Drive Backup & Sync Modal */}
+      <GoogleDriveModal
+        isOpen={isGoogleDriveModalOpen}
+        onClose={() => setIsGoogleDriveModalOpen(false)}
+        inventory={inventory}
+        dispatchedRecords={dispatchedRecords}
+        onRestoreFromBackup={(data) => {
+          if (data.inventory && data.inventory.length > 0) {
+            setInventory(data.inventory);
+            saveInventoryLocally(data.inventory);
+          }
+          if (data.dispatchedRecords && data.dispatchedRecords.length > 0) {
+            setDispatchedRecords(data.dispatchedRecords);
+            LocalDatabase.saveDispatchedRecords(data.dispatchedRecords);
+          }
+        }}
         onAddToast={addToast}
       />
 

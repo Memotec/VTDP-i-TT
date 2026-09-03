@@ -15,7 +15,8 @@ import {
   Database,
   RotateCcw,
   CheckCircle2,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
 import { SyncConfig, StorageConfig } from '../types.ts';
 import { playScanBeep } from '../utils/audio.ts';

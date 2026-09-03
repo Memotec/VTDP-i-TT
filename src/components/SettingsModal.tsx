@@ -63,10 +63,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   usageCount,
   onAddToast
 }) => {
-  if (!isOpen) return null;
-
   const [activeTab, setActiveTab] = useState<'STORAGE' | 'CLOUD' | 'CATEGORIES'>('STORAGE');
   const [justSaved, setJustSaved] = useState(false);
+
+  if (!isOpen) return null;
 
   const autoSaveOptions = [
     { value: 0, label: 'Tức thì (Realtime)', desc: 'Lưu ngay khi sửa đổi (Khuyên nghị)' },
@@ -483,8 +483,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Autosync config */}
               <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-extrabold text-slate-800 dark:text-white">Tự động đồng bộ Cloud</span>
-                  <p className="text-[10px] text-slate-400">Đồng bộ Cloud lập tức khi quét kiểm kê hàng hoàn thành</p>
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-white">Tự động đẩy dữ liệu lên Cloud</span>
+                  <p className="text-[10px] text-slate-400">Tự động đẩy lên Google Sheet Cloud khi kiểm kê hoặc thay đổi kho</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -494,12 +494,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       const checked = e.target.checked;
                       setSyncConfig(prev => ({ ...prev, autoSync: checked }));
                       localStorage.setItem('cns_auto_sync', String(checked));
-                      onAddToast(checked ? 'Đã bật tự động đồng bộ lên Cloud.' : 'Đã tắt tự động đồng bộ.', 'info');
+                      onAddToast(checked ? 'Đã bật tự động đẩy lên Cloud.' : 'Đã tắt tự động đẩy.', 'info');
                     }}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
+              </div>
+
+              {/* Auto 30s Google Sheets Pull Config */}
+              <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/70">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-black text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      Tự động 30s kết nối Google Sheet kéo dữ liệu
+                    </span>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Định kỳ tự động gọi Google Sheet API kéo thông tin vật tư mới nhất về ứng dụng
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={syncConfig.autoSync30s !== false}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSyncConfig(prev => ({ ...prev, autoSync30s: checked }));
+                        localStorage.setItem('cns_auto_sync_30s', String(checked));
+                        onAddToast(checked ? 'Đã bật tự động 30s kết nối Google Sheet kéo dữ liệu về.' : 'Đã tắt tự động kéo dữ liệu định kỳ 30s.', 'info');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {syncConfig.autoSync30s !== false && (
+                  <div className="flex items-center justify-between pt-2 border-t border-indigo-200/50 dark:border-indigo-800/50 text-xs">
+                    <span className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300">Chu kỳ đồng bộ:</span>
+                    <select
+                      value={syncConfig.autoSyncInterval || 30}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSyncConfig(prev => ({ ...prev, autoSyncInterval: val }));
+                        localStorage.setItem('cns_auto_sync_interval', String(val));
+                        onAddToast(`Đã đổi chu kỳ kết nối Google Sheet thành ${val} giây.`, 'info');
+                      }}
+                      className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 rounded-lg text-slate-800 dark:text-slate-200 font-bold text-xs outline-none cursor-pointer"
+                    >
+                      <option value={15}>15 giây</option>
+                      <option value={30}>30 giây (Mặc định)</option>
+                      <option value={60}>60 giây</option>
+                      <option value={120}>2 phút</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Auto download startup */}

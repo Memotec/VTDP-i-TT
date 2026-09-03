@@ -34,6 +34,8 @@ export interface InventoryItem {
 export interface SyncConfig {
   webAppUrl: string;
   autoSync: boolean;
+  autoSync30s?: boolean;
+  autoSyncInterval?: number;
   autoLoadOnStartup?: boolean;
   lastSynced?: string;
 }

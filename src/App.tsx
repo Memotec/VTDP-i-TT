@@ -35,6 +35,7 @@ import { CloudService } from './services/cloudService.ts';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { ConflictResolutionModal } from './components/ConflictResolutionModal.tsx';
 import { ConflictItem } from './types.ts';
+import { findMatchingInventoryItems } from './utils/qrParser.ts';
 
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
@@ -205,10 +206,14 @@ export default function App() {
   const [syncConfig, setSyncConfig] = useState<SyncConfig>(() => {
     const savedUrl = localStorage.getItem('cns_sync_url');
     const savedAutoSync = localStorage.getItem('cns_auto_sync');
+    const savedAutoSync30s = localStorage.getItem('cns_auto_sync_30s');
+    const savedAutoSyncInterval = localStorage.getItem('cns_auto_sync_interval');
     const savedAutoLoad = localStorage.getItem('cns_auto_load_startup');
     return {
       webAppUrl: savedUrl !== null ? savedUrl : 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec',
       autoSync: savedAutoSync === 'true',
+      autoSync30s: savedAutoSync30s !== 'false', // Default: true for 30s auto Google Sheet pull
+      autoSyncInterval: savedAutoSyncInterval ? Number(savedAutoSyncInterval) : 30, // Default 30s
       autoLoadOnStartup: savedAutoLoad !== 'false',
       lastSynced: undefined
     };
@@ -1159,17 +1164,19 @@ export default function App() {
   };
 
   // Cloud Sync
-  const fetchCloudData = async (targetUrl?: string) => {
+  const fetchCloudData = async (targetUrl?: string, isSilent: boolean = false) => {
     if (syncStatus === 'syncing') return;
     if (!navigator.onLine) {
-      setSyncStatus('idle');
-      setSyncStatusDetail('Ngoại tuyến (Offline). Trình duyệt lưu trữ cục bộ.');
-      addToast('Không có mạng để tải dữ liệu từ Cloud!', 'info');
+      if (!isSilent) {
+        setSyncStatus('idle');
+        setSyncStatusDetail('Ngoại tuyến (Offline). Trình duyệt lưu trữ cục bộ.');
+        addToast('Không có mạng để tải dữ liệu từ Cloud!', 'info');
+      }
       return;
     }
 
     setSyncStatus('syncing');
-    setSyncStatusDetail('Đang tạo yêu cầu kết nối Server...');
+    setSyncStatusDetail('Đang tạo yêu cầu kết nối Google Sheet Cloud...');
 
     try {
       const activeUrl = targetUrl || syncConfig.webAppUrl;
@@ -1204,7 +1211,9 @@ export default function App() {
           if (detectedConflicts.length > 0) {
             setConflicts(detectedConflicts);
             setIsConflictModalOpen(true);
-            addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
+            if (!isSilent) {
+              addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
+            }
           }
 
           // Merge items that have no conflicts
@@ -1232,26 +1241,52 @@ export default function App() {
           });
 
           saveInventoryLocally(merged);
-          const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
           setSyncStatus('success');
-          setSyncStatusDetail(`Đã tải xuống thành công ${formatted.length} thiết bị.`);
-          addToast(`Đồng bộ thành công! Đã xử lý ${formatted.length} thiết bị từ Cloud.`, 'success');
-          playScanBeep(1000, 0.2);
+          setSyncStatusDetail(`Tự động đồng bộ ${formatted.length} thiết bị từ Google Sheet (${nowStr}).`);
+          if (!isSilent) {
+            addToast(`Đồng bộ thành công! Đã xử lý ${formatted.length} thiết bị từ Cloud.`, 'success');
+            playScanBeep(1000, 0.2);
+          }
         } else {
           setSyncStatus('success');
           setSyncStatusDetail('Kho Cloud rỗng. Có thể tiến hành đẩy lên.');
-          addToast('Kho trên Cloud hiện đang trống!', 'info');
+          if (!isSilent) {
+            addToast('Kho trên Cloud hiện đang trống!', 'info');
+          }
         }
       }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Lỗi mạng không xác định.';
       setSyncStatus('error');
       setSyncStatusDetail(errorMsg);
-      addToast('Lỗi tải dữ liệu từ Cloud! Xem chi tiết ở phần cài đặt.', 'error');
-      playScanBeep(250, 0.3);
+      if (!isSilent) {
+        addToast('Lỗi tải dữ liệu từ Cloud! Xem chi tiết ở phần cài đặt.', 'error');
+        playScanBeep(250, 0.3);
+      }
     }
   };
+
+  // Automatic 30-second background connection to Google Sheets Cloud to pull data
+  useEffect(() => {
+    if (!syncConfig.autoSync30s || !syncConfig.webAppUrl) return;
+
+    const intervalSec = syncConfig.autoSyncInterval && syncConfig.autoSyncInterval > 0 ? syncConfig.autoSyncInterval : 30;
+
+    // Initial fetch on page load if autoLoadOnStartup enabled
+    if (syncConfig.autoLoadOnStartup) {
+      fetchCloudData(undefined, true);
+    }
+
+    const intervalId = setInterval(() => {
+      if (navigator.onLine) {
+        fetchCloudData(undefined, true);
+      }
+    }, intervalSec * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [syncConfig.autoSync30s, syncConfig.autoSyncInterval, syncConfig.webAppUrl, syncConfig.autoLoadOnStartup]);
 
   const syncToCloud = async () => {
     if (syncStatus === 'syncing') return;

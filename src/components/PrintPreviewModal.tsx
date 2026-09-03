@@ -27,6 +27,7 @@ import {
 import { InventoryItem, AuditStats, SyncConfig, AuditActionType } from '../types.ts';
 import { QRCodeSVG } from 'qrcode.react';
 import { playScanBeep } from '../utils/audio.ts';
+import { exportAuditReportToPDF } from '../utils/pdfExporter.ts';
 
 export type PrintMode = 'QR' | 'LABEL' | 'AUDIT_REPORT';
 
@@ -93,6 +94,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     itemsCount: number;
     totalQty: number;
   } | null>(null);
+  const [isExportingAuditPdf, setIsExportingAuditPdf] = useState(false);
 
   if (!isOpen) return null;
 
@@ -103,6 +105,36 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     : baseItems.filter(item => item.category === categoryFilter);
 
   const categories = Array.from(new Set(inventory.map(item => item.category).filter(Boolean)));
+
+  const handleExportPdf = async () => {
+    if (targetItems.length === 0) {
+      onAddToast('Không có thiết bị nào trong danh sách xuất PDF!', 'error');
+      return;
+    }
+
+    try {
+      setIsExportingAuditPdf(true);
+      onAddToast('Đang tạo tệp PDF biên bản kiểm kê & tồn kho...', 'info');
+      await exportAuditReportToPDF(
+        targetItems,
+        inspectorName,
+        auditDate,
+        auditLocation,
+        auditNote
+      );
+      onAddToast(`Đã xuất tệp PDF Báo cáo kiểm kê (${targetItems.length} mục) thành công!`, 'success');
+      onAddSystemAuditLog?.(
+        'REPORT_DISPATCH',
+        'Xuất file PDF biên bản kiểm kê kho',
+        `Xuất tệp PDF báo cáo kiểm kê ${targetItems.length} thiết bị bởi ${inspectorName}.`
+      );
+    } catch (err) {
+      console.error('Lỗi tạo PDF:', err);
+      onAddToast('Có lỗi xảy ra khi khởi tạo tệp PDF.', 'error');
+    } finally {
+      setIsExportingAuditPdf(false);
+    }
+  };
 
   const handleExecutePrint = () => {
     if (targetItems.length === 0) {
@@ -740,8 +772,20 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
               Đóng
             </button>
             <button
+              onClick={handleExportPdf}
+              disabled={isExportingAuditPdf}
+              className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-rose-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isExportingAuditPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>XUẤT TỆP PDF</span>
+            </button>
+            <button
               onClick={handleExecutePrint}
-              className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
+              className="py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>XUẤT BẢN IN NGAY</span>

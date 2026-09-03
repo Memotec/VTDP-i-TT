@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { 
   FileText, ArrowRightLeft, Search, Filter, Printer, FileSpreadsheet, 
   RotateCcw, Trash2, CheckCircle2, MapPin, Plus,
-  Layers, Building2, User, Eye
+  Layers, Building2, User, Eye, Download, Loader2
 } from 'lucide-react';
 import { DispatchedRecord, Role } from '../types.ts';
 import * as XLSX from 'xlsx';
+import { exportDispatchedRegistryToPDF } from '../utils/pdfExporter.ts';
 
 interface DeployedRegistryTableProps {
   records: DispatchedRecord[];
@@ -36,6 +37,25 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = ({
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'USAGE_SLIP' | 'HANDOVER_DOC'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEPLOYED' | 'RETURNED'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [isExportingRegistryPdf, setIsExportingRegistryPdf] = useState(false);
+
+  const handleExportPdfRegistry = async () => {
+    if (filteredRecords.length === 0) {
+      onAddToast('Không có dữ liệu sổ theo dõi nào để xuất PDF!', 'error');
+      return;
+    }
+    try {
+      setIsExportingRegistryPdf(true);
+      onAddToast('Đang tạo tệp PDF Sổ Tổng Hợp Theo Dõi Thiết Bị...', 'info');
+      await exportDispatchedRegistryToPDF(filteredRecords);
+      onAddToast(`Đã xuất tệp PDF Sổ Theo Dõi (${filteredRecords.length} hồ sơ) thành công!`, 'success');
+    } catch (err) {
+      console.error('Lỗi xuất PDF sổ tổng hợp:', err);
+      onAddToast('Có lỗi phát sinh khi tạo tệp PDF sổ tổng hợp.', 'error');
+    } finally {
+      setIsExportingRegistryPdf(false);
+    }
+  };
 
   // Compute categories present in records
   const uniqueCategories = useMemo(() => {
@@ -273,6 +293,20 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = ({
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>XUẤT EXCEL</span>
+            </button>
+
+            <button
+              onClick={handleExportPdfRegistry}
+              disabled={isExportingRegistryPdf}
+              className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              title="Xuất Sổ Tổng Hợp Theo Dõi Thiết Bị Đã Bàn Giao sang tệp PDF"
+            >
+              {isExportingRegistryPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+              ) : (
+                <Download className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              )}
+              <span>XUẤT PDF SỔ</span>
             </button>
 
             <button

@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, FileText, ArrowRightLeft, Printer, RotateCcw, Building2, User, MapPin, Calendar, CheckCircle2, Clock } from 'lucide-react';
-import { DispatchedRecord } from '../types.ts';
+import React, { useState } from 'react';
+import { X, FileText, ArrowRightLeft, Printer, RotateCcw, Building2, User, MapPin, Calendar, CheckCircle2, Clock, Download, Loader2 } from 'lucide-react';
+import { DispatchedRecord, UsageSlip } from '../types.ts';
+import { exportHandoverToPDF, exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
 
 interface DispatchedDetailModalProps {
   record: DispatchedRecord | null;
@@ -17,9 +18,81 @@ export const DispatchedDetailModal: React.FC<DispatchedDetailModalProps> = ({
   onPrint,
   onReturnClick
 }) => {
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
   if (!isOpen || !record) return null;
 
   const isHandover = record.type === 'HANDOVER_DOC';
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      if (isHandover) {
+        const parts = record.date.split('/');
+        const day = parts[0] || '15';
+        const month = parts[1] || '09';
+        const year = parts[2] || '2026';
+
+        await exportHandoverToPDF(
+          {
+            handoverNo: record.docNumber || 'BBBG-KT',
+            handoverLocation: record.targetLocation || 'Trung tâm BĐKT',
+            handoverDay: day,
+            handoverMonth: month,
+            handoverYear: year,
+            handoverReason: record.purpose || 'Bàn giao sử dụng',
+            handoverGiverDept: record.giverDept || 'Đội Thông Tin – Trung tâm BĐKT',
+            handoverGiverName: record.giverName || 'Admin Kho',
+            handoverGiverPos: record.giverPos || 'Kỹ sư quản lý kho',
+            handoverReceiverDept: record.receiverDept || 'Tổ Vận Hành',
+            handoverReceiverName: record.receiverName || 'Kỹ sư nhận',
+            handoverReceiverPos: record.receiverPos || 'Kỹ sư trực ban'
+          },
+          [
+            {
+              id: record.id,
+              name: record.itemName,
+              unit: record.unit || 'Bộ',
+              qty: record.qty,
+              quality: 'Tốt (100%)',
+              specs: `${record.category} - ${record.pn || ''}`,
+              sn: record.sn,
+              note: record.notes || ''
+            }
+          ]
+        );
+      } else {
+        const slip: UsageSlip = {
+          id: record.id,
+          docNumber: record.docNumber || `PBSD-${record.id.slice(-4)}`,
+          itemId: record.itemId,
+          itemName: record.itemName,
+          sn: record.sn,
+          pn: record.pn || '',
+          category: record.category,
+          warehouse: 'Kho TT',
+          originalLoc: '',
+          user: record.receiverName,
+          qtyUsed: record.qty,
+          unit: record.unit || 'Chiếc',
+          giverDept: record.giverDept || 'Đội Thông Tin – Trung tâm BĐKT',
+          giverName: record.giverName || 'Admin Kho',
+          giverPos: record.giverPos || 'Kỹ sư phụ trách kho',
+          receiverDept: record.receiverDept || 'Tổ Vận Hành CNS/ATM',
+          receiverPos: record.receiverPos || 'Kỹ sư trực ban',
+          purpose: record.purpose,
+          notes: record.notes || '',
+          targetLocation: record.targetLocation,
+          date: record.date
+        };
+        await exportUsageSlipToPDF(slip);
+      }
+    } catch (err) {
+      console.error('Lỗi xuất PDF hồ sơ luân chuyển:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-slate-900/50 overflow-y-auto animate-fade-in">
@@ -207,11 +280,24 @@ export const DispatchedDetailModal: React.FC<DispatchedDetailModalProps> = ({
           <div className="flex gap-2.5">
             <button
               type="button"
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-4.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-600/20 disabled:opacity-50"
+            >
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              Xuất File PDF
+            </button>
+            <button
+              type="button"
               onClick={() => onPrint(record)}
-              className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-amber-500/20"
+              className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-amber-500/20"
             >
               <Printer className="w-3.5 h-3.5" />
-              In Lại Hồ Sơ
+              In Trực Tiếp
             </button>
             <button
               type="button"

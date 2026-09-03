@@ -54,6 +54,26 @@
     animation: scan-move 2.2s ease-in-out infinite alternate;
   }
 
+  /* HTML5-QRCode scanner responsive styling */
+  #qr-reader {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+  #qr-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 1rem !important;
+  }
+  #qr-reader img[alt="Info icon"],
+  #qr-reader span,
+  #qr-reader a {
+    display: none !important;
+  }
+
   @keyframes scan-move {
     0% {
       top: 15%;

@@ -58,8 +58,6 @@ export const AdminAccountModal: React.FC<AdminAccountModalProps> = ({
   currentUsername,
   onOpenAuditLog
 }) => {
-  if (!isOpen) return null;
-
   const [activeTab, setActiveTab] = useState<'USERS' | 'CREDENTIALS' | 'PERMISSIONS' | 'SNAPSHOTS' | 'SECURITY'>('USERS');
 
   // User management state
@@ -101,6 +99,8 @@ export const AdminAccountModal: React.FC<AdminAccountModalProps> = ({
     }
   });
   const [newSnapshotName, setNewSnapshotName] = useState('');
+
+  if (!isOpen) return null;
 
   // Filtered users list
   const filteredUsers = users.filter(u => {

@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, ArrowRightLeft, Trash2, Printer } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
+import { exportHandoverToPDF } from '../utils/pdfExporter.ts';
 
 export interface HandoverRow {
   id: string;
@@ -82,7 +83,46 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   onSaveHandoverToRegistry,
   onAddToast
 }) => {
-  const [deductStock, setDeductStock] = React.useState(true);
+  const [deductStock, setDeductStock] = useState(true);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleDirectExportPDF = async () => {
+    if (handoverRows.length === 0) {
+      onAddToast('Danh sách thiết bị bàn giao đang trống!', 'error');
+      return;
+    }
+    try {
+      setIsExportingPdf(true);
+      if (onSaveHandoverToRegistry) {
+        onSaveHandoverToRegistry(deductStock);
+      }
+      onAddToast('Đang khởi tạo tệp PDF biên bản bàn giao...', 'info');
+      await exportHandoverToPDF(
+        {
+          handoverNo,
+          handoverLocation,
+          handoverDay,
+          handoverMonth,
+          handoverYear,
+          handoverReason,
+          handoverGiverDept,
+          handoverGiverName,
+          handoverGiverPos,
+          handoverReceiverDept,
+          handoverReceiverName,
+          handoverReceiverPos
+        },
+        handoverRows
+      );
+      onAddToast(`Đã xuất tệp PDF Biên Bàn Bàn Giao ${handoverNo || ''} thành công!`, 'success');
+    } catch (err) {
+      console.error('Lỗi xuất PDF bàn giao:', err);
+      onAddToast('Có lỗi xảy ra khi tạo tệp PDF biên bản bàn giao.', 'error');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -527,6 +567,20 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
 
             <button
               type="button"
+              onClick={handleDirectExportPDF}
+              disabled={handoverRows.length === 0 || isExportingPdf}
+              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-rose-600/15 disabled:opacity-40"
+            >
+              {isExportingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              XUẤT FILE PDF BIÊN BẢN
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 if (onSaveHandoverToRegistry) {
                   onSaveHandoverToRegistry(deductStock);
@@ -534,10 +588,10 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
                 onPrintHandover();
               }}
               disabled={handoverRows.length === 0}
-              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-8 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-rose-600/15 disabled:opacity-40"
+              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-extrabold px-5 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40"
             >
               <Printer className="w-3.5 h-3.5" />
-              LƯU & XUẤT IN BIÊN BẢN CHUẨN FORM
+              XUẤT IN TRỰC TIẾP
             </button>
           </div>
         </div>

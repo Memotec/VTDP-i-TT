@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, FileText, History, Printer, Trash2, Search } from 'lucide-react';
+import { X, FileText, History, Printer, Trash2, Search, Download, Loader2 } from 'lucide-react';
 import { InventoryItem, UsageSlip, Role } from '../types.ts';
+import { exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
 
 interface UsageModalProps {
   selectedItemForUsage: InventoryItem | null;
@@ -46,6 +47,53 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   // History search state
   const [usageSearchQuery, setUsageSearchQuery] = useState('');
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPDFSlip = async (slip: UsageSlip) => {
+    try {
+      setIsExportingPdf(true);
+      await exportUsageSlipToPDF(slip);
+    } catch (err) {
+      console.error('Lỗi xuất PDF phiếu báo sử dụng:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleFormSubmitWithPdf = async () => {
+    if (!selectedItemForUsage) return;
+    if (!usageUser.trim()) return;
+
+    const todayStr = new Date().toLocaleString('vi-VN');
+    const newSlip: UsageSlip = {
+      id: `slip-${Date.now()}`,
+      docNumber: usageDocNumber.trim() || `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`,
+      itemId: selectedItemForUsage.id,
+      itemName: selectedItemForUsage.name,
+      sn: selectedItemForUsage.sn,
+      pn: selectedItemForUsage.pn || '',
+      category: selectedItemForUsage.category || 'Khác',
+      warehouse: selectedItemForUsage.warehouse || '',
+      originalLoc: selectedItemForUsage.loc || '',
+      user: usageUser.trim(),
+      qtyUsed: usageQty,
+      unit: usageUnit.trim() || 'Chiếc',
+      giverDept: usageGiverDept.trim(),
+      giverName: usageGiverName.trim(),
+      giverPos: usageGiverPos.trim(),
+      receiverDept: usageReceiverDept.trim(),
+      receiverPos: usageReceiverPos.trim(),
+      purpose: usagePurpose,
+      notes: usageNotes.trim(),
+      targetLocation: usageTargetLoc.trim(),
+      date: todayStr
+    };
+
+    onSubmitUsage(newSlip, deductInventory);
+    await handleExportPDFSlip(newSlip);
+    onCloseUsageForm();
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemForUsage) return;
@@ -77,6 +125,8 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     };
 
     onSubmitUsage(newSlip, deductInventory);
+    onPrintSlip(newSlip);
+    onCloseUsageForm();
   };
 
   return (
@@ -332,20 +382,33 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 </div>
               </label>
 
-              <div className="flex gap-3 pt-4 border-t border-slate-150 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-150 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={onCloseUsageForm}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold py-3 rounded-2xl text-xs transition-colors cursor-pointer text-center"
+                  className="sm:w-28 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold py-3 rounded-2xl text-xs transition-colors cursor-pointer text-center"
                 >
                   Bỏ qua
                 </button>
                 <button
+                  type="button"
+                  onClick={handleFormSubmitWithPdf}
+                  disabled={isExportingPdf}
+                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-3 px-4 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {isExportingPdf ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  XUẤT FILE PDF TRỰC TIẾP
+                </button>
+                <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                  className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black py-3 px-4 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  XUẤT IN PHIẾU CHUẨN FORM
+                  XUẤT IN TRỰC TIẾP
                 </button>
               </div>
             </form>
@@ -471,9 +534,16 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                             <td className="py-3 px-3 text-right">
                               <div className="flex justify-end gap-2">
                                 <button
+                                  onClick={() => handleExportPDFSlip(slip)}
+                                  className="p-1.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-500/10 dark:text-amber-400 rounded-lg transition-colors cursor-pointer"
+                                  title="Xuất file PDF phiếu báo sử dụng"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button
                                   onClick={() => onPrintSlip(slip)}
-                                  className="p-1.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-500/5 dark:text-amber-400 rounded-lg transition-colors cursor-pointer"
-                                  title="In lại phiếu báo bàn giao (PDF)"
+                                  className="p-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                                  title="In trực tiếp"
                                 >
                                   <Printer className="w-3.5 h-3.5" />
                                 </button>

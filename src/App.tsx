@@ -4,7 +4,7 @@ import {
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive
+  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType } from './types.ts';
@@ -218,9 +218,10 @@ export default function App() {
     const savedAutoSync30s = localStorage.getItem('cns_auto_sync_30s');
     const savedAutoSyncInterval = localStorage.getItem('cns_auto_sync_interval');
     const savedAutoLoad = localStorage.getItem('cns_auto_load_startup');
+    const targetUrl = (savedUrl && savedUrl.trim()) ? savedUrl.trim() : 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec';
     return {
-      webAppUrl: savedUrl !== null ? savedUrl : 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec',
-      autoSync: savedAutoSync === 'true',
+      webAppUrl: targetUrl,
+      autoSync: savedAutoSync !== 'false', // Enabled bidirectional auto-sync
       autoSync30s: savedAutoSync30s !== 'false', // Default: true for 30s auto Google Sheet pull
       autoSyncInterval: savedAutoSyncInterval ? Number(savedAutoSyncInterval) : 30, // Default 30s
       autoLoadOnStartup: savedAutoLoad !== 'false',
@@ -275,6 +276,8 @@ export default function App() {
     onConfirm: () => void;
   } | null>(null);
   const [printLayout, setPrintLayout] = useState<'NONE' | 'QR' | 'LABEL'>('NONE');
+  const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('cns_theme');
@@ -2895,7 +2898,7 @@ export default function App() {
 
             {/* Navigation Menu */}
             <nav className="flex-1 p-3.5 space-y-1 overflow-y-auto custom-scrollbar">
-              <div className="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Hệ Thống Chính</div>
+              <div className="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Danh Mục Chính</div>
               
               <button
                 type="button"
@@ -2910,7 +2913,7 @@ export default function App() {
                 }`}
               >
                 <Database className="w-4.5 h-4.5 shrink-0" />
-                <span className="flex-1 text-left truncate">Kho Vật Tư Dự Phòng</span>
+                <span className="flex-1 text-left truncate">Kho Thiết Bị & Vật Tư</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'INVENTORY' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {inventory.length}
                 </span>
@@ -2929,7 +2932,7 @@ export default function App() {
                 }`}
               >
                 <Layers className="w-4.5 h-4.5 shrink-0" />
-                <span className="flex-1 text-left truncate">Sổ Bàn Giao & Sử Dụng</span>
+                <span className="flex-1 text-left truncate">Sổ Bàn Giao & Điều Chuyển</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'DISPATCHED' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {dispatchedRecords.length}
                 </span>
@@ -2954,19 +2957,7 @@ export default function App() {
                 </span>
               </button>
 
-              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Tác Vụ Kho Nhanh</div>
-
-              {role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={handleOpenAddNewModal}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#2563EB] dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 transition-colors cursor-pointer border border-blue-200/80 dark:border-blue-900/60"
-                  title="Mở form thêm mới thiết bị vào kho"
-                >
-                  <PlusCircle className="w-4.5 h-4.5 text-[#2563EB] dark:text-blue-400 shrink-0" />
-                  <span className="flex-1 text-left font-black truncate">+ Thêm Mới Thiết Bị</span>
-                </button>
-              )}
+              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Tác Vụ Kho & Bàn Giao</div>
 
               <button
                 type="button"
@@ -3005,7 +2996,19 @@ export default function App() {
                 <span className="flex-1 text-left truncate">Lập Biên Bản Bàn Giao</span>
               </button>
 
-              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Quản Trị & Tiện Ích</div>
+              <button
+                type="button"
+                onClick={() => setIsUsageHistoryOpen(true)}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <History className="w-4.5 h-4.5 text-amber-500 shrink-0" />
+                <span className="flex-1 text-left truncate">Sổ Phiếu Sử Dụng</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 shrink-0">
+                  {usageSlips.length}
+                </span>
+              </button>
+
+              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Quản Trị & Hệ Thống</div>
 
               {role === 'admin' && (
                 <button
@@ -3020,20 +3023,11 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setIsGoogleDriveModalOpen(true)}
-                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
-              >
-                <HardDrive className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                <span className="flex-1 text-left truncate">Sao Lưu Google Drive</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setIsSettingsOpen(true)}
                 className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
               >
                 <Settings className="w-4.5 h-4.5 text-slate-400 shrink-0" />
-                <span className="flex-1 text-left truncate">Cấu Hình Cloud Sync</span>
+                <span className="flex-1 text-left truncate">Cấu Hình & Sao Lưu</span>
               </button>
 
               <button
@@ -3247,110 +3241,175 @@ export default function App() {
           </div>
 
           {/* Search and Action Toolbar */}
-          <section className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 sm:p-5 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4 shadow-xs">
-            <div className="relative w-full xl:w-[420px]">
-              <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400" />
+          <section className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3.5 shadow-xs">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-full xl:max-w-md">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm: Tên thiết bị, P/N, S/N, Mã Kho..."
-                className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 transition-all text-xs sm:text-sm font-medium placeholder:text-slate-400"
+                placeholder="Tìm: Tên thiết bị, S/N, P/N, Vị trí, Mã kho..."
+                className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-medium placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
-              <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200/60 dark:border-slate-700/60">
-                <button
-                  onClick={() => fetchCloudData()}
-                  disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3 text-xs font-black uppercase text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
-                  title="Tải dữ liệu từ Google Sheets về máy"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-[#2563EB] ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                  PULL (Tải Về)
-                </button>
-                <button
-                  onClick={syncToCloud}
-                  disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3 text-xs font-black uppercase text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
-                  title="Đẩy dữ liệu hiện có lên Google Sheets"
-                >
-                  PUSH (Đẩy Lên)
-                </button>
-              </div>
-
-              <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 hidden xl:block mx-0.5"></div>
-
+            {/* Action Buttons Group */}
+            <div className="flex flex-wrap items-center gap-2 justify-start xl:justify-end">
               {role === 'admin' && (
                 <button
                   type="button"
                   onClick={handleOpenAddNewModal}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-black py-2.5 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs tracking-wide cursor-pointer"
-                  title="Mở biểu mẫu thêm mới thiết bị vào kho"
+                  className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-black py-2 px-3.5 rounded-xl shadow-xs shadow-blue-500/20 transition-all text-xs cursor-pointer"
+                  title="Thêm thiết bị mới vào kho"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  + THÊM THIẾT BỊ
+                  <span>+ THÊM THIẾT BỊ</span>
                 </button>
               )}
 
               <button
+                type="button"
                 onClick={() => {
                   setScanTargetItem(null);
                   setIsScannerOpen(true);
                   playScanBeep(1000, 0.1);
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black py-2.5 px-4 rounded-xl shadow-xs transition-all text-xs tracking-wide cursor-pointer"
+                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black py-2 px-3.5 rounded-xl shadow-xs transition-all text-xs cursor-pointer"
+                title="Mở camera quét mã QR/Barcode kiểm kê"
               >
-                <Camera className="w-4 h-4 text-blue-400 animate-pulse" />
-                KIỂM KÊ (QUÉT)
+                <Camera className="w-4 h-4 text-blue-400" />
+                <span>QUÉT MÃ</span>
               </button>
 
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 border border-slate-200/60 dark:border-slate-700/60">
+              {/* IN ẤN DROPDOWN */}
+              <div className="relative">
                 <button
-                  onClick={() => handleOpenPrintCenter('QR')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                  title="Mở xem trước & In bảng mã QR định danh"
+                  type="button"
+                  onClick={() => {
+                    setIsPrintDropdownOpen(!isPrintDropdownOpen);
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/60 font-black py-2 px-3 rounded-xl transition-all text-xs cursor-pointer shadow-xs"
+                  title="In ấn tem nhãn & biểu mẫu"
                 >
-                  <Printer className="w-3.5 h-3.5 text-[#2563EB]" />
-                  MÃ QR
+                  <Printer className="w-4 h-4" />
+                  <span>IN ẤN</span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-70" />
                 </button>
-                <button
-                  onClick={() => handleOpenPrintCenter('LABEL')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                  title="Mở xem trước & In tem nhãn kỹ thuật"
-                >
-                  <Tag className="w-3.5 h-3.5 text-[#2563EB]" />
-                  TEM NHÃN
-                </button>
+
+                {isPrintDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsPrintDropdownOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          handleOpenPrintCenter('LABEL');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-[#2563EB] rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <Tag className="w-4 h-4 text-[#2563EB]" />
+                        <span>In Tem Nhãn Kỹ Thuật</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          handleOpenPrintCenter('QR');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-[#2563EB] rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <QrCode className="w-4 h-4 text-[#2563EB]" />
+                        <span>In Bảng Mã QR Định Danh</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          handleOpenPrintCenter('AUDIT_REPORT');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-[#2563EB] rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileText className="w-4 h-4 text-[#2563EB]" />
+                        <span>In Biên Bản Kiểm Kê Kho</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 border border-slate-200/60 dark:border-slate-700/60 flex-wrap sm:flex-nowrap">
+              {/* XUẤT DỮ LIỆU DROPDOWN */}
+              <div className="relative">
                 <button
-                  onClick={handleExportExcel}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-emerald-700 dark:text-emerald-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                  title="Xuất bảng Excel (.xlsx)"
+                  type="button"
+                  onClick={() => {
+                    setIsExportDropdownOpen(!isExportDropdownOpen);
+                    setIsPrintDropdownOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 font-black py-2 px-3 rounded-xl transition-all text-xs cursor-pointer shadow-xs"
+                  title="Xuất dữ liệu Excel / CSV / Sao lưu"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  EXCEL
+                  <FileDown className="w-4 h-4" />
+                  <span>XUẤT DỮ LIỆU</span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-70" />
                 </button>
+
+                {isExportDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          handleExportExcel();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        <span>Xuất Bảng Tính Excel (.xlsx)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          handleExportCsv();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-600" />
+                        <span>Xuất Danh Sách CSV (.csv)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          handleExportJSON();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileCode className="w-4 h-4 text-emerald-600" />
+                        <span>Sao Lưu Toàn Bộ Dữ Liệu (JSON)</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* BÀN GIAO & PHIẾU QUICK ACTIONS */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 border border-slate-200/60 dark:border-slate-700/60">
                 <button
-                  onClick={() => handleOpenPrintCenter('AUDIT_REPORT')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-blue-700 dark:text-blue-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                  title="In Biên bản kiểm kê chuẩn form hành chính"
-                >
-                  <FileText className="w-3.5 h-3.5 text-[#2563EB]" />
-                  BIÊN BẢN
-                </button>
-                <button
+                  type="button"
                   onClick={() => {
                     setIsHandoverModalOpen(true);
                     if (handoverRows.length === 0 && inventory.length > 0) {
@@ -3367,37 +3426,39 @@ export default function App() {
                       setHandoverRows(initialRows);
                     }
                   }}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-rose-700 dark:text-rose-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5"
+                  className="p-2 px-2.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-rose-700 dark:text-rose-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer"
                   title="Lập Biên Bản Bàn Giao thiết bị"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5 text-rose-500" />
-                  BB BÀN GIAO
+                  <span>BB BÀN GIAO</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setIsUsageHistoryOpen(true)}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-amber-700 dark:text-amber-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5"
-                  title="Xem lịch sử phiếu báo sử dụng"
+                  className="p-2 px-2.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-amber-700 dark:text-amber-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2"
+                  title="Xem sổ phiếu báo sử dụng thiết bị"
                 >
                   <History className="w-3.5 h-3.5 text-amber-500" />
-                  PHIẾU SỬ DỤNG ({usageSlips.length})
+                  <span>PHIẾU ({usageSlips.length})</span>
                 </button>
               </div>
             </div>
           </section>
 
-          {/* Filter Pills */}
-          <div className="mt-5 flex flex-col xl:flex-row gap-4 items-start xl:items-stretch">
-            <div className="flex-1 w-full bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-wrap gap-2 items-center">
-              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-1 flex items-center gap-1.5">
+          {/* Filter & Category Bar */}
+          <div className="mt-4 flex flex-col xl:flex-row gap-3 items-stretch">
+            {/* Category Filter */}
+            <div className="flex-1 bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-2.5 shadow-xs flex items-center gap-2 overflow-x-auto custom-scrollbar">
+              <span className="text-xs uppercase font-black text-slate-400 tracking-wider shrink-0 flex items-center gap-1.5 pl-1.5">
                 <Filter className="w-3.5 h-3.5 text-[#2563EB]" /> Phân Loại:
               </span>
               {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     selectedCategory === cat
-                      ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/25'
+                      ? 'bg-[#2563EB] text-white shadow-xs font-black'
                       : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
                   }`}
                 >
@@ -3406,50 +3467,61 @@ export default function App() {
               ))}
             </div>
 
-            <div className="w-full xl:w-auto bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-wrap gap-2 items-center">
-              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-1">
-                Kiểm kê:
-              </span>
-              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-xs font-extrabold flex-wrap sm:flex-nowrap gap-1">
-                <button
-                  onClick={() => setStatusFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
-                >
-                  Tất cả
-                </button>
-                <button
-                  onClick={() => setStatusFilter('OK')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'OK' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'}`}
-                >
-                  Tốt / Đủ ({stats.okCount})
-                </button>
-                <button
-                  onClick={() => setStatusFilter('MISSING')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'MISSING' ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
-                >
-                  Thiếu / Hỏng ({stats.missingCount})
-                </button>
-                <button
-                  onClick={() => setStatusFilter('UNCHECKED')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
-                >
-                  Chưa kiểm ({stats.totalItems - stats.checkedCount})
-                </button>
-                <button
-                  onClick={() => setStatusFilter('LOW_STOCK')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'LOW_STOCK'
-                      ? 'bg-amber-500 text-white shadow-xs font-black'
-                      : lowStockItems.length > 0
-                      ? 'text-amber-600 dark:text-amber-400 font-extrabold hover:bg-amber-100/80 dark:hover:bg-amber-950/50'
-                      : 'text-slate-500'
-                  }`}
-                  title="Lọc các thiết bị có số lượng <= 1 bộ"
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  Sắp hết ({lowStockItems.length})
-                </button>
-              </div>
+            {/* Status Audit Filter */}
+            <div className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-2 shadow-xs flex items-center gap-1 shrink-0 overflow-x-auto custom-scrollbar">
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'ALL'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                Tất cả ({stats.totalItems})
+              </button>
+              <button
+                onClick={() => setStatusFilter('OK')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'OK'
+                    ? 'bg-emerald-600 text-white font-black shadow-xs'
+                    : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                }`}
+              >
+                Đủ / Tốt ({stats.okCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('MISSING')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'MISSING'
+                    ? 'bg-rose-600 text-white font-black shadow-xs'
+                    : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                }`}
+              >
+                Thiếu / Hỏng ({stats.missingCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('UNCHECKED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'UNCHECKED'
+                    ? 'bg-blue-600 text-white font-black shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                Chưa kiểm ({stats.totalItems - stats.checkedCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('LOW_STOCK')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  statusFilter === 'LOW_STOCK'
+                    ? 'bg-amber-500 text-white font-black shadow-xs'
+                    : lowStockItems.length > 0
+                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
+                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Sắp hết ({lowStockItems.length})
+              </button>
             </div>
           </div>
 

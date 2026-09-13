@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SyncConfig, StorageConfig } from '../types.ts';
 import { playScanBeep } from '../utils/audio.ts';
+import { APPS_SCRIPT_SOURCE_CODE } from './AppsScriptFixModal.tsx';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -613,120 +614,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     <div className="relative">
-                      <pre className="p-3 bg-slate-950 text-emerald-400 font-mono text-[10px] rounded-xl overflow-x-auto max-h-48 leading-relaxed select-all">
-{`function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("KhoVatTu") || ss.getSheets()[0];
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", items: [] }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  var headers = data[0];
-  var items = [];
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
-    }
-    items.push(obj);
-  }
-  return ContentService.createTextOutput(JSON.stringify({ status: "success", items: items }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("KhoVatTu") || ss.insertSheet("KhoVatTu");
-    var rawData = e.parameter.data || e.parameter.inventory || (e.postData && e.postData.contents);
-    if (!rawData) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Không có dữ liệu" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    var items = JSON.parse(rawData);
-    if (Array.isArray(items)) {
-      sheet.clearContents();
-      var headers = ["id", "name", "category", "pn", "sn", "warehouse", "loc", "qty", "auditStatus", "auditDate", "auditNote", "updatedAt"];
-      sheet.appendRow(headers);
-      var rows = items.map(function(it) {
-        return [
-          it.id || "", it.name || "", it.category || "Khác", it.pn || "", it.sn || "",
-          it.warehouse || "", it.loc || "", it.qty !== undefined ? it.qty : 1,
-          it.auditStatus || "", it.auditDate || "", it.auditNote || "",
-          it.updatedAt || new Date().toISOString()
-        ];
-      });
-      if (rows.length > 0) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
-    }
-    return ContentService.createTextOutput(JSON.stringify({ success: true, count: items.length }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}`}
+                      <pre className="p-3 bg-slate-950 text-emerald-400 font-mono text-[10px] rounded-xl overflow-x-auto max-h-48 leading-relaxed select-all border border-slate-800">
+                        {APPS_SCRIPT_SOURCE_CODE}
                       </pre>
                       <button
                         type="button"
                         onClick={() => {
-                          const scriptText = `function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("KhoVatTu") || ss.getSheets()[0];
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", items: [] }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  var headers = data[0];
-  var items = [];
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
-    }
-    items.push(obj);
-  }
-  return ContentService.createTextOutput(JSON.stringify({ status: "success", items: items }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("KhoVatTu") || ss.insertSheet("KhoVatTu");
-    var rawData = e.parameter.data || e.parameter.inventory || (e.postData && e.postData.contents);
-    if (!rawData) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Không có dữ liệu" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    var items = JSON.parse(rawData);
-    if (Array.isArray(items)) {
-      sheet.clearContents();
-      var headers = ["id", "name", "category", "pn", "sn", "warehouse", "loc", "qty", "auditStatus", "auditDate", "auditNote", "updatedAt"];
-      sheet.appendRow(headers);
-      var rows = items.map(function(it) {
-        return [
-          it.id || "", it.name || "", it.category || "Khác", it.pn || "", it.sn || "",
-          it.warehouse || "", it.loc || "", it.qty !== undefined ? it.qty : 1,
-          it.auditStatus || "", it.auditDate || "", it.auditNote || "",
-          it.updatedAt || new Date().toISOString()
-        ];
-      });
-      if (rows.length > 0) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
-    }
-    return ContentService.createTextOutput(JSON.stringify({ success: true, count: items.length }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}`;
-                          navigator.clipboard.writeText(scriptText);
+                          navigator.clipboard.writeText(APPS_SCRIPT_SOURCE_CODE);
                           setCopiedScript(true);
-                          onAddToast('Đã sao chép mã Google Apps Script mẫu vào bộ nhớ tạm!', 'success');
+                          onAddToast('Đã sao chép mã Google Apps Script mẫu v3.6 vào bộ nhớ tạm!', 'success');
                           setTimeout(() => setCopiedScript(false), 2500);
                         }}
                         className="absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm cursor-pointer"

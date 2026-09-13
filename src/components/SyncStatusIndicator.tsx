@@ -17,12 +17,14 @@ import { syncService, SyncServiceState } from '../services/syncService.ts';
 interface SyncStatusIndicatorProps {
   onOpenConflictModal?: () => void;
   onOpenSettings?: () => void;
+  onOpenAppsScriptFix?: () => void;
   className?: string;
 }
 
 export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   onOpenConflictModal,
   onOpenSettings,
+  onOpenAppsScriptFix,
   className = ''
 }) => {
   const [syncState, setSyncState] = useState<SyncServiceState>(syncService.getState());
@@ -69,7 +71,12 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   let label = 'Đã đồng bộ';
   let Icon = CheckCircle2;
 
-  if (!isOnline || globalStatus === 'offline') {
+  if (syncState.scriptErrorCode === 'NON_FROZEN_ROWS_EXCEPTION') {
+    badgeBg = 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50 shadow-xs shadow-amber-500/10 animate-pulse';
+    dotBg = 'bg-amber-500';
+    label = 'Lỗi hàng cố định Apps Script';
+    Icon = AlertTriangle;
+  } else if (!isOnline || globalStatus === 'offline') {
     badgeBg = 'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-400/30';
     dotBg = 'bg-slate-400';
     label = 'Ngoại tuyến (Offline)';
@@ -147,6 +154,33 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
               )}
             </div>
           </div>
+
+          {/* Apps Script Frozen Rows Error Banner */}
+          {syncState.scriptErrorCode === 'NON_FROZEN_ROWS_EXCEPTION' && (
+            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                    Lỗi hàng cố định Apps Script
+                  </p>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                    Cần dán mã Code.gs chuẩn để tiếp tục đồng bộ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenAppsScriptFix?.();
+                }}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer shrink-0"
+              >
+                Khắc phục
+              </button>
+            </div>
+          )}
 
           {/* Conflict Banner if any */}
           {conflicts.length > 0 && (

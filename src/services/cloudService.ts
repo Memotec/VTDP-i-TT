@@ -12,6 +12,8 @@ export interface CloudPushResult {
   error?: string;
   timestamp?: string;
   itemCount?: number;
+  scriptErrorCode?: string;
+  raw?: string;
 }
 
 export interface CloudPullResult {
@@ -120,6 +122,52 @@ export class CloudService {
       return { success: false, error: 'Đường dẫn Cloud API (Google Apps Script) chưa được cấu hình hợp lệ.' };
     }
 
+    // Step 1: Try server-side Cloud Proxy first (avoids browser CORS & inspects true Apps Script errors)
+    try {
+      const proxyRes = await fetch('/api/cloud-proxy/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: cleanUrl,
+          data: inventory,
+          inventory,
+          dispatched: dispatchedRecords,
+          queue: queueItems,
+          user: user || 'guest',
+          categories
+        })
+      });
+
+      if (proxyRes.ok) {
+        const proxyData = await proxyRes.json();
+        if (proxyData.scriptErrorCode === 'NON_FROZEN_ROWS_EXCEPTION') {
+          return {
+            success: false,
+            error: proxyData.error || 'Google Apps Script gặp lỗi: "Sorry, it is not possible to delete all non-frozen rows".',
+            scriptErrorCode: 'NON_FROZEN_ROWS_EXCEPTION',
+            raw: proxyData.raw
+          };
+        }
+        if (!proxyData.success) {
+          return {
+            success: false,
+            error: proxyData.error || 'Lỗi gửi dữ liệu qua Cloud Proxy',
+            scriptErrorCode: proxyData.scriptErrorCode,
+            raw: proxyData.raw
+          };
+        }
+        return {
+          success: true,
+          message: proxyData.message || `Đồng bộ thành công ${inventory.length} thiết bị lên Google Sheet!`,
+          timestamp: new Date().toISOString(),
+          itemCount: inventory.length
+        };
+      }
+    } catch {
+      // If local proxy fails or not available, gracefully fall back to direct browser fetch
+    }
+
+    // Step 2: Direct browser fetch fallback
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safe timeout
@@ -134,13 +182,10 @@ export class CloudService {
       params.append('queue', JSON.stringify(queueItems));
       params.append('timestamp', Date.now().toString());
       params.append('user', user || 'guest');
-      params.append('clientVersion', '3.5-enterprise');
+      params.append('clientVersion', '3.6-enterprise');
 
-      // Post with form urlencoded to bypass CORS preflight issues with Google Apps Script
-      await fetch(cleanUrl, {
+      const res = await fetch(cleanUrl, {
         method: 'POST',
-        mode: 'no-cors',
-        cache: 'no-cache',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
@@ -149,6 +194,26 @@ export class CloudService {
       });
 
       clearTimeout(timeoutId);
+
+      const resText = (await res.text()).trim();
+
+      if (resText.includes('Sorry, it is not possible to delete all non-frozen rows')) {
+        return {
+          success: false,
+          error: 'Google Sheet đang bị lỗi mã Apps Script: "Sorry, it is not possible to delete all non-frozen rows". Cần cập nhật Code.gs trong Cài đặt.',
+          scriptErrorCode: 'NON_FROZEN_ROWS_EXCEPTION',
+          raw: resText
+        };
+      }
+
+      if (resText.startsWith('ERROR:') || resText.includes('Exception:')) {
+        return {
+          success: false,
+          error: `Google Apps Script gặp lỗi: ${resText}`,
+          scriptErrorCode: 'APPS_SCRIPT_EXCEPTION',
+          raw: resText
+        };
+      }
 
       return {
         success: true,
@@ -180,6 +245,51 @@ export class CloudService {
       return { success: false, error: 'Đường dẫn Cloud API (Google Apps Script) chưa hợp lệ.' };
     }
 
+    // Step 1: Try server-side Cloud Proxy first
+    try {
+      const proxyRes = await fetch('/api/cloud-proxy/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl })
+      });
+
+      if (proxyRes.ok) {
+        const proxyData = await proxyRes.json();
+        if (proxyData.success && proxyData.data) {
+          const parsed = proxyData.data;
+          let rawItems: any[] = [];
+          let rawDispatched: any[] = [];
+
+          if (Array.isArray(parsed)) {
+            rawItems = parsed;
+          } else if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.items)) rawItems = parsed.items;
+            else if (Array.isArray(parsed.data)) rawItems = parsed.data;
+            else if (Array.isArray(parsed.inventory)) rawItems = parsed.inventory;
+            else if (Array.isArray(parsed.result)) rawItems = parsed.result;
+            else if (Array.isArray(parsed.records)) rawItems = parsed.records;
+
+            if (Array.isArray(parsed.dispatched)) rawDispatched = parsed.dispatched;
+            else if (Array.isArray(parsed.dispatchedRecords)) rawDispatched = parsed.dispatchedRecords;
+          }
+
+          if (rawItems.length === 0 && rawDispatched.length === 0) {
+            return { success: true, items: [], dispatched: [], empty: true };
+          }
+
+          const formattedItems: InventoryItem[] = rawItems.map((raw, idx) => extractInventoryItem(raw, idx));
+          return {
+            success: true,
+            items: formattedItems,
+            dispatched: rawDispatched
+          };
+        }
+      }
+    } catch {
+      // Fall back to direct fetch
+    }
+
+    // Step 2: Direct browser fetch fallback
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 18000);
@@ -207,7 +317,7 @@ export class CloudService {
       let parsed: any;
       try {
         parsed = JSON.parse(trimmed);
-      } catch (jsonErr) {
+      } catch {
         return {
           success: false,
           error: 'Dữ liệu từ Google Sheet không đúng định dạng JSON. Vui lòng kiểm tra hàm doGet() trong Apps Script.'

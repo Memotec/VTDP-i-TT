@@ -28,6 +28,7 @@ export interface SyncServiceState {
   conflicts: ConflictItem[];
   queue: SyncQueueItem[];
   detailMessage?: string;
+  scriptErrorCode?: string;
 }
 
 class SyncService {
@@ -36,6 +37,7 @@ class SyncService {
   private globalStatus: GlobalSyncState = 'synced';
   private lastSyncedTime: string = '';
   private detailMessage: string = 'Hệ thống sẵn sàng';
+  private scriptErrorCode?: string;
   private listeners: Set<SyncListener> = new Set();
   private debounceTimer: any = null;
   private retryTimer: any = null;
@@ -88,12 +90,100 @@ class SyncService {
       isOnline: networkMonitor.isOnline(),
       conflicts: this.conflicts,
       queue: [...this.queue],
-      detailMessage: this.detailMessage
+      detailMessage: this.detailMessage,
+      scriptErrorCode: this.scriptErrorCode
     };
   }
 
   public getQueue(): SyncQueueItem[] {
     return [...this.queue];
+  }
+
+  public getScriptErrorCode(): string | undefined {
+    return this.scriptErrorCode;
+  }
+
+  public clearScriptErrorCode(): void {
+    this.scriptErrorCode = undefined;
+    this.notify();
+  }
+
+  /**
+   * Schedule debounced full push to ensure local state persists to cloud automatically
+   */
+  public scheduleDebouncedPush(delayMs = 1200): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.triggerFullSync();
+    }, delayMs);
+  }
+
+  /**
+   * Immediately push complete local dataset to Cloud Google Sheet
+   */
+  public async triggerFullSync(): Promise<{ success: boolean; error?: string; scriptErrorCode?: string }> {
+    if (this.isProcessing) return { success: false, error: 'Đang trong tiến trình đồng bộ' };
+    if (!networkMonitor.isOnline()) {
+      this.globalStatus = 'offline';
+      this.detailMessage = 'Đang ngoại tuyến. Dữ liệu sẽ tự động đồng bộ khi có Internet.';
+      this.notify();
+      return { success: false, error: 'Ngoại tuyến' };
+    }
+
+    this.isProcessing = true;
+    this.globalStatus = 'syncing';
+    this.detailMessage = 'Đang tự động ghi dữ liệu mới lên Cloud Google Sheet...';
+    this.notify();
+
+    try {
+      const currentInventory = LocalDatabase.getInventory();
+      const currentDispatched = LocalDatabase.getDispatchedRecords();
+      const currentCategories = LocalDatabase.getCategories();
+      const pendingItems = this.queue.filter(q => q.syncStatus === 'pending' || q.syncStatus === 'failed');
+
+      const pushResult = await CloudService.pushToCloud(
+        this.webAppUrl,
+        currentInventory,
+        currentDispatched,
+        pendingItems,
+        this.currentUser,
+        currentCategories
+      );
+
+      if (pushResult.success) {
+        this.queue = [];
+        LocalDatabase.saveSyncQueue(this.queue);
+        LocalDatabase.markAllItemsSyncStatus('synced');
+
+        const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        this.lastSyncedTime = nowStr;
+        localStorage.setItem('cns_last_synced_time', nowStr);
+
+        this.globalStatus = 'synced';
+        this.scriptErrorCode = undefined;
+        this.detailMessage = `Đã tự động lưu lên Google Sheet lúc ${nowStr}`;
+        this.notify();
+        return { success: true };
+      } else {
+        this.scriptErrorCode = pushResult.scriptErrorCode;
+        this.globalStatus = 'failed';
+        this.detailMessage = pushResult.error || 'Lỗi lưu dữ liệu lên Cloud';
+        this.notify();
+        return { success: false, error: pushResult.error, scriptErrorCode: pushResult.scriptErrorCode };
+      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định khi đồng bộ';
+      this.globalStatus = 'failed';
+      this.detailMessage = errMsg;
+      this.notify();
+      return { success: false, error: errMsg };
+    } finally {
+      this.isProcessing = false;
+      this.evaluateStatus();
+      this.notify();
+    }
   }
 
   public subscribe(listener: SyncListener): () => void {
@@ -268,9 +358,11 @@ class SyncService {
         localStorage.setItem('cns_last_synced_time', nowStr);
 
         this.globalStatus = 'synced';
+        this.scriptErrorCode = undefined;
         this.detailMessage = `Đồng bộ thành công lúc ${nowStr}`;
       } else {
         // Cloud reported failure: Apply retry policy
+        this.scriptErrorCode = pushResult.scriptErrorCode;
         this.handleBatchFailure(pendingItems, pushResult.error || 'Lỗi kết nối máy chủ');
       }
     } catch (err: unknown) {

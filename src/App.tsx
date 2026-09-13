@@ -23,6 +23,7 @@ import { LocalDatabase } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
 import { CloudService } from './services/cloudService.ts';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
+import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
 
@@ -146,6 +147,7 @@ export default function App() {
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
   const [selectedItemForUsage, setSelectedItemForUsage] = useState<InventoryItem | null>(null);
   const [isUsageHistoryOpen, setIsUsageHistoryOpen] = useState(false);
+  const [isAppsScriptFixOpen, setIsAppsScriptFixOpen] = useState(false);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictItem[]>(() => LocalDatabase.getConflicts());
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
@@ -474,11 +476,15 @@ export default function App() {
     const nowStr = new Date().toLocaleTimeString('vi-VN');
     localStorage.setItem('cns_last_saved_time', nowStr);
     setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
+    // Automatically trigger debounced push to Cloud Google Sheet
+    syncService.scheduleDebouncedPush();
   };
 
   const saveDispatchedRecordsLocally = (newRecords: DispatchedRecord[]) => {
     setDispatchedRecords(newRecords);
     LocalDatabase.saveDispatchedRecords(newRecords);
+    // Automatically trigger debounced push to Cloud Google Sheet
+    syncService.scheduleDebouncedPush();
   };
 
   const saveAuditLogsLocally = (newLogs: SystemAuditLogEntry[]) => {
@@ -761,6 +767,8 @@ export default function App() {
   const saveCategoriesLocally = (newCats: string[]) => {
     setCategories(newCats);
     localStorage.setItem('cns_categories_v30', JSON.stringify(newCats));
+    // Automatically trigger debounced push to Cloud Google Sheet
+    syncService.scheduleDebouncedPush();
   };
 
   const lowStockItems = useMemo(() => {
@@ -1494,6 +1502,9 @@ export default function App() {
       );
 
       if (!res.success) {
+        if (res.scriptErrorCode === 'NON_FROZEN_ROWS_EXCEPTION') {
+          setIsAppsScriptFixOpen(true);
+        }
         throw new Error(res.error || 'Đẩy dữ liệu thất bại');
       }
 
@@ -3085,6 +3096,7 @@ export default function App() {
                 <SyncStatusIndicator
                   onOpenSettings={() => setIsSettingsOpen(true)}
                   onOpenConflictModal={() => setIsConflictModalOpen(true)}
+                  onOpenAppsScriptFix={() => setIsAppsScriptFixOpen(true)}
                 />
 
                 {/* Low Stock Warning Button */}
@@ -3817,6 +3829,16 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      {/* Google Apps Script Frozen Rows Fix Modal */}
+      <AppsScriptFixModal
+        isOpen={isAppsScriptFixOpen}
+        onClose={() => setIsAppsScriptFixOpen(false)}
+        isSyncing={syncStatus === 'syncing'}
+        onRetrySync={async () => {
+          await syncToCloud();
+        }}
+      />
     </div>
   );
 }

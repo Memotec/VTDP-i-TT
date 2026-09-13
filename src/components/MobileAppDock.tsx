@@ -2,13 +2,13 @@ import React from 'react';
 import { 
   Package, 
   Camera, 
-  BarChart3, 
+  Layers, 
   FileText, 
   Settings, 
   ShieldAlert
 } from 'lucide-react';
 
-export type MobileTab = 'inventory' | 'stats' | 'reports' | 'admin';
+export type MobileTab = 'inventory' | 'dispatched' | 'stats' | 'reports' | 'admin';
 
 interface MobileAppDockProps {
   currentTab: MobileTab;
@@ -16,6 +16,7 @@ interface MobileAppDockProps {
   onOpenScanner: () => void;
   lowStockCount: number;
   missingCount: number;
+  dispatchedCount?: number;
   role: 'admin' | 'guest';
 }
 
@@ -25,6 +26,7 @@ export const MobileAppDock: React.FC<MobileAppDockProps> = ({
   onOpenScanner,
   lowStockCount,
   missingCount,
+  dispatchedCount = 0,
   role,
 }) => {
   const handleTabClick = (tab: MobileTab) => {
@@ -43,61 +45,64 @@ export const MobileAppDock: React.FC<MobileAppDockProps> = ({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[50000] md:hidden">
-      {/* Background glass container with safe bottom inset */}
-      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-2 pt-2 pb-safe">
+      {/* Background container with blur & safe bottom inset */}
+      <div className="bg-white/95 dark:bg-[#131B2E]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-2 pt-2 pb-safe">
         <div className="flex items-center justify-around relative max-w-lg mx-auto">
           
           {/* TAB 1: KHO VẬT TƯ */}
           <button
+            type="button"
             onClick={() => handleTabClick('inventory')}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer relative ${
               currentTab === 'inventory'
-                ? 'text-indigo-600 dark:text-indigo-400 font-black scale-105'
+                ? 'text-[#2563EB] dark:text-blue-400 font-black scale-105'
                 : 'text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <div className="relative">
               <Package className="w-5 h-5" />
               {missingCount > 0 && (
-                <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center animate-pulse">
+                <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-rose-600 text-white text-[8px] font-black rounded-full flex items-center justify-center animate-pulse">
                   {missingCount > 9 ? '9+' : missingCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] mt-1 tracking-tight">Kho VT</span>
+            <span className="text-[10px] mt-1 tracking-tight whitespace-nowrap">Kho VT</span>
             {currentTab === 'inventory' && (
-              <span className="w-1 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-0.5"></span>
+              <span className="w-1 h-1 bg-[#2563EB] dark:bg-blue-400 rounded-full mt-0.5"></span>
             )}
           </button>
 
-          {/* TAB 2: THỐNG KÊ */}
+          {/* TAB 2: BÀN GIAO */}
           <button
-            onClick={() => handleTabClick('stats')}
+            type="button"
+            onClick={() => handleTabClick('dispatched')}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer relative ${
-              currentTab === 'stats'
-                ? 'text-indigo-600 dark:text-indigo-400 font-black scale-105'
+              currentTab === 'dispatched'
+                ? 'text-[#2563EB] dark:text-blue-400 font-black scale-105'
                 : 'text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <div className="relative">
-              <BarChart3 className="w-5 h-5" />
-              {lowStockCount > 0 && (
-                <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
-                  !
+              <Layers className="w-5 h-5" />
+              {dispatchedCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 px-0.5 bg-slate-700 text-white text-[8px] font-black rounded-full flex items-center justify-center">
+                  {dispatchedCount > 99 ? '99+' : dispatchedCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] mt-1 tracking-tight">Thống Kê</span>
-            {currentTab === 'stats' && (
-              <span className="w-1 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-0.5"></span>
+            <span className="text-[10px] mt-1 tracking-tight whitespace-nowrap">Bàn Giao</span>
+            {currentTab === 'dispatched' && (
+              <span className="w-1 h-1 bg-[#2563EB] dark:bg-blue-400 rounded-full mt-0.5"></span>
             )}
           </button>
 
           {/* CENTER: CAMERA SCAN FLOATING BUTTON */}
           <div className="flex-1 flex justify-center -translate-y-4">
             <button
+              type="button"
               onClick={handleScanClick}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-indigo-400 text-white flex flex-col items-center justify-center shadow-lg shadow-indigo-600/40 border-4 border-white dark:border-slate-900 active:scale-95 transition-all cursor-pointer group"
+              className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#2563EB] via-blue-600 to-blue-500 text-white flex flex-col items-center justify-center shadow-lg shadow-blue-500/30 border-4 border-white dark:border-[#131B2E] active:scale-95 transition-all cursor-pointer group"
               title="Quét mã QR & Barcode"
             >
               <Camera className="w-6 h-6 animate-pulse group-hover:scale-110 transition-transform" />
@@ -105,43 +110,52 @@ export const MobileAppDock: React.FC<MobileAppDockProps> = ({
             </button>
           </div>
 
-          {/* TAB 3: BÁO CÁO & PHIẾU */}
+          {/* TAB 3: BÁO CÁO & IN */}
           <button
+            type="button"
             onClick={() => handleTabClick('reports')}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer relative ${
               currentTab === 'reports'
-                ? 'text-indigo-600 dark:text-indigo-400 font-black scale-105'
+                ? 'text-[#2563EB] dark:text-blue-400 font-black scale-105'
                 : 'text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <FileText className="w-5 h-5" />
-            <span className="text-[10px] mt-1 tracking-tight">Báo Cáo</span>
+            <div className="relative">
+              <FileText className="w-5 h-5" />
+              {lowStockCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
+                  !
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] mt-1 tracking-tight whitespace-nowrap">Báo Cáo</span>
             {currentTab === 'reports' && (
-              <span className="w-1 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-0.5"></span>
+              <span className="w-1 h-1 bg-[#2563EB] dark:bg-blue-400 rounded-full mt-0.5"></span>
             )}
           </button>
 
           {/* TAB 4: QUẢN TRỊ / CÀI ĐẶT */}
           <button
+            type="button"
             onClick={() => handleTabClick('admin')}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all cursor-pointer relative ${
               currentTab === 'admin'
-                ? 'text-indigo-600 dark:text-indigo-400 font-black scale-105'
+                ? 'text-[#2563EB] dark:text-blue-400 font-black scale-105'
                 : 'text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <div className="relative">
               {role === 'admin' ? (
-                <ShieldAlert className="w-5 h-5 text-indigo-500" />
+                <ShieldAlert className="w-5 h-5 text-amber-500" />
               ) : (
                 <Settings className="w-5 h-5" />
               )}
             </div>
-            <span className="text-[10px] mt-1 tracking-tight">
+            <span className="text-[10px] mt-1 tracking-tight whitespace-nowrap">
               {role === 'admin' ? 'Quản Trị' : 'Cài Đặt'}
             </span>
             {currentTab === 'admin' && (
-              <span className="w-1 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-0.5"></span>
+              <span className="w-1 h-1 bg-[#2563EB] dark:bg-blue-400 rounded-full mt-0.5"></span>
             )}
           </button>
 

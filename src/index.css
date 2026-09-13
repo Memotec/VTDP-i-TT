@@ -2,20 +2,20 @@
 
 :root {
   --color-primary: #2563EB;
-  --color-bg: #1E2430;
-  --color-card: #131B2E;
-  --color-text: #F8FAFC;
+  --color-bg: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-text: #0F172A;
   --color-success: #16A34A;
-  --color-warning: #F59E0B;
+  --color-warning: #D97706;
   --color-danger: #DC2626;
-  --color-border: #2E384D;
+  --color-border: #E2E8F0;
 }
 
 .dark {
   --color-primary: #3B82F6;
-  --color-bg: #1E2430;
+  --color-bg: #0B0F19;
   --color-card: #131B2E;
-  --color-text: #1a7fe4;
+  --color-text: #F8FAFC;
   --color-success: #22C55E;
   --color-warning: #FBBF24;
   --color-danger: #EF4444;
@@ -193,7 +193,7 @@ html, body {
   }
 
   html, body {
-    background: #427fd4 !important;
+    background: #ffffff !important;
     color: #000000 !important;
     font-size: 12pt;
     margin: 0 !important;
@@ -223,14 +223,14 @@ html, body {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #d25353 !important;
+    background: #ffffff !important;
     color: #000000 !important;
     z-index: 9999999 !important;
   }
 
   .print-page {
     width: 100%;
-    background: #b64848 !important;
+    background: #ffffff !important;
     color: #000000 !important;
     page-break-after: auto;
   }
@@ -310,7 +310,7 @@ html, body {
     justify-content: space-between !important;
     min-height: 155px !important;
     page-break-inside: avoid !important;
-    background: #d06c6c !important;
+    background: #ffffff !important;
   }
 
   .label-header {

@@ -52,6 +52,7 @@ class SyncService {
     this.queue = LocalDatabase.getSyncQueue();
     this.conflicts = LocalDatabase.getConflicts();
     this.lastSyncedTime = localStorage.getItem('cns_last_synced_time') || '';
+    this.webAppUrl = localStorage.getItem('cns_sync_url') || 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec';
 
     // 2. Listen to network changes
     networkMonitor.subscribe((online) => {
@@ -242,11 +243,15 @@ class SyncService {
 
     try {
       const currentInventory = LocalDatabase.getInventory();
+      const currentDispatched = LocalDatabase.getDispatchedRecords();
+      const currentCategories = LocalDatabase.getCategories();
       const pushResult = await CloudService.pushToCloud(
         this.webAppUrl,
         currentInventory,
+        currentDispatched,
         pendingItems,
-        this.currentUser
+        this.currentUser,
+        currentCategories
       );
 
       if (pushResult.success) {
@@ -340,10 +345,24 @@ class SyncService {
   public checkForConflicts(cloudItems: InventoryItem[], localItems: InventoryItem[]): ConflictItem[] {
     const detected: ConflictItem[] = [];
     const localMap = new Map<string, InventoryItem>();
-    localItems.forEach(i => localMap.set(i.id, i));
+    const localSnMap = new Map<string, InventoryItem>();
+    
+    localItems.forEach(i => {
+      localMap.set(i.id, i);
+      if (i.sn) {
+        localSnMap.set(i.sn.trim().toLowerCase(), i);
+      }
+    });
+
+    const pendingQueueIds = new Set(
+      this.queue
+        .filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing')
+        .map(q => q.entityId)
+    );
 
     cloudItems.forEach(cloudItem => {
-      const localItem = localMap.get(cloudItem.id);
+      const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
+      const localItem = localMap.get(cloudItem.id) || (cleanSn ? localSnMap.get(cleanSn) : undefined);
       if (!localItem) return;
 
       // Check if both sides have conflicting versions or contents
@@ -351,13 +370,18 @@ class SyncService {
       const cloudVer = cloudItem.version || 1;
 
       // If local has pending unsynced changes and cloud has a different version or different values
-      const isLocallyPending = localItem.syncStatus === 'pending' || localItem.syncStatus === 'syncing';
+      const isLocallyPending =
+        localItem.syncStatus === 'pending' ||
+        localItem.syncStatus === 'syncing' ||
+        pendingQueueIds.has(localItem.id);
+
       const hasContentDiff =
         localItem.qty !== cloudItem.qty ||
         localItem.auditStatus !== cloudItem.auditStatus ||
-        localItem.loc !== cloudItem.loc;
+        localItem.loc !== cloudItem.loc ||
+        localItem.warehouse !== cloudItem.warehouse;
 
-      if (isLocallyPending && hasContentDiff && (cloudVer > localVer || cloudItem.updatedAt !== localItem.updatedAt)) {
+      if (isLocallyPending && hasContentDiff && (cloudVer > localVer || (cloudItem.updatedAt && localItem.updatedAt && cloudItem.updatedAt !== localItem.updatedAt))) {
         detected.push({
           id: `conflict_${localItem.id}_${Date.now()}`,
           entityType: 'equipment',

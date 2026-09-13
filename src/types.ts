@@ -47,6 +47,8 @@ export interface StorageConfig {
   lastSavedTime?: string;
   autoBackup24h?: boolean; // periodic 24-hour auto download of inventory JSON
   lastAutoBackupTime?: number; // timestamp in milliseconds
+  autoDriveBackup?: boolean; // periodic automatic background backup to Google Drive 'QLVT_Backup' folder
+  lastDriveBackupTime?: number; // timestamp in milliseconds of last Google Drive background backup
 }
 
 export interface UserAccount {

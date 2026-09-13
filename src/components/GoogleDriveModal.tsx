@@ -9,7 +9,6 @@ import {
   listDriveBackups, uploadToDrive, downloadFromDrive, deleteFromDrive, DriveFileItem 
 } from '../services/googleDriveService.ts';
 import { InventoryItem, DispatchedRecord } from '../types.ts';
-import * as XLSX from 'xlsx';
 
 interface GoogleDriveModalProps {
   isOpen: boolean;
@@ -152,6 +151,7 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
       const dateStr = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Danh_Sach_Vat_Tu_CNS_${dateStr}.xlsx`;
 
+      const XLSX = await import('xlsx');
       const excelRows = inventory.map((item, index) => ({
         'STT': index + 1,
         'Mã định danh': item.id,
@@ -161,7 +161,7 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
         'Số lượng': item.qty,
         'Vị trí lưu kho': item.warehouse || '',
         'Phân loại danh mục': item.category,
-        'Trạng thái': item.status === 'READY' ? 'Sẵn sàng' : item.status === 'DEPLOYED' ? 'Đã bàn giao' : 'Cần bảo dưỡng'
+        'Trạng thái kiểm kê': item.auditStatus === 'OK' ? 'Tốt/Đủ' : item.auditStatus === 'MISSING' ? 'Thiếu/Hỏng' : 'Chưa kiểm'
       }));
 
       const ws = XLSX.utils.json_to_sheet(excelRows);

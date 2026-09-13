@@ -8,7 +8,7 @@ export interface DriveFileItem {
   webViewLink?: string;
 }
 
-const DRIVE_FOLDER_NAME = 'CNS_Equipment_Backups';
+const DRIVE_FOLDER_NAME = 'QLVT_Backup';
 
 /**
  * Find or create the default app backup folder on Google Drive

@@ -28,7 +28,6 @@ import {
   Clock,
   Laptop
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { SystemAuditLogEntry, AuditActionType, Role } from '../types.ts';
 
 interface SystemAuditLogViewProps {
@@ -203,36 +202,41 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
   }, [logs]);
 
   // Export Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (filteredLogs.length === 0) {
       onAddToast('Không có dữ liệu nhật ký để xuất!', 'info');
       return;
     }
 
-    const exportRows = filteredLogs.map((log, index) => ({
-      'STT': index + 1,
-      'Mã Log': log.id,
-      'Mốc Thời Gian': log.timestamp,
-      'Loại Hành Động': getActionBadge(log.actionType).label,
-      'Tiêu Đề Hành Động': log.actionTitle,
-      'Người Thực Hiện': `${log.performedByName || log.performedBy} (@${log.performedBy})`,
-      'Vai Trò': log.userRole === 'admin' ? 'QUẢN TRỊ VIÊN' : 'KIỂM KÊ VIÊN',
-      'Thiết Bị / Đối Tượng': log.targetName || 'N/A',
-      'Số Seri (S/N)': log.targetSN || 'N/A',
-      'Phân Loại': log.targetCategory || 'N/A',
-      'Nội Dung Chi Tiết': log.details,
-      'Dữ Liệu Trước Đó': log.prevData || '',
-      'Dữ Liệu Cập Nhật': log.newData || '',
-      'Địa Chỉ IP / Trạm': log.ipAddress || '192.168.1.1',
-    }));
+    try {
+      const XLSX = await import('xlsx');
+      const exportRows = filteredLogs.map((log, index) => ({
+        'STT': index + 1,
+        'Mã Log': log.id,
+        'Mốc Thời Gian': log.timestamp,
+        'Loại Hành Động': getActionBadge(log.actionType).label,
+        'Tiêu Đề Hành Động': log.actionTitle,
+        'Người Thực Hiện': `${log.performedByName || log.performedBy} (@${log.performedBy})`,
+        'Vai Trò': log.userRole === 'admin' ? 'QUẢN TRỊ VIÊN' : 'KIỂM KÊ VIÊN',
+        'Thiết Bị / Đối Tượng': log.targetName || 'N/A',
+        'Số Seri (S/N)': log.targetSN || 'N/A',
+        'Phân Loại': log.targetCategory || 'N/A',
+        'Nội Dung Chi Tiết': log.details,
+        'Dữ Liệu Trước Đó': log.prevData || '',
+        'Dữ Liệu Cập Nhật': log.newData || '',
+        'Địa Chỉ IP / Trạm': log.ipAddress || '192.168.1.1',
+      }));
 
-    const ws = XLSX.utils.json_to_sheet(exportRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'System_Audit_Log');
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'System_Audit_Log');
 
-    const fileName = `System_Audit_Log_CNS_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    onAddToast(`Đã xuất file ${fileName} thành công!`, 'success');
+      const fileName = `System_Audit_Log_CNS_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      onAddToast(`Đã xuất file ${fileName} thành công!`, 'success');
+    } catch {
+      onAddToast('Có lỗi phát sinh khi xuất file Excel nhật ký!', 'error');
+    }
   };
 
   // Print Audit Report

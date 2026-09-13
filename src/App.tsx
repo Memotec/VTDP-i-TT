@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import {
   QrCode, Search, Database, RefreshCw, Plus, Edit,
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
@@ -6,37 +6,42 @@ import {
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
   Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType } from './types.ts';
 import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
 import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
-import { PrintPreviewModal, PrintMode } from './components/PrintPreviewModal.tsx';
+import type { PrintMode } from './components/PrintPreviewModal.tsx';
 import { StatsCards } from './components/StatsCards.tsx';
-import { ScannerModal } from './components/ScannerModal.tsx';
-import { ItemDetailDrawer } from './components/ItemDetailDrawer.tsx';
-import { UsageModal } from './components/UsageModal.tsx';
-import { HandoverModal, HandoverRow } from './components/HandoverModal.tsx';
-import { SettingsModal } from './components/SettingsModal.tsx';
-import { GoogleDriveModal } from './components/GoogleDriveModal.tsx';
+import type { HandoverRow } from './components/HandoverModal.tsx';
 import { InventoryTable } from './components/InventoryTable.tsx';
-import { AdminAccountModal } from './components/AdminAccountModal.tsx';
 import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
-import { MobileAppInstallModal } from './components/MobileAppInstallModal.tsx';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
-import { ReturnStockModal } from './components/ReturnStockModal.tsx';
-import { DispatchedDetailModal } from './components/DispatchedDetailModal.tsx';
-import { SystemAuditLogView } from './components/SystemAuditLogView.tsx';
-import { SystemAuditLogModal } from './components/SystemAuditLogModal.tsx';
-import { ItemFormModal } from './components/ItemFormModal.tsx';
+import { getAccessToken } from './services/authService.ts';
+import { uploadToDrive } from './services/googleDriveService.ts';
 import { LocalDatabase } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
 import { CloudService } from './services/cloudService.ts';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
-import { ConflictResolutionModal } from './components/ConflictResolutionModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
+
+// Lazy-loaded modals and tabs for bundle size optimization and high performance
+const PrintPreviewModal = React.lazy(() => import('./components/PrintPreviewModal.tsx').then(m => ({ default: m.PrintPreviewModal })));
+const ScannerModal = React.lazy(() => import('./components/ScannerModal.tsx').then(m => ({ default: m.ScannerModal })));
+const ItemDetailDrawer = React.lazy(() => import('./components/ItemDetailDrawer.tsx').then(m => ({ default: m.ItemDetailDrawer })));
+const UsageModal = React.lazy(() => import('./components/UsageModal.tsx').then(m => ({ default: m.UsageModal })));
+const HandoverModal = React.lazy(() => import('./components/HandoverModal.tsx').then(m => ({ default: m.HandoverModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal.tsx').then(m => ({ default: m.SettingsModal })));
+const GoogleDriveModal = React.lazy(() => import('./components/GoogleDriveModal.tsx').then(m => ({ default: m.GoogleDriveModal })));
+const AdminAccountModal = React.lazy(() => import('./components/AdminAccountModal.tsx').then(m => ({ default: m.AdminAccountModal })));
+const MobileAppInstallModal = React.lazy(() => import('./components/MobileAppInstallModal.tsx').then(m => ({ default: m.MobileAppInstallModal })));
+const ReturnStockModal = React.lazy(() => import('./components/ReturnStockModal.tsx').then(m => ({ default: m.ReturnStockModal })));
+const DispatchedDetailModal = React.lazy(() => import('./components/DispatchedDetailModal.tsx').then(m => ({ default: m.DispatchedDetailModal })));
+const SystemAuditLogView = React.lazy(() => import('./components/SystemAuditLogView.tsx').then(m => ({ default: m.SystemAuditLogView })));
+const SystemAuditLogModal = React.lazy(() => import('./components/SystemAuditLogModal.tsx').then(m => ({ default: m.SystemAuditLogModal })));
+const ItemFormModal = React.lazy(() => import('./components/ItemFormModal.tsx').then(m => ({ default: m.ItemFormModal })));
+const ConflictResolutionModal = React.lazy(() => import('./components/ConflictResolutionModal.tsx').then(m => ({ default: m.ConflictResolutionModal })));
 
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
@@ -237,6 +242,8 @@ export default function App() {
     const savedTime = localStorage.getItem('cns_last_saved_time');
     const savedAutoBackup24h = localStorage.getItem('cns_auto_backup_24h');
     const savedLastAutoBackup = localStorage.getItem('cns_last_auto_backup_timestamp');
+    const savedAutoDriveBackup = localStorage.getItem('cns_auto_drive_backup');
+    const savedLastDriveBackup = localStorage.getItem('cns_last_drive_backup_timestamp');
     return {
       autoSaveInterval: savedInterval !== null ? Number(savedInterval) : 0, // default 0: realtime
       warnOnClose: savedWarn !== 'false', // default: true
@@ -244,6 +251,8 @@ export default function App() {
       lastSavedTime: savedTime || undefined,
       autoBackup24h: savedAutoBackup24h !== 'false', // default: true
       lastAutoBackupTime: savedLastAutoBackup ? Number(savedLastAutoBackup) : undefined,
+      autoDriveBackup: savedAutoDriveBackup !== 'false', // default: true
+      lastDriveBackupTime: savedLastDriveBackup ? Number(savedLastDriveBackup) : undefined,
     };
   });
 
@@ -640,6 +649,80 @@ export default function App() {
     };
   }, [storageConfig.autoBackup24h, triggerAutoBackupJSON]);
 
+  // Periodic Background Auto-Backup to Google Drive folder 'QLVT_Backup'
+  const triggerAutoDriveBackup = useCallback(async (isSilent = true) => {
+    try {
+      const token = await getAccessToken();
+      if (!token) return; // Not signed in to Google Drive
+
+      const now = new Date();
+      const dateStr = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fileName = `QLVT_Inventory_Backup_${dateStr}.json`;
+
+      const backupData = {
+        app: 'CNS Equipment Inventory Management',
+        version: '2.5.0',
+        exportedAt: now.toISOString(),
+        folder: 'QLVT_Backup',
+        itemCount: inventoryRef.current?.length || 0,
+        inventory: inventoryRef.current || [],
+        dispatchedRecords: LocalDatabase.getDispatchedRecords() || []
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      await uploadToDrive(token, fileName, jsonStr, 'application/json');
+
+      const nowMs = Date.now();
+      localStorage.setItem('cns_last_drive_backup_timestamp', String(nowMs));
+      setStorageConfig(prev => ({ ...prev, lastDriveBackupTime: nowMs }));
+
+      if (!isSilent) {
+        addToast("Đã tự động sao lưu dữ liệu lên thư mục 'QLVT_Backup' trên Google Drive!", 'success');
+      }
+      addSystemAuditLog('AUTO_BACKUP', 'Sao Lưu Google Drive', "Tự động sao lưu ngầm dữ liệu kho lên Google Drive 'QLVT_Backup'");
+    } catch (err) {
+      console.error("Lỗi tự động sao lưu Google Drive 'QLVT_Backup':", err);
+    }
+  }, [addToast, addSystemAuditLog]);
+
+  useEffect(() => {
+    if (storageConfig.autoDriveBackup === false) return;
+
+    const DRIVE_CHECK_INTERVAL = 30 * 60 * 1000; // Check every 30 minutes
+
+    const checkAndTriggerDriveBackup = async () => {
+      const savedTimestampStr = localStorage.getItem('cns_last_drive_backup_timestamp');
+      const now = Date.now();
+
+      if (!savedTimestampStr) {
+        if (inventoryRef.current && inventoryRef.current.length > 0) {
+          await triggerAutoDriveBackup(true);
+        }
+        return;
+      }
+
+      const lastBackup = Number(savedTimestampStr);
+      if (now - lastBackup >= DRIVE_CHECK_INTERVAL) {
+        if (inventoryRef.current && inventoryRef.current.length > 0) {
+          await triggerAutoDriveBackup(true);
+        }
+      }
+    };
+
+    const initialTimer = setTimeout(() => {
+      checkAndTriggerDriveBackup();
+    }, 6000);
+
+    const intervalTimer = setInterval(() => {
+      checkAndTriggerDriveBackup();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, [storageConfig.autoDriveBackup, triggerAutoDriveBackup]);
+
 
   const handleManualSaveLocalStorage = () => {
     try {
@@ -686,10 +769,23 @@ export default function App() {
 
   const stats = useMemo<AuditStats>(() => {
     const totalItems = inventory.length;
-    const totalQty = inventory.reduce((acc, item) => acc + (item.qty || 0), 0);
-    const checkedCount = inventory.filter(item => item.auditStatus !== null).length;
-    const okCount = inventory.filter(item => item.auditStatus === 'OK').length;
-    const missingCount = inventory.filter(item => item.auditStatus === 'MISSING').length;
+    let totalQty = 0;
+    let checkedCount = 0;
+    let okCount = 0;
+    let missingCount = 0;
+
+    for (let i = 0; i < totalItems; i++) {
+      const item = inventory[i];
+      totalQty += (item.qty || 0);
+      if (item.auditStatus === 'OK') {
+        checkedCount++;
+        okCount++;
+      } else if (item.auditStatus === 'MISSING') {
+        checkedCount++;
+        missingCount++;
+      }
+    }
+
     const healthRate = checkedCount > 0 ? Math.round((okCount / checkedCount) * 100) : 100;
 
     return {
@@ -704,6 +800,7 @@ export default function App() {
   }, [inventory, lowStockItems.length]);
 
   const filteredInventory = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return inventory.filter(item => {
       if (selectedCategory !== 'Tất cả loại' && item.category !== selectedCategory) return false;
       if (statusFilter === 'OK' && item.auditStatus !== 'OK') return false;
@@ -711,14 +808,14 @@ export default function App() {
       if (statusFilter === 'UNCHECKED' && item.auditStatus !== null) return false;
       if (statusFilter === 'LOW_STOCK' && (item.qty ?? 0) > 1) return false;
 
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase().trim();
-        const nameMatch = item.name.toLowerCase().includes(q);
-        const snMatch = item.sn.toLowerCase().includes(q);
-        const pnMatch = item.pn?.toLowerCase().includes(q) || false;
-        const whMatch = item.warehouse?.toLowerCase().includes(q) || false;
-        const locMatch = item.loc?.toLowerCase().includes(q) || false;
-        return nameMatch || snMatch || pnMatch || whMatch || locMatch;
+      if (q) {
+        return (
+          item.name.toLowerCase().includes(q) ||
+          item.sn.toLowerCase().includes(q) ||
+          (item.pn && item.pn.toLowerCase().includes(q)) ||
+          (item.warehouse && item.warehouse.toLowerCase().includes(q)) ||
+          (item.loc && item.loc.toLowerCase().includes(q))
+        );
       }
       return true;
     });
@@ -1165,9 +1262,36 @@ export default function App() {
     return true;
   };
 
+  // Utility to check if inventory items actually changed to avoid wasteful React re-renders and disk writes
+  const isInventoryEqual = (a: InventoryItem[], b: InventoryItem[]): boolean => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const itemA = a[i];
+      const itemB = b[i];
+      if (
+        itemA.id !== itemB.id ||
+        itemA.name !== itemB.name ||
+        itemA.sn !== itemB.sn ||
+        itemA.pn !== itemB.pn ||
+        itemA.qty !== itemB.qty ||
+        itemA.warehouse !== itemB.warehouse ||
+        itemA.loc !== itemB.loc ||
+        itemA.auditStatus !== itemB.auditStatus ||
+        itemA.auditDate !== itemB.auditDate ||
+        itemA.category !== itemB.category
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Cloud Sync
   const fetchCloudData = async (targetUrl?: string, isSilent: boolean = false) => {
-    if (syncStatus === 'syncing') return;
+    // Guard against concurrent execution
+    if (syncStatus === 'syncing' || syncService.getState().globalStatus === 'syncing') {
+      return;
+    }
     if (!navigator.onLine) {
       if (!isSilent) {
         setSyncStatus('idle');
@@ -1177,39 +1301,56 @@ export default function App() {
       return;
     }
 
+    const activeUrl = (targetUrl || syncConfig.webAppUrl || '').trim();
+    if (!activeUrl || !activeUrl.startsWith('http')) {
+      if (!isSilent) {
+        addToast('Đường dẫn Google Apps Script chưa được cấu hình!', 'error');
+      }
+      return;
+    }
+
     setSyncStatus('syncing');
-    setSyncStatusDetail('Đang tạo yêu cầu kết nối Google Sheet Cloud...');
+    setSyncStatusDetail('Đang kết nối Google Sheets Cloud...');
 
     try {
-      const activeUrl = targetUrl || syncConfig.webAppUrl;
       const res = await CloudService.pullFromCloud(activeUrl);
 
       if (!res.success) {
         throw new Error(res.error || 'Yêu cầu dữ liệu thất bại từ Google Apps Script.');
       }
 
-      const data = res.items;
-      if (data && Array.isArray(data)) {
-        if (data.length > 0) {
-          const formatted: InventoryItem[] = data.map((item: Partial<InventoryItem>, index: number) => ({
-            id: item.id || `cloud-item-${index}-${Date.now()}`,
-            name: item.name || 'Thiết bị không tên',
-            pn: item.pn || '',
-            sn: item.sn || `SN-${index}`,
-            warehouse: item.warehouse || '',
-            loc: item.loc || '',
-            qty: Number(item.qty) || 1,
-            auditStatus: item.auditStatus === 'OK' ? 'OK' : (item.auditStatus === 'MISSING' ? 'MISSING' : null),
-            auditDate: item.auditDate || null,
-            auditNote: item.auditNote || '',
-            category: item.category || 'Khác',
-            history: item.history || [],
-            version: item.version || 1,
-            updatedAt: item.updatedAt || new Date().toISOString()
-          }));
+      // Sync dispatched records if returned by Cloud
+      if (res.dispatched && Array.isArray(res.dispatched) && res.dispatched.length > 0) {
+        const cloudDispatched = res.dispatched;
+        const existingDispatched = LocalDatabase.getDispatchedRecords();
+        const existingMap = new Map(existingDispatched.map(d => [d.id, d]));
+        let hasNewDispatch = false;
+
+        cloudDispatched.forEach(cd => {
+          if (cd && cd.id && !existingMap.has(cd.id)) {
+            existingDispatched.unshift(cd);
+            hasNewDispatch = true;
+          }
+        });
+
+        if (hasNewDispatch) {
+          saveDispatchedRecordsLocally(existingDispatched);
+        }
+      }
+
+      const cloudItems = res.items;
+      if (cloudItems && Array.isArray(cloudItems)) {
+        if (cloudItems.length > 0) {
+          const currentLocal = LocalDatabase.getInventory();
+          const pendingQueue = syncService.getQueue();
+          const pendingEntityIds = new Set(
+            pendingQueue
+              .filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing')
+              .map(q => q.entityId)
+          );
 
           // Run conflict check with existing local inventory
-          const detectedConflicts = syncService.checkForConflicts(formatted, inventory);
+          const detectedConflicts = syncService.checkForConflicts(cloudItems, currentLocal);
           if (detectedConflicts.length > 0) {
             setConflicts(detectedConflicts);
             setIsConflictModalOpen(true);
@@ -1218,42 +1359,78 @@ export default function App() {
             }
           }
 
-          // Merge items that have no conflicts
           const conflictIds = new Set(detectedConflicts.map(c => c.entityId));
-          const localMap = new Map<string, InventoryItem>(inventory.map(i => [i.id, i]));
-          const merged: InventoryItem[] = [];
+          const localMapById = new Map<string, InventoryItem>();
+          const localMapBySn = new Map<string, InventoryItem>();
 
-          // Keep cloud items or resolved items
-          formatted.forEach(cloudItem => {
-            if (conflictIds.has(cloudItem.id)) {
-              // keep local until user resolves
-              const localVersion = localMap.get(cloudItem.id);
-              if (localVersion) merged.push(localVersion);
-              else merged.push(cloudItem);
-            } else {
-              merged.push(cloudItem);
+          currentLocal.forEach(item => {
+            localMapById.set(item.id, item);
+            if (item.sn) {
+              localMapBySn.set(item.sn.trim().toLowerCase(), item);
             }
           });
 
-          // Add any strictly local new items not on cloud yet
-          inventory.forEach(localItem => {
-            if (!formatted.some(ci => ci.id === localItem.id)) {
+          const merged: InventoryItem[] = [];
+          const matchedLocalIds = new Set<string>();
+
+          // Process each cloud item with conflict, pending, and ID/SN match checks
+          cloudItems.forEach(cloudItem => {
+            const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
+            const localMatch = localMapById.get(cloudItem.id) || (cleanSn ? localMapBySn.get(cleanSn) : undefined);
+
+            if (localMatch) {
+              matchedLocalIds.add(localMatch.id);
+
+              if (conflictIds.has(localMatch.id)) {
+                // Keep local until user explicitly resolves conflict in modal
+                merged.push(localMatch);
+              } else if (pendingEntityIds.has(localMatch.id) || localMatch.syncStatus === 'pending' || localMatch.syncStatus === 'syncing') {
+                // Local has unpushed edits! DO NOT overwrite with older cloud snapshot!
+                merged.push(localMatch);
+              } else {
+                // Cloud wins: adopt cloud data while retaining local audit history if cloud history is empty
+                merged.push({
+                  ...cloudItem,
+                  id: localMatch.id, // Preserve consistent local ID
+                  history: (cloudItem.history && cloudItem.history.length > 0) ? cloudItem.history : (localMatch.history || []),
+                  syncStatus: 'synced'
+                });
+              }
+            } else {
+              // Brand new item from cloud
+              merged.push({
+                ...cloudItem,
+                syncStatus: 'synced'
+              });
+            }
+          });
+
+          // Retain local items not present in cloud to prevent accidental data deletion
+          currentLocal.forEach(localItem => {
+            if (!matchedLocalIds.has(localItem.id)) {
               merged.push(localItem);
             }
           });
 
-          saveInventoryLocally(merged);
           const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+          // Performance optimization: only re-save and trigger React re-render if items actually changed
+          const hasActualChanges = !isInventoryEqual(currentLocal, merged);
+          if (hasActualChanges) {
+            saveInventoryLocally(merged);
+          }
+
           setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
           setSyncStatus('success');
-          setSyncStatusDetail(`Tự động đồng bộ ${formatted.length} thiết bị từ Google Sheet (${nowStr}).`);
+          setSyncStatusDetail(`Đã đồng bộ ${cloudItems.length} thiết bị từ Google Sheet (${nowStr}).${hasActualChanges ? ' Đã cập nhật thay đổi mới.' : ' Dữ liệu đã đồng nhất.'}`);
+
           if (!isSilent) {
-            addToast(`Đồng bộ thành công! Đã xử lý ${formatted.length} thiết bị từ Cloud.`, 'success');
+            addToast(`Đồng bộ thành công ${cloudItems.length} thiết bị từ Cloud!${hasActualChanges ? ' Có thay đổi mới.' : ' Dữ liệu đã cập nhật.'}`, 'success');
             playScanBeep(1000, 0.2);
           }
         } else {
           setSyncStatus('success');
-          setSyncStatusDetail('Kho Cloud rỗng. Có thể tiến hành đẩy lên.');
+          setSyncStatusDetail('Kho Cloud hiện đang trống.');
           if (!isSilent) {
             addToast('Kho trên Cloud hiện đang trống!', 'info');
           }
@@ -1264,7 +1441,7 @@ export default function App() {
       setSyncStatus('error');
       setSyncStatusDetail(errorMsg);
       if (!isSilent) {
-        addToast('Lỗi tải dữ liệu từ Cloud! Xem chi tiết ở phần cài đặt.', 'error');
+        addToast(`Lỗi tải dữ liệu từ Cloud: ${errorMsg}`, 'error');
         playScanBeep(250, 0.3);
       }
     }
@@ -1291,7 +1468,7 @@ export default function App() {
   }, [syncConfig.autoSync30s, syncConfig.autoSyncInterval, syncConfig.webAppUrl, syncConfig.autoLoadOnStartup]);
 
   const syncToCloud = async () => {
-    if (syncStatus === 'syncing') return;
+    if (syncStatus === 'syncing' || syncService.getState().globalStatus === 'syncing') return;
     if (!navigator.onLine) {
       setSyncStatus('idle');
       setSyncStatusDetail('Không thể tải lên. Thiết bị đang Ngoại tuyến.');
@@ -1301,39 +1478,52 @@ export default function App() {
     }
 
     setSyncStatus('syncing');
-    setSyncStatusDetail('Đang đồng bộ dữ liệu lên Cloud...');
+    setSyncStatusDetail('Đang đồng bộ toàn bộ dữ liệu kho và sổ bàn giao lên Cloud...');
 
     try {
-      // First process any pending queue
-      await syncService.processQueue(true);
+      const currentDispatched = LocalDatabase.getDispatchedRecords();
+      const currentCategories = LocalDatabase.getCategories();
+      
+      const res = await CloudService.pushToCloud(
+        syncConfig.webAppUrl,
+        inventory,
+        currentDispatched,
+        syncService.getQueue(),
+        currentUsername || role || 'anonymous',
+        currentCategories
+      );
 
-      // Perform a full inventory push to ensure Google Sheet matches state
-      const res = await CloudService.pushToCloud(syncConfig.webAppUrl, inventory, syncService.getQueue(), currentUsername || role || 'anonymous');
       if (!res.success) {
         throw new Error(res.error || 'Đẩy dữ liệu thất bại');
       }
 
-      const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      // Mark queue as cleared and inventory as synced
+      syncService.clearQueue();
+      LocalDatabase.markAllItemsSyncStatus('synced');
+
+      const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
       setSyncStatus('success');
-      setSyncStatusDetail('Đã đồng bộ dữ liệu thành công lên Apps Script.');
-      addToast('Đã đồng bộ toàn bộ dữ liệu lên Cloud thành công!', 'success');
+      setSyncStatusDetail(`Đã đồng bộ toàn bộ dữ liệu thành công lên Apps Script (${nowStr}).`);
+      addToast('Đã đồng bộ toàn bộ kho và sổ bàn giao lên Cloud thành công!', 'success');
       playScanBeep(980, 0.15);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Đẩy dữ liệu thất bại. Hãy kiểm tra kết nối mạng.';
       setSyncStatus('error');
-      setSyncStatusDetail(err?.message || 'Đẩy dữ liệu thất bại. Hãy kiểm tra kết nối mạng.');
-      addToast('Không thể đẩy dữ liệu lên Cloud. Hãy thử lại.', 'error');
+      setSyncStatusDetail(errorMsg);
+      addToast(`Không thể đẩy dữ liệu lên Cloud: ${errorMsg}`, 'error');
     }
   };
 
   // Exports
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (inventory.length === 0) {
       addToast('Không có dữ liệu để xuất Excel!', 'error');
       return;
     }
 
     try {
+      const XLSX = await import('xlsx');
       const excelRows = inventory.map((item, index) => ({
         'STT': index + 1,
         'Tên thiết bị': item.name,
@@ -2678,113 +2868,170 @@ export default function App() {
         </div>
       ) : (
         /* MODERN ENTERPRISE DASHBOARD LAYOUT */
-        <div className="min-h-screen bg-[#1E2430] dark:bg-[#1E2430] text-slate-100 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-800 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
           {/* Left Sidebar */}
           <aside className="w-full md:w-72 bg-white dark:bg-[#131B2E] border-r border-[#E2E8F0] dark:border-slate-800 flex flex-col shrink-0">
             {/* Sidebar Brand Header */}
             <div className="p-5 border-b border-[#E2E8F0] dark:border-slate-800 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/25">
+              <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
                 <Database className="w-5.5 h-5.5" />
               </div>
               <div className="min-w-0">
-                <h2 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white truncate">CNS/ATM</h2>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Đội Thông Tin • Bảo Đảm Kỹ Thuật</p>
+                <h2 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white truncate">KHO DỰ PHÒNG CNS/ATM</h2>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Đội Thông Tin • TT BĐKT</p>
               </div>
             </div>
 
             {/* Navigation Menu */}
-            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+            <nav className="flex-1 p-3.5 space-y-1 overflow-y-auto custom-scrollbar">
               <div className="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Hệ Thống Chính</div>
               
               <button
                 type="button"
-                onClick={() => setActiveWorkspaceTab('INVENTORY')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  setActiveWorkspaceTab('INVENTORY');
+                  setMobileTab('inventory');
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'INVENTORY'
-                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/20 font-black'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Database className="w-4.5 h-4.5" />
-                <span className="flex-1 text-left">Kho Vật Tư Dự Phòng Tại Chỗ Đội TT</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'INVENTORY' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                <Database className="w-4.5 h-4.5 shrink-0" />
+                <span className="flex-1 text-left truncate">Kho Vật Tư Dự Phòng</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'INVENTORY' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {inventory.length}
                 </span>
               </button>
 
-              {role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={handleOpenAddNewModal}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#2563EB] dark:text-blue-400 bg-blue-50/50 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 transition-colors cursor-pointer border border-blue-200/80 dark:border-blue-900/60"
-                  title="Mở form thêm mới thiết bị vào kho"
-                >
-                  <PlusCircle className="w-4.5 h-4.5 text-[#2563EB] dark:text-blue-400" />
-                  <span className="flex-1 text-left font-black">Thêm Mới Thiết Bị</span>
-                </button>
-              )}
-
               <button
                 type="button"
-                onClick={() => setActiveWorkspaceTab('DISPATCHED')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  setActiveWorkspaceTab('DISPATCHED');
+                  setMobileTab('dispatched');
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'DISPATCHED'
-                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/20 font-black'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Layers className="w-4.5 h-4.5" />
-                <span className="flex-1 text-left">Thiết Bị Bàn Giao & Sử Dụng</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'DISPATCHED' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                <Layers className="w-4.5 h-4.5 shrink-0" />
+                <span className="flex-1 text-left truncate">Sổ Bàn Giao & Sử Dụng</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'DISPATCHED' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {dispatchedRecords.length}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveWorkspaceTab('AUDIT_LOG')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  setActiveWorkspaceTab('AUDIT_LOG');
+                  setMobileTab('reports');
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeWorkspaceTab === 'AUDIT_LOG'
-                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 font-black'
+                    ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/20 font-black'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Activity className="w-4.5 h-4.5" />
-                <span className="flex-1 text-left">Nhật Ký Kiểm Toán (Logs)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeWorkspaceTab === 'AUDIT_LOG' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                <Activity className="w-4.5 h-4.5 shrink-0" />
+                <span className="flex-1 text-left truncate">Nhật Ký Kiểm Toán</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'AUDIT_LOG' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {auditLogs.length}
                 </span>
               </button>
 
-              <div className="pt-4 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Tiện Ích & Quản Trị</div>
+              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Tác Vụ Kho Nhanh</div>
 
               {role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => setIsAdminAccountModalOpen(true)}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                  onClick={handleOpenAddNewModal}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#2563EB] dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 transition-colors cursor-pointer border border-blue-200/80 dark:border-blue-900/60"
+                  title="Mở form thêm mới thiết bị vào kho"
                 >
-                  <Crown className="w-4.5 h-4.5 text-[#F59E0B]" />
-                  <span className="flex-1 text-left">Quản Trị Người Dùng & Admin</span>
+                  <PlusCircle className="w-4.5 h-4.5 text-[#2563EB] dark:text-blue-400 shrink-0" />
+                  <span className="flex-1 text-left font-black truncate">+ Thêm Mới Thiết Bị</span>
                 </button>
               )}
 
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                onClick={() => {
+                  setScanTargetItem(null);
+                  setIsScannerOpen(true);
+                  playScanBeep(1000, 0.1);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
               >
-                <Settings className="w-4.5 h-4.5 text-slate-400" />
-                <span className="flex-1 text-left">Cấu Hình GAS & Cloud Sync</span>
+                <Camera className="w-4.5 h-4.5 text-blue-500 shrink-0" />
+                <span className="flex-1 text-left truncate">Quét Mã QR & Barcode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHandoverModalOpen(true);
+                  if (handoverRows.length === 0 && inventory.length > 0) {
+                    const initialRows: HandoverRow[] = inventory.slice(0, 1).map(item => ({
+                      id: item.id,
+                      name: item.name,
+                      unit: 'Cái',
+                      qty: 1,
+                      quality: 'Tốt (Mới 100%)',
+                      specs: `${item.pn ? 'P/N: ' + item.pn + '. ' : ''}Quy cách chuẩn`,
+                      sn: item.sn,
+                      note: ''
+                    }));
+                    setHandoverRows(initialRows);
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <ArrowRightLeft className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                <span className="flex-1 text-left truncate">Lập Biên Bản Bàn Giao</span>
+              </button>
+
+              <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Quản Trị & Tiện Ích</div>
+
+              {role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setIsAdminAccountModalOpen(true)}
+                  className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                >
+                  <Crown className="w-4.5 h-4.5 text-[#D97706] shrink-0" />
+                  <span className="flex-1 text-left truncate">Quản Trị Tài Khoản</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsGoogleDriveModalOpen(true)}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <HardDrive className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+                <span className="flex-1 text-left truncate">Sao Lưu Google Drive</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                <Settings className="w-4.5 h-4.5 text-slate-400 shrink-0" />
+                <span className="flex-1 text-left truncate">Cấu Hình Cloud Sync</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsInstallModalOpen(true)}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
               >
-                <Smartphone className="w-4.5 h-4.5 text-[#2563EB]" />
-                <span className="flex-1 text-left">Cài App Mobile (PWA)</span>
+                <Smartphone className="w-4.5 h-4.5 text-[#2563EB] shrink-0" />
+                <span className="flex-1 text-left truncate">Cài App Mobile (PWA)</span>
               </button>
             </nav>
 
@@ -2817,16 +3064,18 @@ export default function App() {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Top Enterprise Header */}
             <header className="bg-white dark:bg-[#131B2E] border-b border-[#E2E8F0] dark:border-slate-800 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                    {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao Thiết Bị' : 'Nhật Ký Hệ Thống'}
-                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-[#2563EB] dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-900 hidden sm:inline">
-              
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0">
+                  <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>
+                      {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao & Điều Chuyển' : 'Nhật Ký Kiểm Toán Hệ Thống'}
+                    </span>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-[#2563EB] dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-900 hidden sm:inline-flex items-center">
+                      {activeWorkspaceTab === 'INVENTORY' ? `${inventory.length} vật tư` : activeWorkspaceTab === 'DISPATCHED' ? `${dispatchedRecords.length} hồ sơ` : `${auditLogs.length} bản ghi`}
                     </span>
                   </h1>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Đội Thông Tin  • Trung Tâm Bảo Đảm Kỹ Thuật
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                    Đội Thông Tin • Trung Tâm Bảo Đảm Kỹ Thuật CNS/ATM
                   </p>
                 </div>
               </div>
@@ -2963,13 +3212,15 @@ export default function App() {
           ) : activeWorkspaceTab === 'AUDIT_LOG' ? (
             /* SYSTEM AUDIT LOG WORKSPACE VIEW */
             <div className="mt-6">
-              <SystemAuditLogView
-                logs={auditLogs}
-                role={role}
-                currentUsername={currentUsername || 'guest'}
-                onClearLogs={handleClearAuditLogs}
-                onAddToast={addToast}
-              />
+              <Suspense fallback={<div className="p-12 text-center text-slate-500 font-bold">Đang tải nhật ký kiểm toán hệ thống...</div>}>
+                <SystemAuditLogView
+                  logs={auditLogs}
+                  role={role}
+                  currentUsername={currentUsername || 'guest'}
+                  onClearLogs={handleClearAuditLogs}
+                  onAddToast={addToast}
+                />
+              </Suspense>
             </div>
           ) : (
             /* STANDARD INVENTORY WORKSPACE VIEW */
@@ -2984,58 +3235,58 @@ export default function App() {
           </div>
 
           {/* Search and Action Toolbar */}
-          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 sm:p-5 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4 shadow-sm">
+          <section className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 sm:p-5 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4 shadow-xs">
             <div className="relative w-full xl:w-[420px]">
-              <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm: Tên thiết bị, P/N, S/N, Mã Kho..."
-                className="w-full pl-12 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm sm:text-base font-medium placeholder:text-slate-400"
+                className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 transition-all text-xs sm:text-sm font-medium placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
-              <div className="flex items-center gap-1 rounded-2xl bg-slate-100/80 dark:bg-slate-800 p-1 border border-slate-200/50 dark:border-slate-700/50">
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
+              <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200/60 dark:border-slate-700/60">
                 <button
                   onClick={() => fetchCloudData()}
                   disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3.5 text-xs font-black uppercase text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
-                  title="Tải cấu trúc từ đám mây về"
+                  className="p-2 px-3 text-xs font-black uppercase text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                  title="Tải dữ liệu từ Google Sheets về máy"
                 >
-                  <RefreshCw className={`w-4 h-4 text-indigo-500 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                  Tải Về (PULL)
+                  <RefreshCw className={`w-3.5 h-3.5 text-[#2563EB] ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                  PULL (Tải Về)
                 </button>
                 <button
                   onClick={syncToCloud}
                   disabled={syncStatus === 'syncing'}
-                  className="p-2 px-3.5 text-xs font-black uppercase text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
-                  title="Đẩy dữ liệu hiện có lên Cloud"
+                  className="p-2 px-3 text-xs font-black uppercase text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                  title="Đẩy dữ liệu hiện có lên Google Sheets"
                 >
-                  Đẩy Lên (PUSH)
+                  PUSH (Đẩy Lên)
                 </button>
               </div>
 
-              <div className="w-px h-7 bg-slate-200 dark:bg-slate-800 hidden xl:block mx-1"></div>
+              <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 hidden xl:block mx-0.5"></div>
 
               {role === 'admin' && (
                 <button
                   type="button"
                   onClick={handleOpenAddNewModal}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-extrabold py-3 px-5 rounded-2xl shadow-md shadow-blue-500/25 transition-all text-xs sm:text-sm tracking-wide cursor-pointer"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-black py-2.5 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs tracking-wide cursor-pointer"
                   title="Mở biểu mẫu thêm mới thiết bị vào kho"
                 >
-                  <PlusCircle className="w-4.5 h-4.5" />
-                  THÊM THIẾT BỊ
+                  <PlusCircle className="w-4 h-4" />
+                  + THÊM THIẾT BỊ
                 </button>
               )}
 
@@ -3043,47 +3294,48 @@ export default function App() {
                 onClick={() => {
                   setScanTargetItem(null);
                   setIsScannerOpen(true);
+                  playScanBeep(1000, 0.1);
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 px-5 rounded-2xl shadow-md shadow-indigo-600/15 transition-all text-xs sm:text-sm tracking-wide cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black py-2.5 px-4 rounded-xl shadow-xs transition-all text-xs tracking-wide cursor-pointer"
               >
-                <Camera className="w-4.5 h-4.5 animate-pulse" />
+                <Camera className="w-4 h-4 text-blue-400 animate-pulse" />
                 KIỂM KÊ (QUÉT)
               </button>
 
-              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 border border-slate-200/60 dark:border-slate-700/60">
                 <button
                   onClick={() => handleOpenPrintCenter('QR')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                   title="Mở xem trước & In bảng mã QR định danh"
                 >
-                  <Printer className="w-4 h-4 text-indigo-500" />
+                  <Printer className="w-3.5 h-3.5 text-[#2563EB]" />
                   MÃ QR
                 </button>
                 <button
                   onClick={() => handleOpenPrintCenter('LABEL')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-slate-700 dark:text-slate-200 transition-all text-xs sm:text-sm font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                   title="Mở xem trước & In tem nhãn kỹ thuật"
                 >
-                  <Tag className="w-4 h-4 text-indigo-500" />
+                  <Tag className="w-3.5 h-3.5 text-[#2563EB]" />
                   TEM NHÃN
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 border border-slate-200/60 dark:border-slate-700/60 flex-wrap sm:flex-nowrap">
                 <button
                   onClick={handleExportExcel}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-emerald-700 dark:text-emerald-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-emerald-700 dark:text-emerald-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer"
                   title="Xuất bảng Excel (.xlsx)"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                   EXCEL
                 </button>
                 <button
                   onClick={() => handleOpenPrintCenter('AUDIT_REPORT')}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-indigo-700 dark:text-indigo-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-blue-700 dark:text-blue-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer"
                   title="In Biên bản kiểm kê chuẩn form hành chính"
                 >
-                  <FileText className="w-4 h-4 text-indigo-500" />
+                  <FileText className="w-3.5 h-3.5 text-[#2563EB]" />
                   BIÊN BẢN
                 </button>
                 <button
@@ -3103,18 +3355,18 @@ export default function App() {
                       setHandoverRows(initialRows);
                     }
                   }}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-rose-700 dark:text-rose-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5 shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-rose-700 dark:text-rose-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5"
                   title="Lập Biên Bản Bàn Giao thiết bị"
                 >
-                  <ArrowRightLeft className="w-4 h-4 text-rose-500" />
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-rose-500" />
                   BB BÀN GIAO
                 </button>
                 <button
                   onClick={() => setIsUsageHistoryOpen(true)}
-                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-xl text-amber-700 dark:text-amber-400 transition-all text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5 shadow-xs"
+                  className="p-2 px-3 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-amber-700 dark:text-amber-400 transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-2.5"
                   title="Xem lịch sử phiếu báo sử dụng"
                 >
-                  <History className="w-4 h-4 text-amber-500" />
+                  <History className="w-3.5 h-3.5 text-amber-500" />
                   PHIẾU SỬ DỤNG ({usageSlips.length})
                 </button>
               </div>
@@ -3122,18 +3374,18 @@ export default function App() {
           </section>
 
           {/* Filter Pills */}
-          <div className="mt-6 flex flex-col xl:flex-row gap-5 items-start xl:items-stretch">
-            <div className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 shadow-sm flex flex-wrap gap-2 items-center">
-              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-2 ml-1 flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-indigo-500" /> Phân Loại:
+          <div className="mt-5 flex flex-col xl:flex-row gap-4 items-start xl:items-stretch">
+            <div className="flex-1 w-full bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-wrap gap-2 items-center">
+              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-1 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-[#2563EB]" /> Phân Loại:
               </span>
               {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                     selectedCategory === cat
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
+                      ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/25'
                       : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
                   }`}
                 >
@@ -3142,47 +3394,47 @@ export default function App() {
               ))}
             </div>
 
-            <div className="w-full xl:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-4.5 shadow-sm flex flex-wrap gap-2 items-center">
-              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-2 ml-1">
+            <div className="w-full xl:w-auto bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-wrap gap-2 items-center">
+              <span className="text-xs uppercase font-black text-slate-400 tracking-wider mr-1">
                 Kiểm kê:
               </span>
-              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 text-xs sm:text-sm font-extrabold flex-wrap sm:flex-nowrap gap-1">
+              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-xs font-extrabold flex-wrap sm:flex-nowrap gap-1">
                 <button
                   onClick={() => setStatusFilter('ALL')}
-                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
                   Tất cả
                 </button>
                 <button
                   onClick={() => setStatusFilter('OK')}
-                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'OK' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'OK' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'}`}
                 >
-                  Tốt / Đủ ({inventory.filter(i => i.auditStatus === 'OK').length})
+                  Tốt / Đủ ({stats.okCount})
                 </button>
                 <button
                   onClick={() => setStatusFilter('MISSING')}
-                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'MISSING' ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'MISSING' ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
                 >
-                  Thiếu / Hỏng ({inventory.filter(i => i.auditStatus === 'MISSING').length})
+                  Thiếu / Hỏng ({stats.missingCount})
                 </button>
                 <button
                   onClick={() => setStatusFilter('UNCHECKED')}
-                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${statusFilter === 'UNCHECKED' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
-                  Chưa kiểm ({inventory.filter(i => i.auditStatus === null).length})
+                  Chưa kiểm ({stats.totalItems - stats.checkedCount})
                 </button>
                 <button
                   onClick={() => setStatusFilter('LOW_STOCK')}
-                  className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
                     statusFilter === 'LOW_STOCK'
-                      ? 'bg-amber-500 text-white shadow-sm font-black'
+                      ? 'bg-amber-500 text-white shadow-xs font-black'
                       : lowStockItems.length > 0
                       ? 'text-amber-600 dark:text-amber-400 font-extrabold hover:bg-amber-100/80 dark:hover:bg-amber-950/50'
                       : 'text-slate-500'
                   }`}
                   title="Lọc các thiết bị có số lượng <= 1 bộ"
                 >
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <AlertTriangle className="w-3 h-3" />
                   Sắp hết ({lowStockItems.length})
                 </button>
               </div>
@@ -3234,216 +3486,264 @@ export default function App() {
       )}
 
       {/* Scanner Modal */}
-      <ScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => {
-          setIsScannerOpen(false);
-          setScanTargetItem(null);
-        }}
-        inventory={inventory}
-        scanTargetItem={scanTargetItem}
-        onScanned={handleScannedCode}
-      />
+      {isScannerOpen && (
+        <Suspense fallback={null}>
+          <ScannerModal
+            isOpen={isScannerOpen}
+            onClose={() => {
+              setIsScannerOpen(false);
+              setScanTargetItem(null);
+            }}
+            inventory={inventory}
+            scanTargetItem={scanTargetItem}
+            onScanned={handleScannedCode}
+          />
+        </Suspense>
+      )}
 
       {/* Item Form Modal (Add & Edit) */}
-      <ItemFormModal
-        isOpen={isItemFormModalOpen}
-        onClose={() => {
-          setIsItemFormModalOpen(false);
-          setEditingItem(null);
-        }}
-        editingItem={editingItem}
-        categories={categories}
-        onSaveCategory={(newCat) => {
-          const updated = [...categories, newCat];
-          saveCategoriesLocally(updated);
-          addToast(`Đã thêm loại: ${newCat}`, 'success');
-          playScanBeep(1000, 0.1);
-        }}
-        onSubmit={handleItemFormSubmit}
-      />
+      {isItemFormModalOpen && (
+        <Suspense fallback={null}>
+          <ItemFormModal
+            isOpen={isItemFormModalOpen}
+            onClose={() => {
+              setIsItemFormModalOpen(false);
+              setEditingItem(null);
+            }}
+            editingItem={editingItem}
+            categories={categories}
+            onSaveCategory={(newCat) => {
+              const updated = [...categories, newCat];
+              saveCategoriesLocally(updated);
+              addToast(`Đã thêm loại: ${newCat}`, 'success');
+              playScanBeep(1000, 0.1);
+            }}
+            onSubmit={handleItemFormSubmit}
+          />
+        </Suspense>
+      )}
 
       {/* Item Detail Drawer */}
-      <ItemDetailDrawer
-        item={selectedItemDetail}
-        role={role}
-        onClose={() => setSelectedItemDetail(null)}
-        onEdit={(item) => {
-          setSelectedItemDetail(null);
-          handleEditClick(item);
-        }}
-        onUsage={(item) => setSelectedItemForUsage(item)}
-        onPrintQr={(item) => {
-          setPrintLayout('QR');
-          setIsPrintPreviewOpen(true);
-        }}
-        onPrintLabel={(item) => {
-          setPrintLayout('LABEL');
-          setIsPrintPreviewOpen(true);
-        }}
-      />
+      {selectedItemDetail && (
+        <Suspense fallback={null}>
+          <ItemDetailDrawer
+            item={selectedItemDetail}
+            role={role}
+            onClose={() => setSelectedItemDetail(null)}
+            onEdit={(item) => {
+              setSelectedItemDetail(null);
+              handleEditClick(item);
+            }}
+            onUsage={(item) => setSelectedItemForUsage(item)}
+            onPrintQr={() => {
+              setPrintLayout('QR');
+              setIsPrintPreviewOpen(true);
+            }}
+            onPrintLabel={() => {
+              setPrintLayout('LABEL');
+              setIsPrintPreviewOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Usage Slips Modal */}
-      <UsageModal
-        selectedItemForUsage={selectedItemForUsage}
-        isUsageHistoryOpen={isUsageHistoryOpen}
-        usageSlips={usageSlips}
-        role={role}
-        onCloseUsageForm={() => setSelectedItemForUsage(null)}
-        onCloseHistory={() => setIsUsageHistoryOpen(false)}
-        onSubmitUsage={handleSubmitUsage}
-        onDeleteSlip={(slipId) => {
-          const remaining = usageSlips.filter(s => s.id !== slipId);
-          setUsageSlips(remaining);
-          localStorage.setItem('cns_usage_slips_v1', JSON.stringify(remaining));
-          addToast('Đã xóa phiếu báo sử dụng.', 'success');
-        }}
-        onClearHistory={() => {
-          setUsageSlips([]);
-          localStorage.removeItem('cns_usage_slips_v1');
-          addToast('Đã xóa trắng lịch sử phiếu sử dụng.', 'info');
-        }}
-        onPrintSlip={handlePrintUsageSlip}
-      />
+      {(selectedItemForUsage || isUsageHistoryOpen) && (
+        <Suspense fallback={null}>
+          <UsageModal
+            selectedItemForUsage={selectedItemForUsage}
+            isUsageHistoryOpen={isUsageHistoryOpen}
+            usageSlips={usageSlips}
+            role={role}
+            onCloseUsageForm={() => setSelectedItemForUsage(null)}
+            onCloseHistory={() => setIsUsageHistoryOpen(false)}
+            onSubmitUsage={handleSubmitUsage}
+            onDeleteSlip={(slipId) => {
+              const remaining = usageSlips.filter(s => s.id !== slipId);
+              setUsageSlips(remaining);
+              localStorage.setItem('cns_usage_slips_v1', JSON.stringify(remaining));
+              addToast('Đã xóa phiếu báo sử dụng.', 'success');
+            }}
+            onClearHistory={() => {
+              setUsageSlips([]);
+              localStorage.removeItem('cns_usage_slips_v1');
+              addToast('Đã xóa trắng lịch sử phiếu sử dụng.', 'info');
+            }}
+            onPrintSlip={handlePrintUsageSlip}
+          />
+        </Suspense>
+      )}
 
       {/* Handover Certificate Modal */}
-      <HandoverModal
-        isOpen={isHandoverModalOpen}
-        onClose={() => setIsHandoverModalOpen(false)}
-        inventory={inventory}
-        handoverNo={handoverNo}
-        setHandoverNo={setHandoverNo}
-        handoverLocation={handoverLocation}
-        setHandoverLocation={setHandoverLocation}
-        handoverDay={handoverDay}
-        setHandoverDay={setHandoverDay}
-        handoverMonth={handoverMonth}
-        setHandoverMonth={setHandoverMonth}
-        handoverYear={handoverYear}
-        setHandoverYear={setHandoverYear}
-        handoverReason={handoverReason}
-        setHandoverReason={setHandoverReason}
-        handoverGiverDept={handoverGiverDept}
-        setHandoverGiverDept={setHandoverGiverDept}
-        handoverGiverName={handoverGiverName}
-        setHandoverGiverName={setHandoverGiverName}
-        handoverGiverPos={handoverGiverPos}
-        setHandoverGiverPos={setHandoverGiverPos}
-        handoverReceiverDept={handoverReceiverDept}
-        setHandoverReceiverDept={setHandoverReceiverDept}
-        handoverReceiverName={handoverReceiverName}
-        setHandoverReceiverName={setHandoverReceiverName}
-        handoverReceiverPos={handoverReceiverPos}
-        setHandoverReceiverPos={setHandoverReceiverPos}
-        handoverRows={handoverRows}
-        setHandoverRows={setHandoverRows}
-        onPrintHandover={handlePrintOfficialHandover}
-        onSaveHandoverToRegistry={handleSaveHandoverToRegistry}
-        onAddToast={addToast}
-      />
+      {isHandoverModalOpen && (
+        <Suspense fallback={null}>
+          <HandoverModal
+            isOpen={isHandoverModalOpen}
+            onClose={() => setIsHandoverModalOpen(false)}
+            inventory={inventory}
+            handoverNo={handoverNo}
+            setHandoverNo={setHandoverNo}
+            handoverLocation={handoverLocation}
+            setHandoverLocation={setHandoverLocation}
+            handoverDay={handoverDay}
+            setHandoverDay={setHandoverDay}
+            handoverMonth={handoverMonth}
+            setHandoverMonth={setHandoverMonth}
+            handoverYear={handoverYear}
+            setHandoverYear={setHandoverYear}
+            handoverReason={handoverReason}
+            setHandoverReason={setHandoverReason}
+            handoverGiverDept={handoverGiverDept}
+            setHandoverGiverDept={setHandoverGiverDept}
+            handoverGiverName={handoverGiverName}
+            setHandoverGiverName={setHandoverGiverName}
+            handoverGiverPos={handoverGiverPos}
+            setHandoverGiverPos={setHandoverGiverPos}
+            handoverReceiverDept={handoverReceiverDept}
+            setHandoverReceiverDept={setHandoverReceiverDept}
+            handoverReceiverName={handoverReceiverName}
+            setHandoverReceiverName={setHandoverReceiverName}
+            handoverReceiverPos={handoverReceiverPos}
+            setHandoverReceiverPos={setHandoverReceiverPos}
+            handoverRows={handoverRows}
+            setHandoverRows={setHandoverRows}
+            onPrintHandover={handlePrintOfficialHandover}
+            onSaveHandoverToRegistry={handleSaveHandoverToRegistry}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Return Dispatched Equipment To Stock Modal */}
-      <ReturnStockModal
-        isOpen={!!selectedDispatchedForReturn}
-        onClose={() => setSelectedDispatchedForReturn(null)}
-        record={selectedDispatchedForReturn}
-        onConfirmReturn={handleConfirmReturnStock}
-      />
+      {!!selectedDispatchedForReturn && (
+        <Suspense fallback={null}>
+          <ReturnStockModal
+            isOpen={!!selectedDispatchedForReturn}
+            onClose={() => setSelectedDispatchedForReturn(null)}
+            record={selectedDispatchedForReturn}
+            onConfirmReturn={handleConfirmReturnStock}
+          />
+        </Suspense>
+      )}
 
       {/* Dispatched Record Detail Modal */}
-      <DispatchedDetailModal
-        isOpen={!!selectedDispatchedDetail}
-        onClose={() => setSelectedDispatchedDetail(null)}
-        record={selectedDispatchedDetail}
-        role={role}
-        onReturn={(rec) => {
-          setSelectedDispatchedDetail(null);
-          setSelectedDispatchedForReturn(rec);
-        }}
-        onPrint={(rec) => handlePrintDispatchedRecord(rec)}
-      />
+      {!!selectedDispatchedDetail && (
+        <Suspense fallback={null}>
+          <DispatchedDetailModal
+            isOpen={!!selectedDispatchedDetail}
+            onClose={() => setSelectedDispatchedDetail(null)}
+            record={selectedDispatchedDetail}
+            role={role}
+            onReturn={(rec) => {
+              setSelectedDispatchedDetail(null);
+              setSelectedDispatchedForReturn(rec);
+            }}
+            onPrint={(rec) => handlePrintDispatchedRecord(rec)}
+          />
+        </Suspense>
+      )}
 
       {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        syncConfig={syncConfig}
-        setSyncConfig={setSyncConfig}
-        storageConfig={storageConfig}
-        setStorageConfig={setStorageConfig}
-        syncStatus={syncStatus}
-        syncStatusDetail={syncStatusDetail}
-        categories={categories}
-        saveCategoriesLocally={saveCategoriesLocally}
-        onPullCloud={() => fetchCloudData()}
-        onPushCloud={syncToCloud}
-        onExportJSON={handleExportJSON}
-        onImportJSON={handleImportJSON}
-        onManualSaveLocalStorage={handleManualSaveLocalStorage}
-        onResetToDefault={handleResetToDefault}
-        itemCount={inventory.length}
-        usageCount={usageSlips.length}
-        onOpenGoogleDriveModal={() => setIsGoogleDriveModalOpen(true)}
-        onAddToast={addToast}
-      />
+      {isSettingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            syncConfig={syncConfig}
+            setSyncConfig={setSyncConfig}
+            storageConfig={storageConfig}
+            setStorageConfig={setStorageConfig}
+            syncStatus={syncStatus}
+            syncStatusDetail={syncStatusDetail}
+            categories={categories}
+            saveCategoriesLocally={saveCategoriesLocally}
+            onPullCloud={() => fetchCloudData()}
+            onPushCloud={syncToCloud}
+            onExportJSON={handleExportJSON}
+            onImportJSON={handleImportJSON}
+            onManualSaveLocalStorage={handleManualSaveLocalStorage}
+            onResetToDefault={handleResetToDefault}
+            itemCount={inventory.length}
+            usageCount={usageSlips.length}
+            onOpenGoogleDriveModal={() => setIsGoogleDriveModalOpen(true)}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Google Drive Backup & Sync Modal */}
-      <GoogleDriveModal
-        isOpen={isGoogleDriveModalOpen}
-        onClose={() => setIsGoogleDriveModalOpen(false)}
-        inventory={inventory}
-        dispatchedRecords={dispatchedRecords}
-        onRestoreFromBackup={(data) => {
-          if (data.inventory && data.inventory.length > 0) {
-            setInventory(data.inventory);
-            saveInventoryLocally(data.inventory);
-          }
-          if (data.dispatchedRecords && data.dispatchedRecords.length > 0) {
-            setDispatchedRecords(data.dispatchedRecords);
-            LocalDatabase.saveDispatchedRecords(data.dispatchedRecords);
-          }
-        }}
-        onAddToast={addToast}
-      />
+      {isGoogleDriveModalOpen && (
+        <Suspense fallback={null}>
+          <GoogleDriveModal
+            isOpen={isGoogleDriveModalOpen}
+            onClose={() => setIsGoogleDriveModalOpen(false)}
+            inventory={inventory}
+            dispatchedRecords={dispatchedRecords}
+            onRestoreFromBackup={(data) => {
+              if (data.inventory && data.inventory.length > 0) {
+                setInventory(data.inventory);
+                saveInventoryLocally(data.inventory);
+              }
+              if (data.dispatchedRecords && data.dispatchedRecords.length > 0) {
+                setDispatchedRecords(data.dispatchedRecords);
+                LocalDatabase.saveDispatchedRecords(data.dispatchedRecords);
+              }
+            }}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Admin Account & Security Center Modal */}
-      <AdminAccountModal
-        isOpen={isAdminAccountModalOpen}
-        onClose={() => setIsAdminAccountModalOpen(false)}
-        inventory={inventory}
-        onRestoreSnapshot={(restoredItems) => saveInventoryLocally(restoredItems)}
-        onAddToast={addToast}
-        onLogout={handleLogout}
-        users={users}
-        onUpdateUsers={handleUpdateUsers}
-        currentUsername={currentUsername || 'admin'}
-        onOpenAuditLog={() => setIsAuditLogModalOpen(true)}
-      />
+      {isAdminAccountModalOpen && (
+        <Suspense fallback={null}>
+          <AdminAccountModal
+            isOpen={isAdminAccountModalOpen}
+            onClose={() => setIsAdminAccountModalOpen(false)}
+            inventory={inventory}
+            onRestoreSnapshot={(restoredItems) => saveInventoryLocally(restoredItems)}
+            onAddToast={addToast}
+            onLogout={handleLogout}
+            users={users}
+            onUpdateUsers={handleUpdateUsers}
+            currentUsername={currentUsername || 'admin'}
+            onOpenAuditLog={() => setIsAuditLogModalOpen(true)}
+          />
+        </Suspense>
+      )}
 
       {/* System Audit Log Center Modal */}
-      <SystemAuditLogModal
-        isOpen={isAuditLogModalOpen}
-        onClose={() => setIsAuditLogModalOpen(false)}
-        logs={auditLogs}
-        role={role}
-        currentUsername={currentUsername || 'guest'}
-        onClearLogs={handleClearAuditLogs}
-        onAddToast={addToast}
-      />
+      {isAuditLogModalOpen && (
+        <Suspense fallback={null}>
+          <SystemAuditLogModal
+            isOpen={isAuditLogModalOpen}
+            onClose={() => setIsAuditLogModalOpen(false)}
+            logs={auditLogs}
+            role={role}
+            currentUsername={currentUsername || 'guest'}
+            onClearLogs={handleClearAuditLogs}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Print Preview & Options Center Modal */}
-      <PrintPreviewModal
-        isOpen={isPrintPreviewOpen}
-        onClose={() => {
-          setIsPrintPreviewOpen(false);
-          setPrintLayout('NONE');
-        }}
-        inventory={inventory}
-        filteredInventory={filteredInventory}
-        stats={stats}
-        currentUsername={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName || currentUsername || 'Kiểm kê viên'}
-        onAddToast={addToast}
-      />
+      {isPrintPreviewOpen && (
+        <Suspense fallback={null}>
+          <PrintPreviewModal
+            isOpen={isPrintPreviewOpen}
+            onClose={() => {
+              setIsPrintPreviewOpen(false);
+              setPrintLayout('NONE');
+            }}
+            inventory={inventory}
+            filteredInventory={filteredInventory}
+            stats={stats}
+            currentUsername={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName || currentUsername || 'Kiểm kê viên'}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Printable Area: rendered in DOM for standard browser @media print */}
       <PrintTemplates
@@ -3460,8 +3760,13 @@ export default function App() {
           onSelectTab={(tab) => {
             setMobileTab(tab);
             if (tab === 'inventory') {
+              setActiveWorkspaceTab('INVENTORY');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (tab === 'dispatched') {
+              setActiveWorkspaceTab('DISPATCHED');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } else if (tab === 'stats') {
+              setActiveWorkspaceTab('INVENTORY');
               const el = document.getElementById('stats-section');
               if (el) {
                 el.scrollIntoView({ behavior: 'smooth' });
@@ -3485,24 +3790,33 @@ export default function App() {
           }}
           lowStockCount={lowStockItems.length}
           missingCount={stats.missingCount}
+          dispatchedCount={dispatchedRecords.length}
           role={role}
         />
       )}
 
       {/* Conflict Resolution Modal for Cloud vs Local Concurrency */}
-      <ConflictResolutionModal
-        isOpen={isConflictModalOpen}
-        onClose={() => setIsConflictModalOpen(false)}
-        conflicts={conflicts}
-        onResolved={handleConflictResolved}
-        onAddToast={addToast}
-      />
+      {isConflictModalOpen && (
+        <Suspense fallback={null}>
+          <ConflictResolutionModal
+            isOpen={isConflictModalOpen}
+            onClose={() => setIsConflictModalOpen(false)}
+            conflicts={conflicts}
+            onResolved={handleConflictResolved}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
 
       {/* Mobile PWA Installation Modal */}
-      <MobileAppInstallModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-      />
+      {isInstallModalOpen && (
+        <Suspense fallback={null}>
+          <MobileAppInstallModal
+            isOpen={isInstallModalOpen}
+            onClose={() => setIsInstallModalOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

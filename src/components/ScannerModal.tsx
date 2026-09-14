@@ -14,7 +14,9 @@ import {
   ArrowRight,
   PlusCircle,
   Search,
-  ExternalLink
+  ExternalLink,
+  CameraOff,
+  Smartphone
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { InventoryItem } from '../types.ts';
@@ -193,14 +195,31 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       });
       qrScannerRef.current = scanner;
 
-      // Query available cameras if not yet retrieved
+      // Step 1: Detect available camera devices first
+      let detectedDevs: Array<{ id: string; label: string }> = [];
       try {
-        const devs = await Html5Qrcode.getCameras();
-        if (devs && devs.length > 0) {
-          setCameras(devs);
+        detectedDevs = await Html5Qrcode.getCameras();
+        if (detectedDevs && detectedDevs.length > 0) {
+          setCameras(detectedDevs);
         }
-      } catch {
-        // cameras query might be restricted in some iframes, proceed with facingMode
+      } catch (devErr) {
+        console.warn('Unable to enumerate cameras prior to start:', devErr);
+      }
+
+      // If we explicitly detected 0 camera devices, handle gracefully without crashing
+      if (detectedDevs && detectedDevs.length === 0 && navigator.mediaDevices?.enumerateDevices) {
+        try {
+          const allMedia = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = allMedia.filter(d => d.kind === 'videoinput');
+          if (videoInputs.length === 0) {
+            setCameraError('Không phát hiện thấy mắt Camera hoặc Webcam nào trên thiết bị này. Vui lòng gắn thêm webcam hoặc chuyển sang tab "Tải Ảnh Mã QR" hoặc "Nhập Tay / Chọn Kho".');
+            setIsCameraActive(false);
+            setIsCameraStarting(false);
+            return;
+          }
+        } catch {
+          // ignore enumeration error
+        }
       }
 
       const qrBoxSize = (w: number, h: number) => {
@@ -217,38 +236,100 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         aspectRatio: 1.333333
       };
 
-      // Determine which camera to start
-      let targetConfig: string | { facingMode: string } = { facingMode: 'environment' };
+      // Step 2: Determine camera strategy:
+      // Priority 1: Specified device ID
+      // Priority 2: Selected device ID if in detectedDevs
+      // Priority 3: First available device ID from detectedDevs
+      // Priority 4: facingMode 'environment' (back camera for phones)
+      // Priority 5: facingMode 'user' (front camera / laptop webcam)
+      // Priority 6: boolean true ({ video: true })
+      let startSuccess = false;
+
+      // Candidate 1: Explicit camera ID if requested
       if (cameraIdToUse) {
-        targetConfig = cameraIdToUse;
-      } else if (selectedCameraId) {
-        targetConfig = selectedCameraId;
+        try {
+          await scanner.start(cameraIdToUse, qrConfig, handleCodeScanned, () => {});
+          setSelectedCameraId(cameraIdToUse);
+          startSuccess = true;
+        } catch (errId) {
+          console.warn(`Starting with specified camera ID ${cameraIdToUse} failed:`, errId);
+        }
       }
 
-      try {
-        await scanner.start(targetConfig, qrConfig, handleCodeScanned, () => {});
-        setIsCameraActive(true);
-        setIsCameraStarting(false);
-      } catch (e1) {
-        console.warn('Initial camera start failed with targetConfig, attempting user/front facing:', e1);
-        // Fallback 1: FacingMode user (front camera / laptop webcam)
+      // Candidate 2: Current selectedCameraId if available
+      if (!startSuccess && selectedCameraId && selectedCameraId !== 'environment' && selectedCameraId !== 'user') {
         try {
-          await scanner.start({ facingMode: 'user' }, qrConfig, handleCodeScanned, () => {});
-          setIsCameraActive(true);
-          setIsCameraStarting(false);
-        } catch (e2) {
-          console.warn('Fallback facingMode user failed, trying first available camera device:', e2);
-          // Fallback 2: First device ID from getCameras
-          const devices = await Html5Qrcode.getCameras().catch(() => []);
-          if (devices.length > 0) {
-            await scanner.start(devices[0].id, qrConfig, handleCodeScanned, () => {});
-            setSelectedCameraId(devices[0].id);
-            setIsCameraActive(true);
-            setIsCameraStarting(false);
-          } else {
-            throw e2;
+          await scanner.start(selectedCameraId, qrConfig, handleCodeScanned, () => {});
+          startSuccess = true;
+        } catch (errSel) {
+          console.warn(`Starting with selectedCameraId ${selectedCameraId} failed:`, errSel);
+        }
+      }
+
+      // Candidate 3: First physical camera from detected devices
+      if (!startSuccess && detectedDevs.length > 0) {
+        // Try rear camera first if labeled as back/rear/environment
+        const backCam = detectedDevs.find(c => /back|rear|sau|environment/i.test(c.label));
+        const firstCam = backCam || detectedDevs[0];
+        try {
+          await scanner.start(firstCam.id, qrConfig, handleCodeScanned, () => {});
+          setSelectedCameraId(firstCam.id);
+          startSuccess = true;
+        } catch (errDev) {
+          console.warn('Starting with detected device ID failed:', errDev);
+          // Try other devices
+          for (const dev of detectedDevs) {
+            if (dev.id === firstCam.id) continue;
+            try {
+              await scanner.start(dev.id, qrConfig, handleCodeScanned, () => {});
+              setSelectedCameraId(dev.id);
+              startSuccess = true;
+              break;
+            } catch {
+              // continue
+            }
           }
         }
+      }
+
+      // Candidate 4: facingMode 'environment'
+      if (!startSuccess) {
+        try {
+          await scanner.start({ facingMode: 'environment' }, qrConfig, handleCodeScanned, () => {});
+          setSelectedCameraId('environment');
+          startSuccess = true;
+        } catch (errEnv) {
+          console.warn('Starting with facingMode environment failed, trying facingMode user:', errEnv);
+        }
+      }
+
+      // Candidate 5: facingMode 'user' (laptop/desktop webcam)
+      if (!startSuccess) {
+        try {
+          await scanner.start({ facingMode: 'user' }, qrConfig, handleCodeScanned, () => {});
+          setSelectedCameraId('user');
+          startSuccess = true;
+        } catch (errUser) {
+          console.warn('Starting with facingMode user failed:', errUser);
+        }
+      }
+
+      // Candidate 6: standard video constraint (any camera)
+      if (!startSuccess) {
+        try {
+          await scanner.start({ facingMode: { ideal: 'environment' } } as unknown as string, qrConfig, handleCodeScanned, () => {});
+          startSuccess = true;
+        } catch (errAny) {
+          console.warn('Starting with any camera failed:', errAny);
+          throw errAny;
+        }
+      }
+
+      if (startSuccess) {
+        setIsCameraActive(true);
+        setIsCameraStarting(false);
+      } else {
+        throw new Error('NotFoundError: Requested device not found');
       }
 
       // Check torch capability
@@ -523,19 +604,51 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 {/* HTML5-QRCode Reader Element */}
                 <div id="qr-reader" className="w-full h-full"></div>
 
-                {/* Overlaid Viewfinder Aim Frame */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                  <div className="relative w-52 h-44 sm:w-60 sm:h-52 border-2 border-dashed border-indigo-400/40 rounded-2xl flex items-center justify-center">
-                    {/* Corners */}
-                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg"></div>
-                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg"></div>
-                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg"></div>
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-lg"></div>
+                {/* Overlaid Viewfinder Aim Frame or No-Camera Placeholder */}
+                {!cameraError ? (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                    <div className="relative w-52 h-44 sm:w-60 sm:h-52 border-2 border-dashed border-indigo-400/40 rounded-2xl flex items-center justify-center">
+                      {/* Corners */}
+                      <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg"></div>
+                      <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg"></div>
+                      <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg"></div>
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-lg"></div>
 
-                    <QrCode className="w-12 h-12 text-indigo-400/25 animate-pulse" />
+                      <QrCode className="w-12 h-12 text-indigo-400/25 animate-pulse" />
+                    </div>
+                    <div className="scanner-laser"></div>
                   </div>
-                  <div className="scanner-laser"></div>
-                </div>
+                ) : (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-slate-900/95 text-center text-white">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3 border border-amber-500/30">
+                      <CameraOff className="w-7 h-7" />
+                    </div>
+                    <p className="text-sm font-semibold text-white mb-1">
+                      Không tìm thấy thiết bị Camera
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-xs mb-4">
+                      Thiết bị chưa gắn camera hoặc đang chạy trong trình duyệt bị giới hạn phần cứng.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setScanMode('upload')}
+                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Tải ảnh mã QR</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScanMode('manual')}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Nhập mã tay</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Top Controls Overlay: Camera Switch & Torch */}
                 <div className="absolute top-3 right-3 z-20 flex items-center gap-2">

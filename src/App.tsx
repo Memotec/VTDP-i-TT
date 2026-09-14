@@ -29,6 +29,8 @@ import { findMatchingInventoryItems } from './utils/qrParser.ts';
 import {
   testFirestoreConnection,
   batchSaveInventoryToFirestore,
+  saveInventoryItemToFirestore,
+  deleteInventoryItemFromFirestore,
   saveDispatchedRecordToFirestore,
   saveAuditLogToFirestore,
   saveCategoriesToFirestore,
@@ -259,6 +261,20 @@ export default function App() {
     const updatedInv = inventory.map(item => item.id === resolvedItem.id ? resolvedItem : item);
     saveInventoryLocally(updatedInv);
     setConflicts(prev => prev.filter(c => c.id !== conflictId));
+  };
+
+  const handleResolveAllConflicts = (choice: 'keep_local' | 'keep_cloud') => {
+    const updated = syncService.resolveAllConflicts(choice);
+    setInventory(updated);
+    LocalDatabase.saveInventory(updated);
+    setConflicts([]);
+    setIsConflictModalOpen(false);
+  };
+
+  const handleClearAllConflicts = () => {
+    syncService.clearConflicts();
+    setConflicts([]);
+    setIsConflictModalOpen(false);
   };
 
   // LocalStorage Auto-Save & Data Loss Prevention Configuration
@@ -497,11 +513,13 @@ export default function App() {
     const unsubInv = subscribeToInventory(
       (firestoreItems) => {
         if (firestoreItems && firestoreItems.length > 0) {
+          // Filter out items that have been explicitly deleted locally
+          const validItems = firestoreItems.filter(item => !LocalDatabase.isItemDeleted(item.id, item.sn));
           setInventory(prev => {
             // Merge with local items if local was empty or older
             if (prev.length === 0) {
-              LocalDatabase.saveInventory(firestoreItems);
-              return firestoreItems;
+              LocalDatabase.saveInventory(validItems);
+              return validItems;
             }
             return prev;
           });
@@ -536,21 +554,24 @@ export default function App() {
   useEffect(() => {
     const unsub = syncService.subscribe(syncState => {
       setConflicts(syncState.conflicts);
-      if (syncState.conflicts.length > 0) {
-        setIsConflictModalOpen(true);
-      }
     });
     return unsub;
   }, []);
 
-  const saveInventoryLocally = (newInv: InventoryItem[]) => {
+  const saveInventoryLocally = (newInv: InventoryItem[], immediateCloud: boolean = false) => {
     setInventory(newInv);
     LocalDatabase.saveInventory(newInv);
     const nowStr = new Date().toLocaleTimeString('vi-VN');
     localStorage.setItem('cns_last_saved_time', nowStr);
     setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
-    // Automatically trigger debounced push to Cloud Google Sheet
-    syncService.scheduleDebouncedPush();
+
+    if (immediateCloud) {
+      // Trigger instant push to Cloud Google Sheet
+      syncService.triggerImmediateSync().catch(err => console.warn('Instant cloud push:', err));
+    } else {
+      // Automatically trigger debounced push to Cloud Google Sheet
+      syncService.scheduleDebouncedPush();
+    }
     // Also sync to Firebase Firestore in background
     batchSaveInventoryToFirestore(newInv).catch(err => console.warn('Firestore batch save:', err));
   };
@@ -1052,35 +1073,37 @@ export default function App() {
     }
 
     if (editingItem) {
-      const existingItem = inventory.find(i => i.id === editingItem.id);
+      const currentItems = LocalDatabase.getInventory();
+      const existingItem = currentItems.find(i => i.id === editingItem.id) || editingItem;
       const updatedItem = LocalDatabase.applyMetadata({
-        ...(existingItem || editingItem),
+        ...existingItem,
         name: formData.name.trim(),
         pn: formData.pn.trim(),
         sn: formData.sn.trim(),
-        warehouse: formData.warehouse.trim().toUpperCase(),
+        warehouse: (formData.warehouse || 'KHO CHÍNH').trim().toUpperCase(),
         loc: formData.loc.trim(),
-        qty: Number(formData.qty) || 1,
+        qty: Math.max(1, Number(formData.qty) || 1),
         category: formData.category
       }, currentUsername || 'guest', false);
 
-      const updated = inventory.map(item => item.id === editingItem.id ? updatedItem : item);
-      saveInventoryLocally(updated);
-      syncService.enqueue('equipment', updatedItem.id, 'UPDATE', updatedItem, currentUsername);
-      addToast('Cập nhật dữ liệu thiết bị thành công!', 'success');
+      const updated = currentItems.map(item => item.id === editingItem.id ? updatedItem : item);
+      saveInventoryLocally(updated, true);
+      saveInventoryItemToFirestore(updatedItem).catch(err => console.warn('Firestore item update:', err));
+      syncService.enqueue('equipment', updatedItem.id, 'UPDATE', updatedItem, currentUsername, true);
+      addToast('Cập nhật dữ liệu thiết bị và lưu lên Cloud tức thì!', 'success');
       playScanBeep(900, 0.1);
 
       addSystemAuditLog(
         'ITEM_UPDATE',
         'Chỉnh sửa thông tin thiết bị',
-        `Cập nhật thiết bị "${formData.name.trim()}": Kho ${formData.warehouse.trim().toUpperCase()}, Vị trí ${formData.loc.trim()}, SL ${formData.qty}, Loại ${formData.category}`,
+        `Cập nhật thiết bị "${formData.name.trim()}": Kho ${(formData.warehouse || 'KHO CHÍNH').trim().toUpperCase()}, Vị trí ${formData.loc.trim()}, SL ${formData.qty}, Loại ${formData.category}`,
         {
           id: editingItem.id,
           name: formData.name.trim(),
           sn: formData.sn.trim(),
           category: formData.category,
           prevData: `SL: ${existingItem?.qty || 1} | Kho: ${existingItem?.warehouse || 'Chưa gán'} | Vị trí: ${existingItem?.loc || 'Chưa gán'}`,
-          newData: `SL: ${formData.qty} | Kho: ${formData.warehouse.trim().toUpperCase()} | Vị trí: ${formData.loc.trim()}`
+          newData: `SL: ${formData.qty} | Kho: ${(formData.warehouse || 'KHO CHÍNH').trim().toUpperCase()} | Vị trí: ${formData.loc.trim()}`
         }
       );
 
@@ -1091,35 +1114,43 @@ export default function App() {
         }, 350);
       }
     } else {
-      const isDuplicate = inventory.some(item => item.sn.toLowerCase() === formData.sn.trim().toLowerCase());
+      const currentItems = LocalDatabase.getInventory();
+      const cleanSn = formData.sn.trim().toLowerCase();
+      const isDuplicate = currentItems.some(item => (item.sn || '').trim().toLowerCase() === cleanSn);
       if (isDuplicate) {
         addToast(`Cảnh báo: S/N "${formData.sn}" đã tồn tại trong hệ thống!`, 'error');
         return;
       }
+
+      // If this SN was previously tombstoned, remove it from tombstones since it is being re-added
+      LocalDatabase.removeDeletedItemTombstone(formData.sn.trim());
 
       const rawItem: InventoryItem = {
         id: `item-${Date.now()}`,
         name: formData.name.trim(),
         pn: formData.pn.trim(),
         sn: formData.sn.trim(),
-        warehouse: formData.warehouse.trim().toUpperCase(),
+        warehouse: (formData.warehouse || 'KHO CHÍNH').trim().toUpperCase(),
         loc: formData.loc.trim(),
-        qty: Number(formData.qty) || 1,
+        qty: Math.max(1, Number(formData.qty) || 1),
         auditStatus: null,
         auditNote: '',
         category: formData.category,
         history: []
       };
       const newItem = LocalDatabase.applyMetadata(rawItem, currentUsername || 'guest', true);
-      saveInventoryLocally([...inventory, newItem]);
-      syncService.enqueue('equipment', newItem.id, 'CREATE', newItem, currentUsername);
-      addToast('Đã thêm thiết bị mới vào kho thành công!', 'success');
+      const nextInv = [...currentItems.filter(i => i.id !== newItem.id && (i.sn || '').trim().toLowerCase() !== cleanSn), newItem];
+      
+      saveInventoryLocally(nextInv, true);
+      saveInventoryItemToFirestore(newItem).catch(err => console.warn('Firestore item create:', err));
+      syncService.enqueue('equipment', newItem.id, 'CREATE', newItem, currentUsername, true);
+      addToast('Đã thêm thiết bị mới vào kho và lưu lên Cloud tức thì!', 'success');
       playScanBeep(880, 0.15);
 
       addSystemAuditLog(
         'ITEM_CREATE',
         'Thêm mới thiết bị vào kho',
-        `Nhập mới thiết bị "${formData.name.trim()}" (S/N: ${formData.sn.trim()}, P/N: ${formData.pn.trim() || 'N/A'}, SL: ${formData.qty}) tại Kho ${formData.warehouse.trim().toUpperCase()}`,
+        `Nhập mới thiết bị "${formData.name.trim()}" (S/N: ${formData.sn.trim()}, P/N: ${formData.pn.trim() || 'N/A'}, SL: ${formData.qty}) tại Kho ${(formData.warehouse || 'KHO CHÍNH').trim().toUpperCase()}`,
         {
           id: newItem.id,
           name: newItem.name,
@@ -1147,18 +1178,29 @@ export default function App() {
     setConfirmDialog({
       isOpen: true,
       title: 'Xác nhận xóa thiết bị',
-      message: `Bạn đang chọn xóa thiết bị "${item.name}" (S/N: ${item.sn}). Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa?`,
-      onConfirm: () => {
-        const nextInv = inventory.filter(i => i.id !== item.id);
-        saveInventoryLocally(nextInv);
-        syncService.enqueue('equipment', item.id, 'DELETE', { id: item.id }, currentUsername);
-        addToast('Đã xóa thiết bị khỏi cơ sở dữ liệu.', 'success');
+      message: `Bạn đang chọn xóa thiết bị "${item.name}" (S/N: ${item.sn}). Hành động này sẽ xóa vĩnh viễn và cập nhật lên Cloud ngay lập tức. Bạn có chắc chắn muốn xóa?`,
+      onConfirm: async () => {
+        // 1. Record tombstone & update local database atomically
+        const nextInv = LocalDatabase.deleteItem(item.id, item.sn);
+        setInventory(nextInv);
+        const nowStr = new Date().toLocaleTimeString('vi-VN');
+        localStorage.setItem('cns_last_saved_time', nowStr);
+        setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
+
+        // 2. Immediately delete from Firestore document
+        deleteInventoryItemFromFirestore(item.id).catch(err => console.warn('Delete from Firestore:', err));
+
+        // 3. Immediately queue and push changes to Cloud Google Sheet
+        syncService.enqueue('equipment', item.id, 'DELETE', { id: item.id, sn: item.sn }, currentUsername, true);
+        syncService.triggerImmediateSync().catch(err => console.warn('Instant delete sync:', err));
+
+        addToast(`Đã xóa thiết bị "${item.name}" và cập nhật lên Cloud tức thì.`, 'success');
         playScanBeep(400, 0.3);
 
         addSystemAuditLog(
           'ITEM_DELETE',
           'Xóa thiết bị khỏi kho',
-          `Xóa vĩnh viễn thiết bị "${item.name}" (S/N: ${item.sn}, SL: ${item.qty}) khỏi hệ thống quản lý`,
+          `Xóa vĩnh viễn thiết bị "${item.name}" (S/N: ${item.sn}, SL: ${item.qty}) khỏi hệ thống quản lý và đồng bộ Cloud`,
           {
             id: item.id,
             name: item.name,
@@ -1533,11 +1575,11 @@ export default function App() {
 
         // Run conflict check with existing local inventory
         const detectedConflicts = syncService.checkForConflicts(cloudItems, currentLocal);
+        setConflicts(detectedConflicts);
         if (detectedConflicts.length > 0) {
-          setConflicts(detectedConflicts);
-          setIsConflictModalOpen(true);
           if (!isSilent) {
-            addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
+            addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local. Hãy đối chiếu và chọn phiên bản giữ lại.`, 'info');
+            setIsConflictModalOpen(true);
           }
         }
 
@@ -1557,6 +1599,12 @@ export default function App() {
 
         // Process each cloud item with conflict, pending, and ID/SN match checks
         cloudItems.forEach(cloudItem => {
+          // If item was deleted locally, do not resurrect it
+          if (LocalDatabase.isItemDeleted(cloudItem.id, cloudItem.sn)) {
+            deleteInventoryItemFromFirestore(cloudItem.id).catch(() => {});
+            return;
+          }
+
           const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
           const localMatch = localMapById.get(cloudItem.id) || (cleanSn ? localMapBySn.get(cleanSn) : undefined);
 
@@ -1566,8 +1614,8 @@ export default function App() {
             if (conflictIds.has(localMatch.id)) {
               // Keep local until user explicitly resolves conflict in modal
               merged.push(localMatch);
-            } else if (pendingEntityIds.has(localMatch.id) || localMatch.syncStatus === 'pending' || localMatch.syncStatus === 'syncing') {
-              // Local has unpushed edits! DO NOT overwrite with older cloud snapshot!
+            } else if (pendingEntityIds.has(localMatch.id)) {
+              // Local has active unpushed edits in queue! DO NOT overwrite with older cloud snapshot!
               merged.push(localMatch);
             } else {
               // Cloud wins: adopt cloud data while retaining local audit history if cloud history is empty
@@ -1590,7 +1638,10 @@ export default function App() {
         // Retain local items not present in cloud to prevent accidental data deletion
         currentLocal.forEach(localItem => {
           if (!matchedLocalIds.has(localItem.id)) {
-            merged.push(localItem);
+            // Only retain if NOT tombstoned
+            if (!LocalDatabase.isItemDeleted(localItem.id, localItem.sn)) {
+              merged.push(localItem);
+            }
           }
         });
 
@@ -4130,6 +4181,8 @@ export default function App() {
             onClose={() => setIsConflictModalOpen(false)}
             conflicts={conflicts}
             onResolved={handleConflictResolved}
+            onResolveAll={handleResolveAllConflicts}
+            onClearAll={handleClearAllConflicts}
             onAddToast={addToast}
           />
         </Suspense>

@@ -130,15 +130,14 @@ async function startServer() {
     }
   });
 
+  const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec";
+
   // Cloud Proxy Push Endpoint (Bypasses browser CORS limitations, follows redirects, inspects true Google Apps Script response)
   app.post("/api/cloud-proxy/push", async (req, res) => {
     try {
       const { url, data, inventory, dispatched, categories, user, queue } = req.body;
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ success: false, error: "Thiếu URL Google Apps Script Web App." });
-      }
+      const cleanUrl = (url && typeof url === "string" && url.trim().length > 0) ? url.trim() : DEFAULT_GAS_URL;
 
-      const cleanUrl = url.trim();
       const params = new URLSearchParams();
       params.append("action", "AUTO_SYNC_BATCH");
       params.append("type", "full_sync");
@@ -240,11 +239,8 @@ async function startServer() {
   app.post("/api/cloud-proxy/pull", async (req, res) => {
     try {
       const { url } = req.body;
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ success: false, error: "Thiếu URL Google Apps Script Web App." });
-      }
+      const cleanUrl = (url && typeof url === "string" && url.trim().length > 0) ? url.trim() : DEFAULT_GAS_URL;
 
-      const cleanUrl = url.trim();
       const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}t=${Date.now()}&source=cloud_proxy`;
 
       const controller = new AbortController();

@@ -44,6 +44,74 @@ export class LocalDatabase {
     }
   }
 
+  // Tombstones for explicitly deleted items (prevents cloud sync revival)
+  static getDeletedItems(): { id: string; sn: string; deletedAt: number }[] {
+    try {
+      const raw = localStorage.getItem('cns_deleted_items_tombstones');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static recordDeletedItem(id: string, sn?: string): void {
+    try {
+      const current = this.getDeletedItems();
+      const cleanSn = (sn || '').trim().toLowerCase();
+      const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const filtered = current.filter(item => item.deletedAt > oneWeekAgo && item.id !== id && (!cleanSn || item.sn !== cleanSn));
+      filtered.push({
+        id,
+        sn: cleanSn,
+        deletedAt: Date.now()
+      });
+      localStorage.setItem('cns_deleted_items_tombstones', JSON.stringify(filtered));
+    } catch (err) {
+      console.error('LocalDatabase.recordDeletedItem error:', err);
+    }
+  }
+
+  static removeDeletedItemTombstone(idOrSn: string): void {
+    try {
+      const current = this.getDeletedItems();
+      const target = (idOrSn || '').trim().toLowerCase();
+      if (!target) return;
+      const filtered = current.filter(item => item.id.toLowerCase() !== target && item.sn.toLowerCase() !== target);
+      localStorage.setItem('cns_deleted_items_tombstones', JSON.stringify(filtered));
+    } catch (err) {
+      console.error('LocalDatabase.removeDeletedItemTombstone error:', err);
+    }
+  }
+
+  static isItemDeleted(id: string, sn?: string): boolean {
+    try {
+      const current = this.getDeletedItems();
+      const cleanId = (id || '').trim().toLowerCase();
+      const cleanSn = (sn || '').trim().toLowerCase();
+      return current.some(item => 
+        (cleanId && item.id.toLowerCase() === cleanId) || 
+        (cleanSn && item.sn.toLowerCase() === cleanSn)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  static deleteItem(id: string, sn?: string): InventoryItem[] {
+    this.recordDeletedItem(id, sn);
+    const cleanId = (id || '').trim().toLowerCase();
+    const cleanSn = (sn || '').trim().toLowerCase();
+    const current = this.getInventory();
+    const updated = current.filter(item => 
+      item.id.toLowerCase() !== cleanId && 
+      (!cleanSn || (item.sn || '').trim().toLowerCase() !== cleanSn)
+    );
+    this.saveInventory(updated);
+    return updated;
+  }
+
   static updateItemSyncStatus(id: string, status: SyncItemStatus): void {
     try {
       const items = this.getInventory();
@@ -171,6 +239,14 @@ export class LocalDatabase {
       localStorage.setItem(STORAGE_KEYS.CONFLICTS, JSON.stringify(conflicts));
     } catch (err) {
       console.error('LocalDatabase.saveConflicts error:', err);
+    }
+  }
+
+  static clearConflicts(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CONFLICTS);
+    } catch (err) {
+      console.error('LocalDatabase.clearConflicts error:', err);
     }
   }
 

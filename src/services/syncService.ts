@@ -45,8 +45,11 @@ class SyncService {
   private debounceTimer: any = null;
   private retryTimer: any = null;
   private isProcessing: boolean = false;
+  private hasPendingImmediatePush: boolean = false;
   private webAppUrl: string = '';
   private currentUser: string = 'guest';
+
+  public static readonly DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec';
 
   constructor() {
     this.init();
@@ -56,12 +59,19 @@ class SyncService {
     // 1. Hydrate queue & conflicts from Local Storage
     this.queue = LocalDatabase.getSyncQueue();
     this.conflicts = LocalDatabase.getConflicts();
+
+    // Auto-clean stale conflicts if there are no pending changes in queue (Cloud-First principle)
+    const activePending = this.queue.filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing');
+    if (activePending.length === 0 && this.conflicts.length > 0) {
+      this.conflicts = [];
+      LocalDatabase.clearConflicts();
+    }
+
     this.lastSyncedTime = localStorage.getItem('cns_last_synced_time') || '';
-    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec';
     const storedUrl = localStorage.getItem('cns_sync_url');
-    if (!storedUrl || storedUrl.includes('AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f')) {
-      this.webAppUrl = DEFAULT_GAS_URL;
-      localStorage.setItem('cns_sync_url', DEFAULT_GAS_URL);
+    if (!storedUrl || !storedUrl.trim() || storedUrl.includes('AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f')) {
+      this.webAppUrl = SyncService.DEFAULT_GAS_URL;
+      localStorage.setItem('cns_sync_url', SyncService.DEFAULT_GAS_URL);
     } else {
       this.webAppUrl = storedUrl.trim();
     }
@@ -84,8 +94,12 @@ class SyncService {
   }
 
   public configure(url: string, user: string) {
-    this.webAppUrl = url;
+    this.webAppUrl = (url && url.trim()) ? url.trim() : (this.webAppUrl || SyncService.DEFAULT_GAS_URL);
     this.currentUser = user || 'guest';
+  }
+
+  public getWebAppUrl(): string {
+    return (this.webAppUrl && this.webAppUrl.trim()) ? this.webAppUrl.trim() : SyncService.DEFAULT_GAS_URL;
   }
 
   public getState(): SyncServiceState {
@@ -147,7 +161,10 @@ class SyncService {
    * Immediately push complete local dataset to Cloud Google Sheet
    */
   public async triggerFullSync(): Promise<{ success: boolean; error?: string; scriptErrorCode?: string }> {
-    if (this.isProcessing) return { success: false, error: 'Đang trong tiến trình đồng bộ' };
+    if (this.isProcessing) {
+      this.hasPendingImmediatePush = true;
+      return { success: true };
+    }
     if (!networkMonitor.isOnline()) {
       this.globalStatus = 'offline';
       this.detailMessage = 'Đang ngoại tuyến. Dữ liệu sẽ tự động đồng bộ khi có Internet.';
@@ -167,7 +184,7 @@ class SyncService {
       const pendingItems = this.queue.filter(q => q.syncStatus === 'pending' || q.syncStatus === 'failed');
 
       const pushResult = await CloudService.pushToCloud(
-        this.webAppUrl,
+        this.getWebAppUrl(),
         currentInventory,
         currentDispatched,
         pendingItems,
@@ -206,7 +223,22 @@ class SyncService {
       this.isProcessing = false;
       this.evaluateStatus();
       this.notify();
+      if (this.hasPendingImmediatePush) {
+        this.hasPendingImmediatePush = false;
+        setTimeout(() => this.triggerFullSync(), 80);
+      }
     }
+  }
+
+  /**
+   * Force an immediate sync without debouncing
+   */
+  public async triggerImmediateSync(): Promise<{ success: boolean; error?: string; scriptErrorCode?: string }> {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    return this.triggerFullSync();
   }
 
   public subscribe(listener: SyncListener): () => void {
@@ -262,7 +294,8 @@ class SyncService {
     entityId: string,
     action: SyncActionType,
     payload: any,
-    user?: string
+    user?: string,
+    immediate = false
   ): void {
     const actor = user || this.currentUser || 'guest';
     const now = Date.now();
@@ -309,8 +342,13 @@ class SyncService {
     this.evaluateStatus();
     this.notify();
 
-    // Trigger debounced auto-sync to avoid spamming the cloud on rapid keystrokes
-    this.scheduleDebouncedSync(800);
+    // Trigger instant cloud sync for CREATE / DELETE / explicit immediate actions
+    if (immediate || action === 'CREATE' || action === 'DELETE') {
+      this.triggerImmediateSync().catch(err => console.warn('Instant enqueue sync:', err));
+    } else {
+      // Trigger debounced auto-sync to avoid spamming the cloud on rapid keystrokes
+      this.scheduleDebouncedSync(800);
+    }
   }
 
   private scheduleDebouncedSync(delayMs = 800) {
@@ -455,9 +493,23 @@ class SyncService {
   }
 
   /**
-   * Check for conflicts against pulled cloud items
+   * Check for conflicts against pulled cloud items with Cloud-First Priority.
+   * A conflict ONLY genuinely exists if the local machine has an unsent pending edit
+   * in the sync queue AND the cloud has received a newer version with different content.
    */
   public checkForConflicts(cloudItems: InventoryItem[], localItems: InventoryItem[]): ConflictItem[] {
+    const pendingQueue = this.queue.filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing');
+    const pendingQueueIds = new Set(pendingQueue.map(q => q.entityId));
+
+    // Cloud-First Priority: If there are no pending local edits queued by the user,
+    // there can be no conflict. Cloud data is applied seamlessly!
+    if (pendingQueueIds.size === 0) {
+      if (this.conflicts.length > 0) {
+        this.clearConflicts();
+      }
+      return [];
+    }
+
     const detected: ConflictItem[] = [];
     const localMap = new Map<string, InventoryItem>();
     const localSnMap = new Map<string, InventoryItem>();
@@ -469,34 +521,38 @@ class SyncService {
       }
     });
 
-    const pendingQueueIds = new Set(
-      this.queue
-        .filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing')
-        .map(q => q.entityId)
-    );
-
     cloudItems.forEach(cloudItem => {
+      // If this item was explicitly deleted by the user, ignore it (not a conflict)
+      if (LocalDatabase.isItemDeleted(cloudItem.id, cloudItem.sn)) {
+        return;
+      }
+
       const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
       const localItem = localMap.get(cloudItem.id) || (cleanSn ? localSnMap.get(cleanSn) : undefined);
       if (!localItem) return;
+
+      // Only check items that ACTUALLY have a pending un-pushed change in the local queue
+      if (!pendingQueueIds.has(localItem.id)) {
+        return;
+      }
 
       // Check if both sides have conflicting versions or contents
       const localVer = localItem.version || 1;
       const cloudVer = cloudItem.version || 1;
 
-      // If local has pending unsynced changes and cloud has a different version or different values
-      const isLocallyPending =
-        localItem.syncStatus === 'pending' ||
-        localItem.syncStatus === 'syncing' ||
-        pendingQueueIds.has(localItem.id);
-
       const hasContentDiff =
-        localItem.qty !== cloudItem.qty ||
-        localItem.auditStatus !== cloudItem.auditStatus ||
-        localItem.loc !== cloudItem.loc ||
-        localItem.warehouse !== cloudItem.warehouse;
+        Number(localItem.qty) !== Number(cloudItem.qty) ||
+        (localItem.auditStatus || '') !== (cloudItem.auditStatus || '') ||
+        (localItem.loc || '').trim() !== (cloudItem.loc || '').trim() ||
+        (localItem.warehouse || '').trim() !== (cloudItem.warehouse || '').trim();
 
-      if (isLocallyPending && hasContentDiff && (cloudVer > localVer || (cloudItem.updatedAt && localItem.updatedAt && cloudItem.updatedAt !== localItem.updatedAt))) {
+      // Real conflict: Cloud has a strictly newer version, or cloud has an explicit newer timestamp
+      const isCloudNewer = cloudVer > localVer;
+      const bothHaveTimestamps = Boolean(cloudItem.updatedAt && localItem.updatedAt);
+      const isCloudTimeNewer = bothHaveTimestamps &&
+        new Date(cloudItem.updatedAt!).getTime() > (new Date(localItem.updatedAt!).getTime() + 3000);
+
+      if (hasContentDiff && (isCloudNewer || isCloudTimeNewer)) {
         detected.push({
           id: `conflict_${localItem.id}_${Date.now()}`,
           entityType: 'equipment',
@@ -519,13 +575,16 @@ class SyncService {
       this.globalStatus = 'conflict';
       this.detailMessage = `Phát hiện ${detected.length} xung đột dữ liệu giữa Local và Cloud.`;
       this.notify();
+    } else if (this.conflicts.length > 0) {
+      // Clear out resolved or obsolete conflicts
+      this.clearConflicts();
     }
 
     return detected;
   }
 
   /**
-   * Resolve a conflict
+   * Resolve a single conflict
    */
   public resolveConflict(conflictId: string, choice: 'keep_local' | 'keep_cloud'): { resolvedItem: any } {
     const conflict = this.conflicts.find(c => c.id === conflictId);
@@ -565,6 +624,60 @@ class SyncService {
     this.notify();
 
     return { resolvedItem: finalItem };
+  }
+
+  /**
+   * Resolve all active conflicts in one action (Batch resolve)
+   */
+  public resolveAllConflicts(choice: 'keep_local' | 'keep_cloud'): InventoryItem[] {
+    const localInventory = LocalDatabase.getInventory();
+    const inventoryMap = new Map<string, InventoryItem>(localInventory.map(i => [i.id, i]));
+    const resolvedItems: InventoryItem[] = [];
+
+    for (const conflict of this.conflicts) {
+      if (choice === 'keep_local') {
+        const finalItem: InventoryItem = {
+          ...conflict.localData,
+          version: Math.max(conflict.localVersion || 1, conflict.cloudVersion || 1) + 1,
+          syncStatus: 'pending'
+        };
+        inventoryMap.set(finalItem.id, finalItem);
+        this.enqueue('equipment', finalItem.id, 'UPDATE', finalItem);
+        resolvedItems.push(finalItem);
+      } else {
+        const finalItem: InventoryItem = {
+          ...conflict.cloudData,
+          syncStatus: 'synced'
+        };
+        inventoryMap.set(finalItem.id, finalItem);
+        this.queue = this.queue.filter(q => q.entityId !== conflict.entityId);
+        resolvedItems.push(finalItem);
+      }
+    }
+
+    if (choice === 'keep_cloud') {
+      LocalDatabase.saveSyncQueue(this.queue);
+    }
+
+    const updated = Array.from(inventoryMap.values());
+    LocalDatabase.saveInventory(updated);
+
+    this.conflicts = [];
+    LocalDatabase.clearConflicts();
+    this.evaluateStatus();
+    this.notify();
+
+    return updated;
+  }
+
+  /**
+   * Clear all active conflicts without forcing changes
+   */
+  public clearConflicts(): void {
+    this.conflicts = [];
+    LocalDatabase.clearConflicts();
+    this.evaluateStatus();
+    this.notify();
   }
 }
 

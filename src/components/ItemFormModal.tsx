@@ -7,6 +7,7 @@ interface ItemFormModalProps {
   onClose: () => void;
   editingItem: InventoryItem | null;
   categories: string[];
+  initialSn?: string;
   onSaveCategory: (newCategory: string) => void;
   onSubmit: (formData: {
     name: string;
@@ -24,6 +25,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   onClose,
   editingItem,
   categories,
+  initialSn,
   onSaveCategory,
   onSubmit
 }) => {
@@ -36,10 +38,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [category, setCategory] = useState('VHF AM');
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Sync state whenever modal opens or editingItem changes
   useEffect(() => {
     if (isOpen) {
+      setFormError(null);
       if (editingItem) {
         setName(editingItem.name || '');
         setPn(editingItem.pn || '');
@@ -51,7 +55,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       } else {
         setName('');
         setPn('');
-        setSn('');
+        setSn(initialSn || '');
         setWarehouse('');
         setLoc('');
         setQty(1);
@@ -60,19 +64,27 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setIsAddingNewCat(false);
       setNewCatInput('');
     }
-  }, [isOpen, editingItem, categories]);
+  }, [isOpen, editingItem, categories, initialSn]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !sn.trim()) return;
+    if (!name.trim()) {
+      setFormError('Vui lòng nhập Tên Thiết Bị (Thông tin bắt buộc *)');
+      return;
+    }
+    if (!sn.trim()) {
+      setFormError('Vui lòng nhập Số Sê-ri S/N (Thông tin bắt buộc *)');
+      return;
+    }
+    setFormError(null);
 
     onSubmit({
       name: name.trim(),
       pn: pn.trim(),
       sn: sn.trim(),
-      warehouse: warehouse.trim().toUpperCase(),
+      warehouse: (warehouse || 'KHO CHÍNH').trim().toUpperCase(),
       loc: loc.trim(),
       qty: Math.max(1, Number(qty) || 1),
       category: category.trim() || 'VHF AM'
@@ -80,6 +92,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   };
 
   const handleReset = () => {
+    setFormError(null);
     if (editingItem) {
       setName(editingItem.name || '');
       setPn(editingItem.pn || '');
@@ -91,7 +104,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     } else {
       setName('');
       setPn('');
-      setSn('');
+      setSn(initialSn || '');
       setWarehouse('');
       setLoc('');
       setQty(1);
@@ -335,6 +348,13 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             <span className="w-2 h-2 rounded-full bg-[#2563EB] shrink-0"></span>
             <span>Số Sê-ri (S/N) là mã định danh duy nhất để tạo mã QR, in tem nhãn và quét kiểm kê bằng camera di động.</span>
           </div>
+
+          {formError && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+              <span>{formError}</span>
+            </div>
+          )}
 
           {/* Form Actions Footer */}
           <div className="pt-3 border-t border-slate-150 dark:border-slate-800 flex items-center justify-between gap-3">

@@ -100,12 +100,14 @@ export function extractInventoryItem(raw: any, idx: number): InventoryItem {
     history: Array.isArray(raw.history) ? raw.history : [],
     syncStatus: 'synced',
     version: typeof raw.version === 'number' ? raw.version : 1,
-    updatedAt: raw.updatedAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || undefined,
     updatedBy: raw.updatedBy || 'cloud'
   };
 }
 
 export class CloudService {
+  public static readonly DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec';
+
   /**
    * Push full inventory, dispatched records, and change queue to Google Apps Script
    */
@@ -117,10 +119,8 @@ export class CloudService {
     user: string = 'guest',
     categories: string[] = []
   ): Promise<CloudPushResult> {
-    const cleanUrl = (webAppUrl || '').trim();
-    if (!cleanUrl || !cleanUrl.startsWith('http')) {
-      return { success: false, error: 'Đường dẫn Cloud API (Google Apps Script) chưa được cấu hình hợp lệ.' };
-    }
+    const rawUrl = (webAppUrl || '').trim();
+    const cleanUrl = (rawUrl && rawUrl.startsWith('http')) ? rawUrl : CloudService.DEFAULT_GAS_URL;
 
     // Step 1: Try server-side Cloud Proxy first (avoids browser CORS & inspects true Apps Script errors)
     try {
@@ -240,10 +240,8 @@ export class CloudService {
    * Pull inventory data & dispatched records from Google Apps Script
    */
   static async pullFromCloud(webAppUrl: string): Promise<CloudPullResult> {
-    const cleanUrl = (webAppUrl || '').trim();
-    if (!cleanUrl || !cleanUrl.startsWith('http')) {
-      return { success: false, error: 'Đường dẫn Cloud API (Google Apps Script) chưa hợp lệ.' };
-    }
+    const rawUrl = (webAppUrl || '').trim();
+    const cleanUrl = (rawUrl && rawUrl.startsWith('http')) ? rawUrl : CloudService.DEFAULT_GAS_URL;
 
     // Step 1: Try server-side Cloud Proxy first
     try {

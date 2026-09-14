@@ -19,6 +19,8 @@ interface ConflictResolutionModalProps {
   onClose: () => void;
   conflicts: ConflictItem[];
   onResolved: (conflictId: string, choice: 'keep_local' | 'keep_cloud', resolvedItem: InventoryItem) => void;
+  onResolveAll?: (choice: 'keep_local' | 'keep_cloud') => void;
+  onClearAll?: () => void;
   onAddToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -27,6 +29,8 @@ export const ConflictResolutionModal: React.FC<ConflictResolutionModalProps> = (
   onClose,
   conflicts,
   onResolved,
+  onResolveAll,
+  onClearAll,
   onAddToast
 }) => {
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -66,6 +70,36 @@ export const ConflictResolutionModal: React.FC<ConflictResolutionModalProps> = (
     }
   };
 
+  const handleBatchResolve = (choice: 'keep_local' | 'keep_cloud') => {
+    try {
+      if (onResolveAll) {
+        onResolveAll(choice);
+      } else {
+        syncService.resolveAllConflicts(choice);
+      }
+      onAddToast(
+        choice === 'keep_cloud'
+          ? `Đã áp dụng toàn bộ ${conflicts.length} thiết bị theo dữ liệu Cloud (Ưu tiên Cloud).`
+          : `Đã giữ lại toàn bộ dữ liệu Máy Trạm (Local) và lên lịch cập nhật Cloud.`,
+        'success'
+      );
+      onClose();
+    } catch (err) {
+      console.error('Lỗi khi giải quyết tất cả xung đột:', err);
+      onAddToast('Không thể giải quyết hàng loạt xung đột', 'error');
+    }
+  };
+
+  const handleClear = () => {
+    if (onClearAll) {
+      onClearAll();
+    } else {
+      syncService.clearConflicts();
+    }
+    onAddToast('Đã xóa bỏ các cảnh báo xung đột dữ liệu.', 'info');
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/70 dark:bg-black/85 backdrop-blur-md flex items-center justify-center z-[95000] p-4 animate-fade-in">
       <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-[2rem] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden">
@@ -95,24 +129,59 @@ export const ConflictResolutionModal: React.FC<ConflictResolutionModalProps> = (
           </button>
         </div>
 
-        {/* Tab selector if multiple conflicts */}
-        {conflicts.length > 1 && (
-          <div className="px-6 pt-3 pb-1 border-b border-slate-100 dark:border-slate-800 flex gap-2 overflow-x-auto custom-scrollbar">
-            {conflicts.map((c, idx) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedIndex(idx)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer ${
-                  selectedIndex === idx
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                }`}
-              >
-                {c.entityName || `Thiết bị #${idx + 1}`}
-              </button>
-            ))}
+        {/* Tab selector and Batch Toolbar */}
+        <div className="px-6 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-2">
+          {/* Multiple items tabs */}
+          {conflicts.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto custom-scrollbar max-w-full sm:max-w-[45%] py-1">
+              {conflicts.map((c, idx) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedIndex(idx)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${
+                    selectedIndex === idx
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300'
+                  }`}
+                >
+                  {c.entityName || `Thiết bị #${idx + 1}`}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-slate-500 font-medium">Chi tiết thiết bị xung đột</span>
+          )}
+
+          {/* Quick Batch Actions */}
+          <div className="flex items-center gap-2 flex-wrap ml-auto">
+            <button
+              type="button"
+              onClick={() => handleBatchResolve('keep_cloud')}
+              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              title="Áp dụng dữ liệu Cloud cho toàn bộ thiết bị xung đột"
+            >
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Ưu tiên Cloud cho tất cả ({conflicts.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBatchResolve('keep_local')}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              title="Giữ dữ liệu Máy trạm và lên lịch ghi đè Cloud"
+            >
+              <Laptop className="w-3.5 h-3.5" />
+              <span>Giữ Local cho tất cả</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              title="Xóa cảnh báo xung đột"
+            >
+              Bỏ qua
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Body Comparison */}
         <div className="flex-1 p-6 overflow-y-auto space-y-6">

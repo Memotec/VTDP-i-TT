@@ -10,7 +10,8 @@ import {
   SyncActionType,
   SyncEntityType,
   GlobalSyncState,
-  ConflictItem
+  ConflictItem,
+  DataSourceOrigin
 } from '../types.ts';
 import { LocalDatabase } from '../database/localDatabase.ts';
 import { CloudService } from './cloudService.ts';
@@ -21,6 +22,7 @@ export type SyncListener = (state: SyncServiceState) => void;
 
 export interface SyncServiceState {
   globalStatus: GlobalSyncState;
+  dataSourceOrigin: DataSourceOrigin;
   pendingCount: number;
   failedCount: number;
   lastSyncedTime: string;
@@ -35,6 +37,7 @@ class SyncService {
   private queue: SyncQueueItem[] = [];
   private conflicts: ConflictItem[] = [];
   private globalStatus: GlobalSyncState = 'synced';
+  private dataSourceOrigin: DataSourceOrigin = 'cloud_loading';
   private lastSyncedTime: string = '';
   private detailMessage: string = 'Hệ thống sẵn sàng';
   private scriptErrorCode?: string;
@@ -54,7 +57,14 @@ class SyncService {
     this.queue = LocalDatabase.getSyncQueue();
     this.conflicts = LocalDatabase.getConflicts();
     this.lastSyncedTime = localStorage.getItem('cns_last_synced_time') || '';
-    this.webAppUrl = localStorage.getItem('cns_sync_url') || 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec';
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec';
+    const storedUrl = localStorage.getItem('cns_sync_url');
+    if (!storedUrl || storedUrl.includes('AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f')) {
+      this.webAppUrl = DEFAULT_GAS_URL;
+      localStorage.setItem('cns_sync_url', DEFAULT_GAS_URL);
+    } else {
+      this.webAppUrl = storedUrl.trim();
+    }
 
     // 2. Listen to network changes
     networkMonitor.subscribe((online) => {
@@ -84,6 +94,7 @@ class SyncService {
 
     return {
       globalStatus: this.globalStatus,
+      dataSourceOrigin: this.dataSourceOrigin,
       pendingCount,
       failedCount,
       lastSyncedTime: this.lastSyncedTime,
@@ -93,6 +104,18 @@ class SyncService {
       detailMessage: this.detailMessage,
       scriptErrorCode: this.scriptErrorCode
     };
+  }
+
+  public getDataSourceOrigin(): DataSourceOrigin {
+    return this.dataSourceOrigin;
+  }
+
+  public setDataSourceOrigin(origin: DataSourceOrigin, message?: string): void {
+    this.dataSourceOrigin = origin;
+    if (message) {
+      this.detailMessage = message;
+    }
+    this.notify();
   }
 
   public getQueue(): SyncQueueItem[] {

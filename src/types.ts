@@ -1,5 +1,7 @@
 export type Role = 'admin' | 'guest';
 
+export type DataSourceOrigin = 'cloud' | 'local_fallback' | 'cloud_loading';
+
 export interface AuditHistoryEntry {
   id: string;
   status: 'OK' | 'MISSING';

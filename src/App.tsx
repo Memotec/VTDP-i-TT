@@ -4,10 +4,10 @@ import {
   Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode
+  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud
 } from 'lucide-react';
 
-import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType } from './types.ts';
+import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
 import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
 import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
@@ -26,6 +26,18 @@ import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
+import {
+  testFirestoreConnection,
+  batchSaveInventoryToFirestore,
+  saveDispatchedRecordToFirestore,
+  saveAuditLogToFirestore,
+  saveCategoriesToFirestore,
+  subscribeToInventory,
+  subscribeToDispatchedRecords,
+  subscribeToAuditLogs,
+  getInventoryFromFirestore,
+  getDispatchedRecordsFromFirestore
+} from './services/firebaseFirestoreService.ts';
 
 // Lazy-loaded modals and tabs for bundle size optimization and high performance
 const PrintPreviewModal = React.lazy(() => import('./components/PrintPreviewModal.tsx').then(m => ({ default: m.PrintPreviewModal })));
@@ -213,12 +225,20 @@ export default function App() {
 
   // Cloud Sync configurations
   const [syncConfig, setSyncConfig] = useState<SyncConfig>(() => {
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec';
     const savedUrl = localStorage.getItem('cns_sync_url');
     const savedAutoSync = localStorage.getItem('cns_auto_sync');
     const savedAutoSync30s = localStorage.getItem('cns_auto_sync_30s');
     const savedAutoSyncInterval = localStorage.getItem('cns_auto_sync_interval');
     const savedAutoLoad = localStorage.getItem('cns_auto_load_startup');
-    const targetUrl = (savedUrl && savedUrl.trim()) ? savedUrl.trim() : 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec';
+    
+    let targetUrl = DEFAULT_GAS_URL;
+    if (savedUrl && savedUrl.trim() && !savedUrl.includes('AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f')) {
+      targetUrl = savedUrl.trim();
+    } else {
+      localStorage.setItem('cns_sync_url', DEFAULT_GAS_URL);
+    }
+
     return {
       webAppUrl: targetUrl,
       autoSync: savedAutoSync !== 'false', // Enabled bidirectional auto-sync
@@ -230,6 +250,10 @@ export default function App() {
   });
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncStatusDetail, setSyncStatusDetail] = useState('');
+  const [dataSourceOrigin, setDataSourceOrigin] = useState<DataSourceOrigin>('cloud_loading');
+  const [isCloudFirstLoading, setIsCloudFirstLoading] = useState<boolean>(true);
+  const [cloudFirstError, setCloudFirstError] = useState<string | null>(null);
+  const [showFallbackBanner, setShowFallbackBanner] = useState<boolean>(true);
 
   const handleConflictResolved = (conflictId: string, choice: 'keep_local' | 'keep_cloud', resolvedItem: InventoryItem) => {
     const updatedInv = inventory.map(item => item.id === resolvedItem.id ? resolvedItem : item);
@@ -462,6 +486,52 @@ export default function App() {
     syncService.configure(syncConfig.webAppUrl, currentUsername || 'guest');
   }, [syncConfig.webAppUrl, currentUsername]);
 
+  // Firebase Firestore Connection & Realtime Synchronization
+  useEffect(() => {
+    // 1. Test connection to Firestore on boot
+    testFirestoreConnection().catch(err => {
+      console.warn('Firebase Firestore test connection:', err);
+    });
+
+    // 2. Realtime listener for Inventory from Firestore
+    const unsubInv = subscribeToInventory(
+      (firestoreItems) => {
+        if (firestoreItems && firestoreItems.length > 0) {
+          setInventory(prev => {
+            // Merge with local items if local was empty or older
+            if (prev.length === 0) {
+              LocalDatabase.saveInventory(firestoreItems);
+              return firestoreItems;
+            }
+            return prev;
+          });
+        }
+      },
+      (err) => console.warn('Firestore inventory listener:', err)
+    );
+
+    // 3. Realtime listener for Dispatched Records from Firestore
+    const unsubRecords = subscribeToDispatchedRecords(
+      (firestoreRecords) => {
+        if (firestoreRecords && firestoreRecords.length > 0) {
+          setDispatchedRecords(prev => {
+            if (prev.length === 0) {
+              LocalDatabase.saveDispatchedRecords(firestoreRecords);
+              return firestoreRecords;
+            }
+            return prev;
+          });
+        }
+      },
+      (err) => console.warn('Firestore dispatched listener:', err)
+    );
+
+    return () => {
+      unsubInv();
+      unsubRecords();
+    };
+  }, []);
+
   // Subscribe to SyncService notifications & conflict events
   useEffect(() => {
     const unsub = syncService.subscribe(syncState => {
@@ -481,6 +551,8 @@ export default function App() {
     setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
     // Automatically trigger debounced push to Cloud Google Sheet
     syncService.scheduleDebouncedPush();
+    // Also sync to Firebase Firestore in background
+    batchSaveInventoryToFirestore(newInv).catch(err => console.warn('Firestore batch save:', err));
   };
 
   const saveDispatchedRecordsLocally = (newRecords: DispatchedRecord[]) => {
@@ -488,6 +560,10 @@ export default function App() {
     LocalDatabase.saveDispatchedRecords(newRecords);
     // Automatically trigger debounced push to Cloud Google Sheet
     syncService.scheduleDebouncedPush();
+    // Also sync to Firebase Firestore in background
+    newRecords.forEach(rec => {
+      saveDispatchedRecordToFirestore(rec).catch(err => console.warn('Firestore record save:', err));
+    });
   };
 
   const saveAuditLogsLocally = (newLogs: SystemAuditLogEntry[]) => {
@@ -496,6 +572,10 @@ export default function App() {
       localStorage.setItem('cns_system_audit_logs_v1', JSON.stringify(newLogs));
     } catch (err) {
       console.warn('Audit logs save error:', err);
+    }
+    // Sync latest audit log to Firestore
+    if (newLogs.length > 0) {
+      saveAuditLogToFirestore(newLogs[0]).catch(err => console.warn('Firestore audit log save:', err));
     }
   };
 
@@ -772,6 +852,8 @@ export default function App() {
     localStorage.setItem('cns_categories_v30', JSON.stringify(newCats));
     // Automatically trigger debounced push to Cloud Google Sheet
     syncService.scheduleDebouncedPush();
+    // Sync to Firestore
+    saveCategoriesToFirestore(newCats).catch(err => console.warn('Firestore categories save:', err));
   };
 
   const lowStockItems = useMemo(() => {
@@ -1297,42 +1379,133 @@ export default function App() {
     return true;
   };
 
-  // Cloud Sync
-  const fetchCloudData = async (targetUrl?: string, isSilent: boolean = false) => {
+  // --- CLOUD-FIRST PRIORITY DATA LOADING STRATEGY ---
+  // "ưu tiên đồng bộ, tải dữ liệu từ Cloud trước nếu thất bại sẽ đồng bộ Local"
+  const handleFallbackToLocal = (reason: string, isSilent: boolean = false, isStartup: boolean = false) => {
+    // 1. Retrieve data safely from LocalStorage / LocalDatabase
+    const localInv = LocalDatabase.getInventory();
+    if (localInv && localInv.length > 0) {
+      setInventory(localInv);
+    } else {
+      const rawLocal = localStorage.getItem('cns_inventory_v30_stable');
+      if (rawLocal) {
+        try {
+          const parsed = JSON.parse(rawLocal);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setInventory(parsed);
+          }
+        } catch {
+          setInventory(INITIAL_INVENTORY);
+        }
+      } else {
+        setInventory(INITIAL_INVENTORY);
+        LocalDatabase.saveInventory(INITIAL_INVENTORY);
+      }
+    }
+
+    const localDispatched = LocalDatabase.getDispatchedRecords();
+    if (localDispatched && localDispatched.length > 0) {
+      setDispatchedRecords(localDispatched);
+    }
+
+    // 2. Set State to local_fallback
+    setDataSourceOrigin('local_fallback');
+    setCloudFirstError(reason);
+    setShowFallbackBanner(true);
+    setIsCloudFirstLoading(false);
+    syncService.setDataSourceOrigin('local_fallback', `Đang dùng dữ liệu Local dự phòng (${reason})`);
+    setSyncStatus('idle');
+    setSyncStatusDetail(`Đã kích hoạt Local dự phòng: ${reason}`);
+
+    // 3. User feedback
+    if (!isSilent) {
+      addToast(`Tải từ Cloud không thành công (${reason}). Hệ thống đã tự động chuyển sang nạp dữ liệu từ Local an toàn!`, 'info');
+      playScanBeep(300, 0.25);
+    }
+
+    // 4. Audit Log entry for traceability
+    const nowStr = new Date().toLocaleString('vi-VN');
+    const auditEntry: SystemAuditLogEntry = {
+      id: `audit_fallback_${Date.now()}`,
+      timestamp: nowStr,
+      actionType: 'CLOUD_AUTO_SYNC',
+      actionTitle: 'Kích hoạt Chế độ Đồng bộ Local Dự Phòng (Fallback)',
+      performedBy: currentUsername || 'system',
+      performedByName: currentUsername === 'admin' ? 'Quản Trị Viên' : 'Kỹ Sư Trực Ban',
+      userRole: role,
+      details: `Không thể kết nối tải dữ liệu từ Cloud (${reason}). Hệ thống tự động kích hoạt đồng bộ dữ liệu từ bộ nhớ Local an toàn.`
+    };
+    setAuditLogs(prev => {
+      const updated = [auditEntry, ...prev.slice(0, 499)];
+      try {
+        localStorage.setItem('cns_system_audit_logs_v1', JSON.stringify(updated));
+      } catch { /* ignore storage errors */ }
+      return updated;
+    });
+  };
+
+  // Cloud Sync with Cloud-First Priority and Local Fallback
+  const fetchCloudData = async (targetUrl?: string, isSilent: boolean = false, isStartup: boolean = false) => {
     // Guard against concurrent execution
     if (syncStatus === 'syncing' || syncService.getState().globalStatus === 'syncing') {
       return;
     }
+
+    setIsCloudFirstLoading(true);
+    setCloudFirstError(null);
+    syncService.setDataSourceOrigin('cloud_loading', 'Đang ưu tiên đồng bộ & tải dữ liệu từ Cloud...');
+    setSyncStatus('syncing');
+    setSyncStatusDetail('Đang ưu tiên kết nối và tải dữ liệu từ Cloud...');
+
+    // If offline, fallback to local immediately
     if (!navigator.onLine) {
-      if (!isSilent) {
-        setSyncStatus('idle');
-        setSyncStatusDetail('Ngoại tuyến (Offline). Trình duyệt lưu trữ cục bộ.');
-        addToast('Không có mạng để tải dữ liệu từ Cloud!', 'info');
-      }
+      handleFallbackToLocal('Thiết bị đang Ngoại tuyến (Offline). Không có kết nối mạng tới Cloud.', isSilent, isStartup);
       return;
     }
 
     const activeUrl = (targetUrl || syncConfig.webAppUrl || '').trim();
-    if (!activeUrl || !activeUrl.startsWith('http')) {
-      if (!isSilent) {
-        addToast('Đường dẫn Google Apps Script chưa được cấu hình!', 'error');
+    let cloudSuccess = false;
+    let cloudItems: InventoryItem[] = [];
+    let cloudDispatched: DispatchedRecord[] = [];
+    let failureReason = '';
+
+    // Priority 1: Google Apps Script Web App / Google Sheets Cloud
+    if (activeUrl && activeUrl.startsWith('http')) {
+      try {
+        const res = await CloudService.pullFromCloud(activeUrl);
+        if (res.success && (res.items || res.dispatched)) {
+          cloudItems = res.items || [];
+          cloudDispatched = res.dispatched || [];
+          cloudSuccess = true;
+        } else {
+          failureReason = res.error || 'Google Apps Script không phản hồi dữ liệu hợp lệ';
+        }
+      } catch (err: unknown) {
+        failureReason = err instanceof Error ? err.message : 'Lỗi kết nối Google Sheets Cloud';
       }
-      return;
+    } else {
+      failureReason = 'Chưa cấu hình URL Google Apps Script Web App';
     }
 
-    setSyncStatus('syncing');
-    setSyncStatusDetail('Đang kết nối Google Sheets Cloud...');
-
-    try {
-      const res = await CloudService.pullFromCloud(activeUrl);
-
-      if (!res.success) {
-        throw new Error(res.error || 'Yêu cầu dữ liệu thất bại từ Google Apps Script.');
+    // Priority 1b: Secondary cloud tier - Firebase Firestore if Apps Script failed or empty
+    if (!cloudSuccess || (cloudItems.length === 0 && cloudDispatched.length === 0)) {
+      try {
+        const firestoreItems = await getInventoryFromFirestore();
+        const firestoreDispatched = await getDispatchedRecordsFromFirestore();
+        if (firestoreItems.length > 0 || firestoreDispatched.length > 0) {
+          cloudItems = firestoreItems.length > 0 ? firestoreItems : cloudItems;
+          cloudDispatched = firestoreDispatched.length > 0 ? firestoreDispatched : cloudDispatched;
+          cloudSuccess = true;
+        }
+      } catch (fsErr) {
+        console.warn('Firestore fallback fetch failed:', fsErr);
       }
+    }
 
+    // Process Cloud Result
+    if (cloudSuccess && (cloudItems.length > 0 || cloudDispatched.length > 0)) {
       // Sync dispatched records if returned by Cloud
-      if (res.dispatched && Array.isArray(res.dispatched) && res.dispatched.length > 0) {
-        const cloudDispatched = res.dispatched;
+      if (cloudDispatched.length > 0) {
         const existingDispatched = LocalDatabase.getDispatchedRecords();
         const existingMap = new Map(existingDispatched.map(d => [d.id, d]));
         let hasNewDispatch = false;
@@ -1349,114 +1522,117 @@ export default function App() {
         }
       }
 
-      const cloudItems = res.items;
-      if (cloudItems && Array.isArray(cloudItems)) {
-        if (cloudItems.length > 0) {
-          const currentLocal = LocalDatabase.getInventory();
-          const pendingQueue = syncService.getQueue();
-          const pendingEntityIds = new Set(
-            pendingQueue
-              .filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing')
-              .map(q => q.entityId)
-          );
+      if (cloudItems.length > 0) {
+        const currentLocal = LocalDatabase.getInventory();
+        const pendingQueue = syncService.getQueue();
+        const pendingEntityIds = new Set(
+          pendingQueue
+            .filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing')
+            .map(q => q.entityId)
+        );
 
-          // Run conflict check with existing local inventory
-          const detectedConflicts = syncService.checkForConflicts(cloudItems, currentLocal);
-          if (detectedConflicts.length > 0) {
-            setConflicts(detectedConflicts);
-            setIsConflictModalOpen(true);
-            if (!isSilent) {
-              addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
-            }
+        // Run conflict check with existing local inventory
+        const detectedConflicts = syncService.checkForConflicts(cloudItems, currentLocal);
+        if (detectedConflicts.length > 0) {
+          setConflicts(detectedConflicts);
+          setIsConflictModalOpen(true);
+          if (!isSilent) {
+            addToast(`Phát hiện ${detectedConflicts.length} xung đột dữ liệu giữa Cloud và Local!`, 'error');
           }
+        }
 
-          const conflictIds = new Set(detectedConflicts.map(c => c.entityId));
-          const localMapById = new Map<string, InventoryItem>();
-          const localMapBySn = new Map<string, InventoryItem>();
+        const conflictIds = new Set(detectedConflicts.map(c => c.entityId));
+        const localMapById = new Map<string, InventoryItem>();
+        const localMapBySn = new Map<string, InventoryItem>();
 
-          currentLocal.forEach(item => {
-            localMapById.set(item.id, item);
-            if (item.sn) {
-              localMapBySn.set(item.sn.trim().toLowerCase(), item);
-            }
-          });
+        currentLocal.forEach(item => {
+          localMapById.set(item.id, item);
+          if (item.sn) {
+            localMapBySn.set(item.sn.trim().toLowerCase(), item);
+          }
+        });
 
-          const merged: InventoryItem[] = [];
-          const matchedLocalIds = new Set<string>();
+        const merged: InventoryItem[] = [];
+        const matchedLocalIds = new Set<string>();
 
-          // Process each cloud item with conflict, pending, and ID/SN match checks
-          cloudItems.forEach(cloudItem => {
-            const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
-            const localMatch = localMapById.get(cloudItem.id) || (cleanSn ? localMapBySn.get(cleanSn) : undefined);
+        // Process each cloud item with conflict, pending, and ID/SN match checks
+        cloudItems.forEach(cloudItem => {
+          const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
+          const localMatch = localMapById.get(cloudItem.id) || (cleanSn ? localMapBySn.get(cleanSn) : undefined);
 
-            if (localMatch) {
-              matchedLocalIds.add(localMatch.id);
+          if (localMatch) {
+            matchedLocalIds.add(localMatch.id);
 
-              if (conflictIds.has(localMatch.id)) {
-                // Keep local until user explicitly resolves conflict in modal
-                merged.push(localMatch);
-              } else if (pendingEntityIds.has(localMatch.id) || localMatch.syncStatus === 'pending' || localMatch.syncStatus === 'syncing') {
-                // Local has unpushed edits! DO NOT overwrite with older cloud snapshot!
-                merged.push(localMatch);
-              } else {
-                // Cloud wins: adopt cloud data while retaining local audit history if cloud history is empty
-                merged.push({
-                  ...cloudItem,
-                  id: localMatch.id, // Preserve consistent local ID
-                  history: (cloudItem.history && cloudItem.history.length > 0) ? cloudItem.history : (localMatch.history || []),
-                  syncStatus: 'synced'
-                });
-              }
+            if (conflictIds.has(localMatch.id)) {
+              // Keep local until user explicitly resolves conflict in modal
+              merged.push(localMatch);
+            } else if (pendingEntityIds.has(localMatch.id) || localMatch.syncStatus === 'pending' || localMatch.syncStatus === 'syncing') {
+              // Local has unpushed edits! DO NOT overwrite with older cloud snapshot!
+              merged.push(localMatch);
             } else {
-              // Brand new item from cloud
+              // Cloud wins: adopt cloud data while retaining local audit history if cloud history is empty
               merged.push({
                 ...cloudItem,
+                id: localMatch.id, // Preserve consistent local ID
+                history: (cloudItem.history && cloudItem.history.length > 0) ? cloudItem.history : (localMatch.history || []),
                 syncStatus: 'synced'
               });
             }
-          });
-
-          // Retain local items not present in cloud to prevent accidental data deletion
-          currentLocal.forEach(localItem => {
-            if (!matchedLocalIds.has(localItem.id)) {
-              merged.push(localItem);
-            }
-          });
-
-          const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-          // Performance optimization: only re-save and trigger React re-render if items actually changed
-          const hasActualChanges = !isInventoryEqual(currentLocal, merged);
-          if (hasActualChanges) {
-            saveInventoryLocally(merged);
+          } else {
+            // Brand new item from cloud
+            merged.push({
+              ...cloudItem,
+              syncStatus: 'synced'
+            });
           }
+        });
 
-          setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
-          setSyncStatus('success');
-          setSyncStatusDetail(`Đã đồng bộ ${cloudItems.length} thiết bị từ Google Sheet (${nowStr}).${hasActualChanges ? ' Đã cập nhật thay đổi mới.' : ' Dữ liệu đã đồng nhất.'}`);
+        // Retain local items not present in cloud to prevent accidental data deletion
+        currentLocal.forEach(localItem => {
+          if (!matchedLocalIds.has(localItem.id)) {
+            merged.push(localItem);
+          }
+        });
 
-          if (!isSilent) {
-            addToast(`Đồng bộ thành công ${cloudItems.length} thiết bị từ Cloud!${hasActualChanges ? ' Có thay đổi mới.' : ' Dữ liệu đã cập nhật.'}`, 'success');
-            playScanBeep(1000, 0.2);
-          }
-        } else {
-          setSyncStatus('success');
-          setSyncStatusDetail('Kho Cloud hiện đang trống.');
-          if (!isSilent) {
-            addToast('Kho trên Cloud hiện đang trống!', 'info');
-          }
+        const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        // Performance optimization: only re-save and trigger React re-render if items actually changed
+        const hasActualChanges = !isInventoryEqual(currentLocal, merged);
+        if (hasActualChanges) {
+          saveInventoryLocally(merged);
+        }
+
+        setSyncConfig(prev => ({ ...prev, lastSynced: nowStr }));
+        setDataSourceOrigin('cloud');
+        syncService.setDataSourceOrigin('cloud', `Đã đồng bộ từ Cloud lúc ${nowStr}`);
+        setSyncStatus('success');
+        setSyncStatusDetail(`Ưu tiên Cloud thành công: Đã đồng bộ ${cloudItems.length} thiết bị từ Cloud (${nowStr}).${hasActualChanges ? ' Đã cập nhật thay đổi mới.' : ' Dữ liệu đã đồng nhất.'}`);
+        setIsCloudFirstLoading(false);
+
+        if (!isSilent) {
+          addToast(`Ưu tiên Cloud: Đã tải và đồng bộ thành công ${cloudItems.length} thiết bị từ Cloud!`, 'success');
+          playScanBeep(1000, 0.2);
+        }
+      } else {
+        setDataSourceOrigin('cloud');
+        syncService.setDataSourceOrigin('cloud', 'Kho trên Cloud hiện đang trống.');
+        setSyncStatus('success');
+        setSyncStatusDetail('Kho Cloud hiện đang trống.');
+        setIsCloudFirstLoading(false);
+        if (!isSilent) {
+          addToast('Kho trên Cloud hiện đang trống!', 'info');
         }
       }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi mạng không xác định.';
-      setSyncStatus('error');
-      setSyncStatusDetail(errorMsg);
-      if (!isSilent) {
-        addToast(`Lỗi tải dữ liệu từ Cloud: ${errorMsg}`, 'error');
-        playScanBeep(250, 0.3);
-      }
+    } else {
+      // Cloud Failed -> Trigger Fallback to Local
+      handleFallbackToLocal(failureReason || 'Không thể kết nối máy chủ Cloud', isSilent, isStartup);
     }
   };
+
+  // Automatic startup Cloud-First priority fetch
+  useEffect(() => {
+    fetchCloudData(undefined, false, true);
+  }, []);
 
   // Automatic 30-second background connection to Google Sheets Cloud to pull data
   useEffect(() => {
@@ -1464,19 +1640,14 @@ export default function App() {
 
     const intervalSec = syncConfig.autoSyncInterval && syncConfig.autoSyncInterval > 0 ? syncConfig.autoSyncInterval : 30;
 
-    // Initial fetch on page load if autoLoadOnStartup enabled
-    if (syncConfig.autoLoadOnStartup) {
-      fetchCloudData(undefined, true);
-    }
-
     const intervalId = setInterval(() => {
       if (navigator.onLine) {
-        fetchCloudData(undefined, true);
+        fetchCloudData(undefined, true, false);
       }
     }, intervalSec * 1000);
 
     return () => clearInterval(intervalId);
-  }, [syncConfig.autoSync30s, syncConfig.autoSyncInterval, syncConfig.webAppUrl, syncConfig.autoLoadOnStartup]);
+  }, [syncConfig.autoSync30s, syncConfig.autoSyncInterval, syncConfig.webAppUrl]);
 
   const syncToCloud = async () => {
     if (syncStatus === 'syncing' || syncService.getState().globalStatus === 'syncing') return;
@@ -2742,7 +2913,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#D2D3D6] dark:bg-[#1E2430] text-slate-100 flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-800 dark:text-slate-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
       {/* Toast notifications */}
       <div className="fixed top-6 right-6 z-[99999] flex flex-col gap-3 w-full max-w-sm">
         {toasts.map(t => (
@@ -2891,8 +3062,12 @@ export default function App() {
                 <Database className="w-5.5 h-5.5" />
               </div>
               <div className="min-w-0">
-                <h2 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white truncate">KHO DỰ PHÒNG CNS/ATM</h2>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Đội Thông Tin • TT BĐKT</p>
+                <h2 className="font-black text-xs uppercase tracking-wider px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-xs truncate inline-block">
+                  KHO DỰ PHÒNG CNS/ATM
+                </h2>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate mt-1">
+                  Kho vật tư dự phòng tại chỗ Đội TT • TT BĐKT
+                </p>
               </div>
             </div>
 
@@ -3091,6 +3266,7 @@ export default function App() {
                   onOpenSettings={() => setIsSettingsOpen(true)}
                   onOpenConflictModal={() => setIsConflictModalOpen(true)}
                   onOpenAppsScriptFix={() => setIsAppsScriptFixOpen(true)}
+                  onPullCloud={() => fetchCloudData(undefined, false, false)}
                 />
 
                 {/* Low Stock Warning Button */}
@@ -3527,6 +3703,73 @@ export default function App() {
 
           {/* Main Inventory Table & Actions */}
           <div className="mt-6">
+            {/* Cloud-First Loading Banner */}
+            {isCloudFirstLoading && (
+              <div className="mb-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs animate-pulse">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm font-bold text-blue-950 dark:text-blue-200">
+                      Đang ưu tiên đồng bộ & tải dữ liệu mới nhất từ Cloud...
+                    </p>
+                    <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                      Hệ thống tự động kết nối Google Sheets & Firestore Cloud để nạp bản ghi mới nhất.
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200 border border-blue-300/50 dark:border-blue-700/50">
+                  Ưu tiên Cloud
+                </span>
+              </div>
+            )}
+
+            {/* Local Fallback Active Banner */}
+            {!isCloudFirstLoading && dataSourceOrigin === 'local_fallback' && showFallbackBanner && (
+              <div className="mb-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                    <HardDrive className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-xs sm:text-sm text-amber-900 dark:text-amber-200">
+                        Chế độ Đồng bộ Local Dự Phòng (Fallback)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                        Local Database Hoạt Động
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                      Tải từ Cloud thất bại ({cloudFirstError || 'Không thể kết nối máy chủ Cloud'}).
+                      Hệ thống đã tự động bảo toàn và nạp cơ sở dữ liệu từ bộ nhớ Local trên máy. Mọi thao tác kiểm kê và sửa đổi đều an toàn và sẽ tự động đồng bộ lên Cloud khi có mạng.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => fetchCloudData(undefined, false, false)}
+                    disabled={isCloudFirstLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+                    title="Thử kết nối và nạp lại từ Cloud"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isCloudFirstLoading ? 'animate-spin' : ''}`} />
+                    <span>Thử lại Cloud</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFallbackBanner(false)}
+                    className="p-1.5 text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200 rounded-lg hover:bg-amber-200/50 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                    title="Đóng thông báo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {role !== 'admin' && (
               <div className="mb-4 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">

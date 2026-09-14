@@ -18,6 +18,7 @@ interface SyncStatusIndicatorProps {
   onOpenConflictModal?: () => void;
   onOpenSettings?: () => void;
   onOpenAppsScriptFix?: () => void;
+  onPullCloud?: () => void;
   className?: string;
 }
 
@@ -25,6 +26,7 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   onOpenConflictModal,
   onOpenSettings,
   onOpenAppsScriptFix,
+  onPullCloud,
   className = ''
 }) => {
   const [syncState, setSyncState] = useState<SyncServiceState>(syncService.getState());
@@ -65,10 +67,10 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   } = syncState;
 
   // Determine badge styling based on requirements:
-  // 🟢 Đã đồng bộ, 🟡 Đang đồng bộ, 🟠 Chờ đồng bộ, 🔴 Thất bại, ⚪ Offline
+  // 🟢 Cloud đã đồng bộ, 🟡 Đang tải Cloud, 🟠 Local dự phòng, 🔴 Thất bại, ⚪ Offline
   let badgeBg = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
   let dotBg = 'bg-emerald-500';
-  let label = 'Đã đồng bộ';
+  let label = 'Cloud: Đã đồng bộ';
   let Icon = CheckCircle2;
 
   if (syncState.scriptErrorCode === 'NON_FROZEN_ROWS_EXCEPTION') {
@@ -81,11 +83,16 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
     dotBg = 'bg-slate-400';
     label = 'Ngoại tuyến (Offline)';
     Icon = CloudOff;
-  } else if (globalStatus === 'syncing') {
-    badgeBg = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
-    dotBg = 'bg-amber-500 animate-ping';
-    label = 'Đang đồng bộ...';
+  } else if (syncState.dataSourceOrigin === 'cloud_loading' || globalStatus === 'syncing') {
+    badgeBg = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+    dotBg = 'bg-blue-500 animate-ping';
+    label = 'Đang tải Cloud...';
     Icon = RefreshCw;
+  } else if (syncState.dataSourceOrigin === 'local_fallback') {
+    badgeBg = 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40 shadow-xs shadow-amber-500/10';
+    dotBg = 'bg-amber-500';
+    label = 'Local (Dự phòng)';
+    Icon = Layers;
   } else if (globalStatus === 'conflict') {
     badgeBg = 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30';
     dotBg = 'bg-purple-500 animate-pulse';
@@ -204,8 +211,63 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             </div>
           )}
 
+          {/* Data Source Strategy & Active Origin */}
+          <div className="mt-3 p-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                Chiến lược: Ưu tiên Cloud ➔ Local
+              </span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                syncState.dataSourceOrigin === 'cloud'
+                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                  : syncState.dataSourceOrigin === 'local_fallback'
+                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                  : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 animate-pulse'
+              }`}>
+                {syncState.dataSourceOrigin === 'cloud' ? 'Cloud Active' : syncState.dataSourceOrigin === 'local_fallback' ? 'Local Fallback' : 'Loading...'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {syncState.dataSourceOrigin === 'cloud' ? (
+                  <Cloud className="w-4 h-4 text-emerald-500 shrink-0" />
+                ) : syncState.dataSourceOrigin === 'local_fallback' ? (
+                  <Layers className="w-4 h-4 text-amber-500 shrink-0" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 truncate">
+                    {syncState.dataSourceOrigin === 'cloud'
+                      ? 'Nguồn Cloud: Google Sheets / Firestore'
+                      : syncState.dataSourceOrigin === 'local_fallback'
+                      ? 'Nguồn Local: Bộ nhớ máy (Dự phòng an toàn)'
+                      : 'Đang kết nối & tải từ Cloud...'}
+                  </p>
+                </div>
+              </div>
+
+              {onPullCloud && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onPullCloud();
+                  }}
+                  disabled={globalStatus === 'syncing'}
+                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-lg text-[10px] transition-colors shrink-0 shadow-xs cursor-pointer flex items-center gap-1"
+                  title="Ưu tiên tải lại dữ liệu mới nhất từ Cloud"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Tải Cloud</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Status Metrics */}
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-2 gap-2 mt-2.5">
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
               <span className="text-[10px] font-semibold text-slate-400 uppercase block">Chờ Đồng Bộ</span>
               <span className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1 mt-0.5">

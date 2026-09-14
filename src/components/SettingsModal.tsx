@@ -21,11 +21,16 @@ import {
   Copy,
   ChevronDown,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Flame,
+  Radio,
+  Server
 } from 'lucide-react';
 import { SyncConfig, StorageConfig } from '../types.ts';
 import { playScanBeep } from '../utils/audio.ts';
 import { APPS_SCRIPT_SOURCE_CODE } from './AppsScriptFixModal.tsx';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { testFirestoreConnection } from '../firebase.ts';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -72,10 +77,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenGoogleDriveModal,
   onAddToast
 }) => {
-  const [activeTab, setActiveTab] = useState<'STORAGE' | 'CLOUD' | 'CATEGORIES'>('STORAGE');
+  const [activeTab, setActiveTab] = useState<'STORAGE' | 'CLOUD' | 'FIREBASE' | 'CATEGORIES'>('STORAGE');
   const [justSaved, setJustSaved] = useState(false);
   const [showScriptCode, setShowScriptCode] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [testingFirebase, setTestingFirebase] = useState(false);
+  const [firebaseStatus, setFirebaseStatus] = useState<'connected' | 'checking' | 'idle'>('idle');
 
   if (!isOpen) return null;
 
@@ -238,6 +245,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Cloud className="w-3.5 h-3.5" />
             <span>Google Sheets Cloud</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('FIREBASE')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'FIREBASE'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-300" />
+            <span>Firebase Firestore</span>
           </button>
 
           <button
@@ -902,6 +922,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className={`font-bold ${storageConfig.autoBackup24h !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
                     {storageConfig.autoBackup24h !== false ? 'Đang kích hoạt' : 'Tạm tắt'}
                   </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: FIREBASE FIRESTORE */}
+          {activeTab === 'FIREBASE' && (
+            <div className="space-y-4 animate-fade-in">
+              {/* Header Status Card */}
+              <div className="p-4 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-slate-50 dark:from-amber-950/40 dark:via-slate-900/60 dark:to-slate-800/60 border border-amber-200 dark:border-amber-900/50 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Flame className="w-5 h-5 text-amber-500" />
+                    <div>
+                      <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">
+                        Firebase Cloud Firestore
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Cơ sở dữ liệu đám mây thời gian thực & đồng bộ đa thiết bị
+                      </span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    <Radio className="w-3 h-3 animate-pulse" /> ĐÃ KẾT NỐI
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-xs">
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Firebase Project ID</span>
+                    <strong className="font-mono text-slate-800 dark:text-white text-xs block truncate">
+                      {firebaseConfig.projectId}
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Firestore Database ID</span>
+                    <strong className="font-mono text-slate-800 dark:text-white text-xs block truncate">
+                      {firebaseConfig.firestoreDatabaseId}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Operations & Ping Card */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
+                <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">
+                  Kiểm tra & Vận hành Firestore
+                </span>
+                
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled={testingFirebase}
+                    onClick={async () => {
+                      setTestingFirebase(true);
+                      setFirebaseStatus('checking');
+                      const ok = await testFirestoreConnection();
+                      setTestingFirebase(false);
+                      if (ok) {
+                        setFirebaseStatus('connected');
+                        onAddToast('Kết nối Firebase Firestore thành công & hoạt động hoàn hảo!', 'success');
+                        playScanBeep(1000, 0.15);
+                      } else {
+                        onAddToast('Không thể kết nối Firebase Firestore. Vui lòng kiểm tra lại mạng.', 'error');
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${testingFirebase ? 'animate-spin' : ''}`} />
+                    <span>{testingFirebase ? 'Đang kiểm tra kết nối...' : 'Kiểm tra kết nối Firestore (Ping)'}</span>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                    <Server className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Cấu hình tự động đồng bộ (Auto Real-time Sync):</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 pl-1 text-[10.5px] text-slate-500 dark:text-slate-400">
+                    <li>Dữ liệu kho vật tư (Inventory) được lưu tự động trên bộ sưu tập <code className="font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">inventory</code>.</li>
+                    <li>Sổ theo dõi & phiếu xuất sử dụng lưu trên <code className="font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">dispatchedRecords</code>.</li>
+                    <li>Nhật ký kiểm kê và an toàn lưu trên <code className="font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">auditLogs</code>.</li>
+                  </ul>
                 </div>
               </div>
             </div>

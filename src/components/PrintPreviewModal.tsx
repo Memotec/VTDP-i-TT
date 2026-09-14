@@ -82,7 +82,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   const [recipientEmail, setRecipientEmail] = useState('TAILIEUTBTT@gmail.com');
   const [reportSubject, setReportSubject] = useState(() => `[BÁO CÁO TỒN KHO CNS/ATM] Tóm tắt kiểm kê vật tư - ${new Date().toLocaleDateString('vi-VN')}`);
   const [reportNoteDetail, setReportNoteDetail] = useState('');
-  const [gasApiEndpoint, setGasApiEndpoint] = useState(() => syncConfig?.webAppUrl || 'https://script.google.com/macros/s/AKfycby4frQYvyEuzbVS7rctYDaxHDhSlEzNmTgYXavWzi0ROJLYEqhfwBd1QRX4v6dVU05f/exec');
+  const [gasApiEndpoint, setGasApiEndpoint] = useState(() => syncConfig?.webAppUrl || 'https://script.google.com/macros/s/AKfycbwPYEY6_0ng5msNsNrddYbvkYKx3NNIDWWNbxDxCwkMw0GdtCYEMFsE0hfJVROWsVcs/exec');
   const [sendingState, setSendingState] = useState<'idle' | 'preparing_pdf' | 'calling_gas' | 'success' | 'error'>('idle');
   const [copiedId, setCopiedId] = useState(false);
   const [sendReceipt, setSendReceipt] = useState<{

@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "CNS/ATM spare parts and equipment items in warehouse",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "pn": { "type": "string" },
+        "sn": { "type": "string" },
+        "warehouse": { "type": "string" },
+        "loc": { "type": "string" },
+        "qty": { "type": "number" },
+        "auditStatus": { "type": "string" },
+        "auditDate": { "type": "string" },
+        "auditNote": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "imagePrompt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "name", "sn", "qty", "category"]
+    },
+    "DispatchedRecord": {
+      "title": "DispatchedRecord",
+      "description": "Usage slips and handover records for equipment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "docNumber": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "category": { "type": "string" },
+        "sn": { "type": "string" },
+        "pn": { "type": "string" },
+        "qty": { "type": "number" },
+        "unit": { "type": "string" },
+        "date": { "type": "string" },
+        "warehouse": { "type": "string" },
+        "originalLoc": { "type": "string" },
+        "receiverName": { "type": "string" },
+        "targetLocation": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "type", "itemName", "sn", "qty", "receiverName", "targetLocation", "purpose", "status"]
+    },
+    "SystemAuditLogEntry": {
+      "title": "SystemAuditLogEntry",
+      "description": "Log of actions taken in the inventory management system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "actionType": { "type": "string" },
+        "actionTitle": { "type": "string" },
+        "performedBy": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "actionType", "actionTitle", "performedBy", "details"]
+    },
+    "AppMetadata": {
+      "title": "AppMetadata",
+      "description": "Application settings and metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "categories": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Equipment inventory items"
+    },
+    "/dispatchedRecords/{recordId}": {
+      "schema": "DispatchedRecord",
+      "description": "Dispatched usage and handover records"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "SystemAuditLogEntry",
+      "description": "System activity and audit logs"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppMetadata",
+      "description": "Shared categories and system configuration"
+    }
+  }
+}

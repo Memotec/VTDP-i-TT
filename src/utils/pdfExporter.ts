@@ -616,3 +616,58 @@ export async function exportAuditReportToPDF(
   const fileName = `BienBan_KiemKe_Kho_${auditDate.replace(/[\/\\]/g, '-')}.pdf`;
   await renderHtmlToPdf(html, fileName);
 }
+
+/**
+ * Universal safe print runner:
+ * Handles popup blockers & iframe sandboxes gracefully by falling back to a hidden iframe.
+ */
+export function safePrintHtml(htmlContent: string): boolean {
+  try {
+    const win = window.open('', '_blank');
+    if (win && win.document) {
+      win.document.open();
+      win.document.write(htmlContent);
+      win.document.close();
+      return true;
+    }
+  } catch (e) {
+    console.warn('window.open blocked, falling back to hidden iframe:', e);
+  }
+
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.zIndex = '-9999';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (printErr) {
+          console.error('Hidden iframe print error:', printErr);
+        }
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }, 500);
+      return true;
+    }
+  } catch (iframeErr) {
+    console.error('Print iframe fallback failed:', iframeErr);
+  }
+  return false;
+}

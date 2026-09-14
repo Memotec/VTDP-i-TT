@@ -26,6 +26,7 @@ import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
+import { safePrintHtml } from './utils/pdfExporter.ts';
 import {
   testFirestoreConnection,
   batchSaveInventoryToFirestore,
@@ -1854,11 +1855,6 @@ export default function App() {
       addToast('Danh sách thiết bị bàn giao đang trống!', 'error');
       return;
     }
-    const win = window.open('', '_blank');
-    if (!win) {
-      addToast('Vui lòng cho phép popup mới!', 'error');
-      return;
-    }
 
     const rowsHtml = handoverRows.map((row, idx) => `
       <tr>
@@ -1873,7 +1869,7 @@ export default function App() {
       </tr>
     `).join('');
 
-    win.document.write(`
+    const html = `
       <html>
         <head>
           <title>BIÊN BẢN GIAO NHẬN TÀI SẢN CÔNG CỤ - ${handoverNo}</title>
@@ -2001,18 +1997,13 @@ export default function App() {
           <script>window.onload = function() { window.print(); }<\/script>
         </body>
       </html>
-    `);
-    win.document.close();
+    `;
+
+    safePrintHtml(html);
     addToast('Đã khởi tạo in biên bản bàn giao thành công!', 'success');
   };
 
   const handlePrintUsageSlip = (slip: UsageSlip) => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      addToast('Vui lòng cho phép popup mới!', 'error');
-      return;
-    }
-
     const now = new Date();
     let printDay = String(now.getDate()).padStart(2, '0');
     let printMonth = String(now.getMonth() + 1).padStart(2, '0');
@@ -2035,7 +2026,7 @@ export default function App() {
     const receiverDept = slip.receiverDept || 'Tổ Vận Hành CNS/ATM';
     const receiverPos = slip.receiverPos || 'Kỹ sư trực ban / Khai thác';
 
-    win.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -2368,8 +2359,9 @@ export default function App() {
           <\/script>
         </body>
       </html>
-    `);
-    win.document.close();
+    `;
+
+    safePrintHtml(html);
     addToast(`Đã xuất phiếu báo sử dụng chuẩn form (${slip.sn})!`, 'success');
   };
 
@@ -2705,12 +2697,7 @@ export default function App() {
       handlePrintUsageSlip(slip);
     } else {
       // Handover doc print
-      const win = window.open('', '_blank');
-      if (!win) {
-        addToast('Vui lòng cho phép popup mới!', 'error');
-        return;
-      }
-      win.document.write(`
+      const html = `
         <html>
           <head>
             <title>BIÊN BẢN BÀN GIAO THIẾT BỊ - ${record.docNumber}</title>
@@ -2857,20 +2844,14 @@ export default function App() {
             <script>window.onload = function() { window.print(); }<\/script>
           </body>
         </html>
-      `);
-      win.document.close();
+      `;
+      safePrintHtml(html);
       addToast(`Đã in biên bản bàn giao ${record.docNumber}!`, 'success');
     }
   };
 
   // Print all Dispatched Records Registry
   const handlePrintDispatchedRegistry = () => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      addToast('Vui lòng cho phép popup mới!', 'error');
-      return;
-    }
-
     const todayStr = new Date().toLocaleDateString('vi-VN');
     const rowsHtml = dispatchedRecords.map((r, idx) => `
       <tr>
@@ -2886,7 +2867,7 @@ export default function App() {
       </tr>
     `).join('');
 
-    win.document.write(`
+    const html = `
       <html>
         <head>
           <title>SỔ TỔNG HỢP THEO DÕI THIẾT BỊ BÀN GIAO & SỬ DỤNG</title>
@@ -2958,8 +2939,9 @@ export default function App() {
           <script>window.onload = function() { window.print(); }<\/script>
         </body>
       </html>
-    `);
-    win.document.close();
+    `;
+
+    safePrintHtml(html);
     addToast('Đã khởi tạo in Sổ Theo Dõi Bàn Giao & Sử Dụng!', 'success');
   };
 

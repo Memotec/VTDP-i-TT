@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Layers, MapPin, AlertCircle, Clock, CheckSquare, XCircle,
   History, FileText, Edit, Trash2, Camera, Box, Download, Plus,
@@ -45,12 +45,34 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
     }, 1800);
   };
 
-  const totalQty = filteredInventory.reduce((s, i) => s + (Number(i.qty) || 0), 0);
-  const okCount = filteredInventory.filter(i => i.auditStatus === 'OK').length;
-  const missingCount = filteredInventory.filter(i => i.auditStatus === 'MISSING').length;
-  const uncheckedCount = filteredInventory.filter(i => !i.auditStatus).length;
-  const lowStockCount = filteredInventory.filter(i => i.qty <= 1).length;
-  const auditPercent = filteredInventory.length > 0 ? Math.round(((okCount + missingCount) / filteredInventory.length) * 100) : 0;
+  const { totalQty, okCount, missingCount, uncheckedCount, lowStockCount, auditPercent } = useMemo(() => {
+    let tQty = 0;
+    let ok = 0;
+    let missing = 0;
+    let unchecked = 0;
+    let low = 0;
+
+    for (let i = 0; i < filteredInventory.length; i++) {
+      const item = filteredInventory[i];
+      const q = Number(item.qty) || 0;
+      tQty += q;
+      if (item.auditStatus === 'OK') ok++;
+      else if (item.auditStatus === 'MISSING') missing++;
+      else unchecked++;
+
+      if (q <= 1) low++;
+    }
+
+    const percent = filteredInventory.length > 0 ? Math.round(((ok + missing) / filteredInventory.length) * 100) : 0;
+    return {
+      totalQty: tQty,
+      okCount: ok,
+      missingCount: missing,
+      uncheckedCount: unchecked,
+      lowStockCount: low,
+      auditPercent: percent
+    };
+  }, [filteredInventory]);
 
   return (
     <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-[#E2E8F0] dark:border-slate-800 overflow-hidden shadow-xs flex flex-col min-h-[420px] w-full transition-all">

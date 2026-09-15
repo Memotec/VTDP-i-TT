@@ -26,62 +26,159 @@ interface HandoverMeta {
   handoverReceiverPos: string;
 }
 
-// Helper to render HTML to PDF via html2canvas + jsPDF
-async function renderHtmlToPdf(htmlContent: string, fileName: string, landscape = false) {
-  // Create temporary container
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.top = '-9999px';
-  container.style.left = '-9999px';
-  container.style.width = landscape ? '297mm' : '210mm';
-  container.style.backgroundColor = '#ffffff';
-  container.style.color = '#000000';
-  container.style.fontFamily = "'Times New Roman', Times, serif";
-  container.style.zIndex = '-9999';
-  container.innerHTML = htmlContent;
+// Helper to render HTML to PDF via html2canvas + jsPDF with isolated iframe environment
+async function renderHtmlToPdf(htmlContent: string, fileName: string, landscape = false): Promise<void> {
+  return new Promise<void>(async (resolve, reject) => {
+    // 1. Create a clean isolated iframe to completely isolate html2canvas from global Tailwind v4 OKLCH CSS
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '0';
+    iframe.style.top = '0';
+    iframe.style.width = landscape ? '1122px' : '794px';
+    iframe.style.height = '1200px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = 'none';
+    iframe.style.zIndex = '-99999';
+    document.body.appendChild(iframe);
 
-  document.body.appendChild(container);
+    try {
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!iframeDoc) {
+        throw new Error('Không thể khởi tạo môi trường render tài liệu');
+      }
 
-  try {
-    const canvas = await html2canvas(container, {
-      scale: 2, // High resolution
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff'
-    });
+      const cleanHtml = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Tài liệu xuất PDF</title>
+          <style>
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            html, body {
+              font-family: 'Times New Roman', Times, 'DejaVu Sans', serif;
+              background: #ffffff !important;
+              color: #000000 !important;
+              width: ${landscape ? '297mm' : '210mm'};
+              margin: 0 auto;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            table {
+              border-collapse: collapse;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="pdf-render-root">
+            ${htmlContent}
+          </div>
+        </body>
+        </html>
+      `;
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
-    const pdf = new jsPDF({
-      orientation: landscape ? 'landscape' : 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+      iframeDoc.open();
+      iframeDoc.write(cleanHtml);
+      iframeDoc.close();
 
-    const pdfWidth = landscape ? 297 : 210;
-    const pdfHeight = landscape ? 210 : 297;
+      // Allow DOM layout and fonts to settle
+      await new Promise(r => setTimeout(r, 250));
 
-    const imgWidth = pdfWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const targetEl = iframeDoc.getElementById('pdf-render-root') || iframeDoc.body;
 
-    let heightLeft = imgHeight;
-    let position = 0;
+      const canvas = await html2canvas(targetEl as HTMLElement, {
+        scale: 2, // High resolution for crisp text
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: landscape ? 1122 : 794,
+        scrollX: 0,
+        scrollY: 0
+      });
 
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight;
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Không thể xử lý đồ họa trang in');
+      }
 
-    while (heightLeft > 5) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
+      const pdf = new jsPDF({
+        orientation: landscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = landscape ? 297 : 210;
+      const pdfHeight = landscape ? 210 : 297;
+
+      // Slice the full-length canvas into exact A4-ratio page tiles
+      const pageCanvasHeightInPx = Math.floor((canvas.width * pdfHeight) / pdfWidth);
+      const totalPages = Math.ceil(canvas.height / pageCanvasHeightInPx);
+
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) {
+          pdf.addPage();
+        }
+
+        const sourceY = page * pageCanvasHeightInPx;
+        const currentSliceHeight = Math.min(pageCanvasHeightInPx, canvas.height - sourceY);
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pageCanvasHeightInPx;
+        const ctx = pageCanvas.getContext('2d');
+
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0,
+            sourceY,
+            canvas.width,
+            currentSliceHeight,
+            0,
+            0,
+            canvas.width,
+            currentSliceHeight
+          );
+
+          const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.96);
+          pdf.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        }
+      }
+
+      // Safe filename sanitize
+      const sanitizedFileName = (fileName || 'BaoCao_TaiLieu.pdf')
+        .replace(/[/\\?%*:|"<>]/g, '_');
+
+      pdf.save(sanitizedFileName);
+      resolve();
+    } catch (err) {
+      console.warn('Lỗi khi render PDF qua html2canvas:', err);
+      // Fallback: trigger print dialog if direct canvas fails
+      try {
+        const fallbackSuccess = safePrintHtml(htmlContent);
+        if (fallbackSuccess) {
+          resolve();
+          return;
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback in ấn thất bại:', fallbackErr);
+      }
+      reject(err);
+    } finally {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
     }
-
-    pdf.save(fileName);
-  } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
-  }
+  });
 }
 
 /**
@@ -703,7 +800,7 @@ export async function exportInventoryReportToPDF(
           ${item.qty}
         </td>
         <td style="border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center;">
-          <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: ${statusBg}; color: ${statusColor}; font-weight: bold; font-size: 8pt; border: 1px solid ${statusColor}33;">
+          <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: ${statusBg}; color: ${statusColor}; font-weight: bold; font-size: 8pt; border: 1px solid ${statusColor};">
             ${statusText}
           </span>
         </td>
@@ -841,12 +938,56 @@ export async function exportInventoryReportToPDF(
  * Handles popup blockers & iframe sandboxes gracefully by falling back to a hidden iframe.
  */
 export function safePrintHtml(htmlContent: string): boolean {
+  const fullDocument = `
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+      <meta charset="utf-8" />
+      <title>In Báo Cáo - Đội Thông Tin CNS</title>
+      <style>
+        @page {
+          size: A4 landscape;
+          margin: 8mm;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          font-family: 'Times New Roman', Times, 'DejaVu Sans', serif;
+          background: #ffffff !important;
+          color: #000000 !important;
+          margin: 0;
+          padding: 0;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        table {
+          border-collapse: collapse;
+        }
+      </style>
+    </head>
+    <body>
+      ${htmlContent}
+    </body>
+    </html>
+  `;
+
   try {
     const win = window.open('', '_blank');
     if (win && win.document) {
       win.document.open();
-      win.document.write(htmlContent);
+      win.document.write(fullDocument);
       win.document.close();
+      setTimeout(() => {
+        try {
+          win.focus();
+          win.print();
+        } catch (e) {
+          console.warn('win.print error:', e);
+        }
+      }, 400);
       return true;
     }
   } catch (e) {
@@ -867,7 +1008,7 @@ export function safePrintHtml(htmlContent: string): boolean {
     const doc = iframe.contentWindow?.document || iframe.contentDocument;
     if (doc) {
       doc.open();
-      doc.write(htmlContent);
+      doc.write(fullDocument);
       doc.close();
 
       setTimeout(() => {
@@ -881,7 +1022,7 @@ export function safePrintHtml(htmlContent: string): boolean {
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
           }
-        }, 3000);
+        }, 4000);
       }, 500);
       return true;
     }

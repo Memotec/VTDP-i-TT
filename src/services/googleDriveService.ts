@@ -8,13 +8,50 @@ export interface DriveFileItem {
   webViewLink?: string;
 }
 
+export const DEFAULT_DRIVE_FOLDER_ID = '1p-sDr3rX0HJNMpGSKIdGvw8B-_8dn0uE';
+export const DEFAULT_DRIVE_FOLDER_URL = 'https://drive.google.com/drive/folders/1p-sDr3rX0HJNMpGSKIdGvw8B-_8dn0uE?usp=sharing';
+
+export function getStoredDriveFolderId(): string {
+  const custom = localStorage.getItem('cns_drive_folder_id');
+  return custom && custom.trim() ? custom.trim() : DEFAULT_DRIVE_FOLDER_ID;
+}
+
+export function setStoredDriveFolderId(idOrUrl: string): string {
+  let cleanId = idOrUrl.trim();
+  // Extract folder ID if full drive URL is pasted
+  const folderMatch = cleanId.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch && folderMatch[1]) {
+    cleanId = folderMatch[1];
+  }
+  localStorage.setItem('cns_drive_folder_id', cleanId);
+  return cleanId;
+}
+
 const DRIVE_FOLDER_NAME = 'QLVT_Backup';
 
 /**
- * Find or create the default app backup folder on Google Drive
+ * Find or use the configured app backup folder on Google Drive
  */
 export async function getOrCreateAppFolder(accessToken: string): Promise<string> {
-  // Search for existing folder
+  const configuredId = getStoredDriveFolderId();
+  if (configuredId) {
+    // Check if the configured folder exists & is accessible
+    try {
+      const checkRes = await fetch(`https://www.googleapis.com/drive/v3/files/${configuredId}?fields=id,name,trashed`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (checkRes.ok) {
+        const folderInfo = await checkRes.json();
+        if (!folderInfo.trashed) {
+          return configuredId;
+        }
+      }
+    } catch (e) {
+      console.warn('Configured folder check failed, trying fallback search:', e);
+    }
+  }
+
+  // Fallback: Search for existing folder named QLVT_Backup
   const query = encodeURIComponent(`name = '${DRIVE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
   const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
   

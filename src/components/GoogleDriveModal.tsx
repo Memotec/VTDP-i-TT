@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, HardDrive, Upload, Download, Trash2, RefreshCw, CheckCircle2, 
   ExternalLink, LogIn, LogOut, FileText, FileSpreadsheet, ShieldAlert,
-  Folder, Loader2, Database
+  Folder, Loader2, Database, FolderCheck, Edit2, Check
 } from 'lucide-react';
 import { googleSignIn, googleLogout, initAuthListener, getAccessToken } from '../services/authService.ts';
 import { 
-  listDriveBackups, uploadToDrive, downloadFromDrive, deleteFromDrive, DriveFileItem 
+  listDriveBackups, uploadToDrive, downloadFromDrive, deleteFromDrive, DriveFileItem,
+  DEFAULT_DRIVE_FOLDER_ID, DEFAULT_DRIVE_FOLDER_URL, getStoredDriveFolderId, setStoredDriveFolderId
 } from '../services/googleDriveService.ts';
 import { InventoryItem, DispatchedRecord } from '../types.ts';
 
@@ -36,6 +37,11 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [restoringFileId, setRestoringFileId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  
+  // Configured Drive Folder
+  const [folderId, setFolderId] = useState<string>(() => getStoredDriveFolderId());
+  const [isEditingFolder, setIsEditingFolder] = useState(false);
+  const [inputFolder, setInputFolder] = useState(folderId);
 
   // Initialize Auth Listener
   useEffect(() => {
@@ -343,6 +349,68 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
                   )}
                   <span>Đăng nhập với Google</span>
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Target Google Drive Folder Card */}
+          <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-amber-900 dark:text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
+                <FolderCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                Thư mục sao lưu liên kết
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://drive.google.com/drive/folders/${folderId}?usp=sharing`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-100/60 dark:bg-amber-900/40 px-2 py-0.5 rounded-lg border border-amber-300/60 dark:border-amber-700"
+                >
+                  Mở Thư Mục <ExternalLink className="w-3 h-3" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingFolder(!isEditingFolder)}
+                  className="p-1 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-lg transition-all"
+                  title="Thay đổi thư mục đích"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {isEditingFolder ? (
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={inputFolder}
+                  onChange={(e) => setInputFolder(e.target.value)}
+                  placeholder="Dán link thư mục Drive hoặc Folder ID..."
+                  className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const savedId = setStoredDriveFolderId(inputFolder);
+                    setFolderId(savedId);
+                    setIsEditingFolder(false);
+                    onAddToast(`Đã lưu thư mục Google Drive: ${savedId}`, 'success');
+                    if (token) loadDriveFiles(token);
+                  }}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" /> Lưu
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-[11.5px] text-amber-950 dark:text-amber-100">
+                <span className="font-mono bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/80 truncate max-w-xs">
+                  ID: {folderId}
+                </span>
+                <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                  Tất cả bản sao lưu JSON & Excel sẽ lưu vào đây
+                </span>
               </div>
             )}
           </div>

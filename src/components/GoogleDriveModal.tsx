@@ -89,8 +89,11 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
         loadDriveFiles(result.accessToken);
       }
     } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user' || err?.message?.includes('popup-closed-by-user')) {
+        return;
+      }
       console.error('Đăng nhập thất bại:', err);
-      onAddToast(`Đăng nhập Google thất bại: ${err.message || 'Đã hủy'}`, 'error');
+      onAddToast(`Đăng nhập Google thất bại: ${err.message || 'Vui lòng thử lại'}`, 'error');
     } finally {
       setIsLoggingIn(false);
     }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, AuditStats, DispatchedRecord } from '../types.ts';
+import { getEquipmentLookupUrl } from '../utils/qrParser.ts';
 
 export type PrintLayoutType = 'NONE' | 'QR' | 'LABEL' | 'AUDIT_REPORT' | 'DISPATCH_REGISTRY' | 'DISPATCH_SINGLE_DOC';
 
@@ -70,7 +71,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
               <div key={item.id || idx} className="qr-print-card">
                 <div className="qr-code-wrapper">
                   <QRCodeSVG 
-                    value={item.warehouse || item.sn} 
+                    value={getEquipmentLookupUrl(item) || item.warehouse || item.sn} 
                     size={112} 
                     level="M"
                     includeMargin={false}
@@ -91,6 +92,9 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                     Vị trí: <strong>{item.loc}</strong> (SL: {item.qty})
                   </div>
                 )}
+                <div className="text-[9px] text-slate-500 font-sans mt-1">
+                  Quét bằng điện thoại để tra cứu
+                </div>
               </div>
             ))}
           </div>
@@ -152,7 +156,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                     {item.warehouse || item.sn ? (
                       <div className="label-qr-box">
                         <QRCodeSVG 
-                          value={item.warehouse || item.sn} 
+                          value={getEquipmentLookupUrl(item) || item.warehouse || item.sn} 
                           size={76} 
                           level="M"
                         />
@@ -170,7 +174,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
 
                 {/* Footer nhãn */}
                 <div className="label-footer">
-                  <span>Tem Quản Lý Tài Sản CNS • Ngày dán: {nowStr}</span>
+                  <span>Tem Quản Lý Tài Sản CNS • Quét QR tra cứu • {nowStr}</span>
                   <span className="font-bold">ĐỘI TT</span>
                 </div>
               </div>

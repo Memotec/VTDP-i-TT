@@ -105,6 +105,7 @@ export interface UsageSlip {
   giverName?: string;
   giverPos?: string;
   receiverDept?: string;
+  receiverName?: string;
   receiverPos?: string;
   purpose: string;
   notes?: string;

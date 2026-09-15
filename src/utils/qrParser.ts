@@ -39,7 +39,7 @@ export function parseScannedCode(raw: string): {
   if (str.startsWith('http://') || str.startsWith('https://')) {
     try {
       const url = new URL(str);
-      const params = ['sn', 'warehouse', 'id', 'pn', 'code', 'item'];
+      const params = ['lookup', 'qr', 'sn', 'warehouse', 'id', 'pn', 'code', 'item', 'q'];
       for (const p of params) {
         const val = url.searchParams.get(p);
         if (val) candidates.push(val.trim());
@@ -72,9 +72,12 @@ export function parseScannedCode(raw: string): {
 }
 
 export function findMatchingInventoryItems(
-  rawInput: string,
-  inventory: InventoryItem[]
+  arg1: string | InventoryItem[],
+  arg2: string | InventoryItem[]
 ): ScanMatchResult {
+  const rawInput = typeof arg1 === 'string' ? arg1 : (typeof arg2 === 'string' ? arg2 : '');
+  const inventory = Array.isArray(arg1) ? arg1 : (Array.isArray(arg2) ? arg2 : []);
+
   const { clean, extractedCandidates } = parseScannedCode(rawInput);
   if (!clean && extractedCandidates.length === 0) {
     return {
@@ -217,4 +220,33 @@ export function findMatchingInventoryItems(
     matchedField: null,
     matchDescription: `Không tìm thấy thiết bị nào khớp với mã "${rawInput}"`
   };
+}
+
+/**
+ * Returns the primary unique code string of an item (Warehouse code or Serial Number or ID)
+ */
+export function getEquipmentScanCode(item: Partial<InventoryItem> | null | undefined): string {
+  if (!item) return '';
+  return (item.warehouse || item.sn || item.id || '').trim();
+}
+
+/**
+ * Generates the full public web lookup URL for an item.
+ * When scanned by ANY smartphone camera (iOS, Android, Zalo, Google Lens),
+ * this URL opens the web application and displays the item's details immediately.
+ */
+export function getEquipmentLookupUrl(itemOrCode: Partial<InventoryItem> | string | null | undefined): string {
+  if (!itemOrCode) return '';
+  const code = typeof itemOrCode === 'string'
+    ? itemOrCode.trim()
+    : getEquipmentScanCode(itemOrCode);
+
+  if (!code) return '';
+
+  if (typeof window !== 'undefined' && window.location) {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname.replace(/\/+$/, '') || '';
+    return `${origin}${pathname}/?lookup=${encodeURIComponent(code)}`;
+  }
+  return `?lookup=${encodeURIComponent(code)}`;
 }

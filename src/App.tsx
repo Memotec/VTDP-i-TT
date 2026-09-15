@@ -17,7 +17,7 @@ import type { HandoverRow } from './components/HandoverModal.tsx';
 import { InventoryTable } from './components/InventoryTable.tsx';
 import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
-import { getAccessToken } from './services/authService.ts';
+import { getAccessToken, googleSignIn } from './services/authService.ts';
 import { uploadToDrive } from './services/googleDriveService.ts';
 import { LocalDatabase, STORAGE_KEYS } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
@@ -27,6 +27,7 @@ import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
 import { safePrintHtml, exportInventoryReportToPDF } from './utils/pdfExporter.ts';
+import { exportInventoryReportToGoogleDoc } from './services/googleDocsService.ts';
 import {
   testFirestoreConnection,
   batchSaveInventoryToFirestore,
@@ -50,6 +51,7 @@ const UsageModal = React.lazy(() => import('./components/UsageModal.tsx').then(m
 const HandoverModal = React.lazy(() => import('./components/HandoverModal.tsx').then(m => ({ default: m.HandoverModal })));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal.tsx').then(m => ({ default: m.SettingsModal })));
 const GoogleDriveModal = React.lazy(() => import('./components/GoogleDriveModal.tsx').then(m => ({ default: m.GoogleDriveModal })));
+const GoogleDocsModal = React.lazy(() => import('./components/GoogleDocsModal.tsx').then(m => ({ default: m.GoogleDocsModal })));
 const AdminAccountModal = React.lazy(() => import('./components/AdminAccountModal.tsx').then(m => ({ default: m.AdminAccountModal })));
 const MobileAppInstallModal = React.lazy(() => import('./components/MobileAppInstallModal.tsx').then(m => ({ default: m.MobileAppInstallModal })));
 const ReturnStockModal = React.lazy(() => import('./components/ReturnStockModal.tsx').then(m => ({ default: m.ReturnStockModal })));
@@ -58,6 +60,8 @@ const SystemAuditLogView = React.lazy(() => import('./components/SystemAuditLogV
 const SystemAuditLogModal = React.lazy(() => import('./components/SystemAuditLogModal.tsx').then(m => ({ default: m.SystemAuditLogModal })));
 const ItemFormModal = React.lazy(() => import('./components/ItemFormModal.tsx').then(m => ({ default: m.ItemFormModal })));
 const ConflictResolutionModal = React.lazy(() => import('./components/ConflictResolutionModal.tsx').then(m => ({ default: m.ConflictResolutionModal })));
+const PublicItemLookupModal = React.lazy(() => import('./components/PublicItemLookupModal.tsx').then(m => ({ default: m.PublicItemLookupModal })));
+const ItemQrCodeModal = React.lazy(() => import('./components/ItemQrCodeModal.tsx').then(m => ({ default: m.ItemQrCodeModal })));
 
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
@@ -148,6 +152,11 @@ export default function App() {
   // Modals & Drawers state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanTargetItem, setScanTargetItem] = useState<InventoryItem | null>(null);
+  const [isPublicLookupOpen, setIsPublicLookupOpen] = useState(false);
+  const [publicLookupCode, setPublicLookupCode] = useState('');
+  const [publicLookupItem, setPublicLookupItem] = useState<InventoryItem | null>(null);
+  const [isItemQrModalOpen, setIsItemQrModalOpen] = useState(false);
+  const [selectedItemForQrModal, setSelectedItemForQrModal] = useState<InventoryItem | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminAccountModalOpen, setIsAdminAccountModalOpen] = useState(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
@@ -158,6 +167,7 @@ export default function App() {
   const [conflicts, setConflicts] = useState<ConflictItem[]>(() => LocalDatabase.getConflicts());
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isGoogleDriveModalOpen, setIsGoogleDriveModalOpen] = useState(false);
+  const [isGoogleDocsModalOpen, setIsGoogleDocsModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
@@ -329,6 +339,112 @@ export default function App() {
   useEffect(() => {
     roleRef.current = role || 'guest';
   }, [role]);
+
+  // Public QR Code Lookup: Detect URL query parameters (?lookup=... / ?qr=... / ?item=... / ?sn=... / ?code=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkUrlLookupParam = () => {
+      try {
+        const url = new URL(window.location.href);
+        const lookupParam = url.searchParams.get('lookup') ||
+                            url.searchParams.get('qr') ||
+                            url.searchParams.get('item') ||
+                            url.searchParams.get('code') ||
+                            url.searchParams.get('sn') ||
+                            url.searchParams.get('warehouse');
+
+        if (lookupParam && lookupParam.trim()) {
+          const code = lookupParam.trim();
+          const currentInv = inventoryRef.current && inventoryRef.current.length > 0 
+            ? inventoryRef.current 
+            : LocalDatabase.getInventory();
+          const match = findMatchingInventoryItems(currentInv, code);
+          setPublicLookupCode(code);
+          if (match.matched && match.matchedItems.length > 0) {
+            setPublicLookupItem(match.matchedItems[0]);
+          } else {
+            setPublicLookupItem(null);
+          }
+          setIsPublicLookupOpen(true);
+        }
+      } catch (err) {
+        console.warn('URL lookup check error:', err);
+      }
+    };
+
+    checkUrlLookupParam();
+    window.addEventListener('popstate', checkUrlLookupParam);
+    return () => window.removeEventListener('popstate', checkUrlLookupParam);
+  }, []);
+
+  // When inventory updates, re-evaluate public lookup item if modal is open and was unmatched
+  useEffect(() => {
+    if (isPublicLookupOpen && publicLookupCode && !publicLookupItem && inventory.length > 0) {
+      const match = findMatchingInventoryItems(inventory, publicLookupCode);
+      if (match.matched && match.matchedItems.length > 0) {
+        setPublicLookupItem(match.matchedItems[0]);
+      }
+    }
+  }, [inventory, isPublicLookupOpen, publicLookupCode, publicLookupItem]);
+
+  const handleOpenPublicLookup = useCallback((itemOrCode: InventoryItem | string) => {
+    const currentInv = inventoryRef.current && inventoryRef.current.length > 0
+      ? inventoryRef.current
+      : LocalDatabase.getInventory();
+
+    if (typeof itemOrCode === 'string') {
+      const code = itemOrCode.trim();
+      setPublicLookupCode(code);
+      const match = findMatchingInventoryItems(currentInv, code);
+      if (match.matched && match.matchedItems.length > 0) {
+        setPublicLookupItem(match.matchedItems[0]);
+      } else {
+        setPublicLookupItem(null);
+      }
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('lookup', code);
+        window.history.replaceState({}, '', url.toString());
+      }
+    } else {
+      const code = itemOrCode.warehouse || itemOrCode.sn || itemOrCode.id || '';
+      setPublicLookupCode(code);
+      setPublicLookupItem(itemOrCode);
+      if (typeof window !== 'undefined' && code) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('lookup', code);
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+    setIsPublicLookupOpen(true);
+  }, []);
+
+  const handleClosePublicLookup = useCallback(() => {
+    setIsPublicLookupOpen(false);
+    setPublicLookupItem(null);
+    setPublicLookupCode('');
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('lookup');
+      url.searchParams.delete('qr');
+      url.searchParams.delete('item');
+      url.searchParams.delete('code');
+      url.searchParams.delete('sn');
+      url.searchParams.delete('warehouse');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+  }, []);
+
+  const handleOpenItemQrModal = useCallback((item: InventoryItem) => {
+    setSelectedItemForQrModal(item);
+    setIsItemQrModalOpen(true);
+  }, []);
+
+  const handleCloseItemQrModal = useCallback(() => {
+    setIsItemQrModalOpen(false);
+    setSelectedItemForQrModal(null);
+  }, []);
 
   // Periodic Auto-Save Timer to LocalStorage
   useEffect(() => {
@@ -1396,6 +1512,44 @@ export default function App() {
       'Xuất dữ liệu kho CSV',
       `Đã xuất ${filteredInventory.length} mục thiết bị ra file CSV với bộ lọc hiện tại.`
     );
+  };
+
+  const handleExportFilteredInventoryGoogleDoc = async () => {
+    if (filteredInventory.length === 0) {
+      addToast('Không có thiết bị nào trong danh sách đang lọc để xuất Google Doc!', 'error');
+      return;
+    }
+
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        token = res?.accessToken || null;
+      }
+      if (!token) return;
+
+      addToast('Đang khởi tạo tài liệu Google Docs...', 'info');
+      const isFilteredCat = selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'Tất cả loại';
+      const res = await exportInventoryReportToGoogleDoc(token, filteredInventory, {
+        currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
+        categoryFilter: selectedCategory,
+        searchQuery: searchQuery,
+        reportTitle: isFilteredCat
+          ? `BÁO CÁO TỒN KHO & HIỆN TRẠNG THIẾT BỊ (${selectedCategory.toUpperCase()})`
+          : 'BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG TẠI CHỖ',
+        reportDate: new Date().toLocaleDateString('vi-VN')
+      });
+      addToast(`Đã xuất thành công Google Doc: "${res.title}"!`, 'success');
+      window.open(res.webViewLink, '_blank');
+      addSystemAuditLog(
+        'REPORT_DISPATCH',
+        'Xuất Báo Cáo Google Docs',
+        `Xuất báo cáo tồn kho Google Docs cho ${filteredInventory.length} thiết bị bởi ${currentUsername || 'Quản trị viên'}.`
+      );
+    } catch (err: any) {
+      console.error('Lỗi khi xuất Google Doc:', err);
+      addToast(err.message || 'Có lỗi xảy ra khi tạo Google Doc. Vui lòng kiểm tra kết nối Google!', 'error');
+    }
   };
 
   const handleExportFilteredInventoryPdf = async () => {
@@ -3475,6 +3629,15 @@ export default function App() {
                   <HardDrive className="w-4.5 h-4.5" />
                 </button>
 
+                {/* Google Docs Quick Action */}
+                <button
+                  onClick={() => setIsGoogleDocsModalOpen(true)}
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-[#E2E8F0] dark:border-slate-800 text-blue-600 dark:text-blue-400 rounded-xl transition-all cursor-pointer"
+                  title="Quản Lý & Tạo Văn Bản Google Docs"
+                >
+                  <FileText className="w-4.5 h-4.5" />
+                </button>
+
                 {/* Theme Toggle */}
                 <button
                   onClick={toggleTheme}
@@ -3680,6 +3843,17 @@ export default function App() {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
                     <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          handleExportFilteredInventoryGoogleDoc();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <span>Xuất Tài Liệu Google Docs (.gdoc)</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -3948,6 +4122,8 @@ export default function App() {
                 setIsScannerOpen(true);
                 playScanBeep(1000, 0.1);
               }}
+              onOpenQrModal={handleOpenItemQrModal}
+              onOpenPublicLookup={handleOpenPublicLookup}
               onExportCsv={handleExportCsv}
               onExportPdf={handleExportFilteredInventoryPdf}
               isExportingPdf={isExportingInventoryPdf}
@@ -3959,6 +4135,60 @@ export default function App() {
             </main>
           </div>
         </div>
+      )}
+
+      {/* Public QR Code Lookup Modal for Any Phone Camera Scan */}
+      {isPublicLookupOpen && (
+        <Suspense fallback={null}>
+          <PublicItemLookupModal
+            isOpen={isPublicLookupOpen}
+            onClose={handleClosePublicLookup}
+            lookupCode={publicLookupCode}
+            item={publicLookupItem}
+            inventory={inventory}
+            role={role}
+            onSelectAnotherCode={(code) => handleOpenPublicLookup(code)}
+            onOpenScanner={() => {
+              setIsScannerOpen(true);
+            }}
+            onEnterApp={() => {
+              setIsPublicLookupOpen(false);
+            }}
+            onPrintQr={(item) => {
+              setPrintLayout('QR');
+              setIsPrintPreviewOpen(true);
+            }}
+            onPrintLabel={(item) => {
+              setPrintLayout('LABEL');
+              setIsPrintPreviewOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Item QR Code Preview & Download Modal */}
+      {isItemQrModalOpen && selectedItemForQrModal && (
+        <Suspense fallback={null}>
+          <ItemQrCodeModal
+            isOpen={isItemQrModalOpen}
+            onClose={handleCloseItemQrModal}
+            item={selectedItemForQrModal}
+            onPrintQr={(item) => {
+              handleCloseItemQrModal();
+              setPrintLayout('QR');
+              setIsPrintPreviewOpen(true);
+            }}
+            onPrintLabel={(item) => {
+              handleCloseItemQrModal();
+              setPrintLayout('LABEL');
+              setIsPrintPreviewOpen(true);
+            }}
+            onOpenPublicLookup={(item) => {
+              handleCloseItemQrModal();
+              handleOpenPublicLookup(item);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Scanner Modal */}
@@ -4019,6 +4249,8 @@ export default function App() {
               setPrintLayout('LABEL');
               setIsPrintPreviewOpen(true);
             }}
+            onOpenQrModal={(item) => handleOpenItemQrModal(item)}
+            onOpenPublicLookup={(item) => handleOpenPublicLookup(item)}
           />
         </Suspense>
       )}
@@ -4142,6 +4374,7 @@ export default function App() {
             itemCount={inventory.length}
             usageCount={usageSlips.length}
             onOpenGoogleDriveModal={() => setIsGoogleDriveModalOpen(true)}
+            onOpenGoogleDocsModal={() => setIsGoogleDocsModalOpen(true)}
             onAddToast={addToast}
           />
         </Suspense>
@@ -4165,6 +4398,20 @@ export default function App() {
                 LocalDatabase.saveDispatchedRecords(data.dispatchedRecords);
               }
             }}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
+
+      {/* Google Docs Management Modal */}
+      {isGoogleDocsModalOpen && (
+        <Suspense fallback={null}>
+          <GoogleDocsModal
+            isOpen={isGoogleDocsModalOpen}
+            onClose={() => setIsGoogleDocsModalOpen(false)}
+            inventory={inventory}
+            selectedCategory={selectedCategory}
+            currentUsername={currentUsername || 'Kỹ sư Quản lý Kho'}
             onAddToast={addToast}
           />
         </Suspense>

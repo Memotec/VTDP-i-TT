@@ -28,6 +28,8 @@ import { InventoryItem, AuditStats, SyncConfig, AuditActionType } from '../types
 import { QRCodeSVG } from 'qrcode.react';
 import { playScanBeep } from '../utils/audio.ts';
 import { exportAuditReportToPDF } from '../utils/pdfExporter.ts';
+import { exportInventoryReportToGoogleDoc } from '../services/googleDocsService.ts';
+import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
 export type PrintMode = 'QR' | 'LABEL' | 'AUDIT_REPORT';
 
@@ -105,6 +107,44 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     : baseItems.filter(item => item.category === categoryFilter);
 
   const categories = Array.from(new Set(inventory.map(item => item.category).filter(Boolean)));
+
+  const [isExportingGoogleDoc, setIsExportingGoogleDoc] = useState(false);
+
+  const handleExportGoogleDoc = async () => {
+    if (targetItems.length === 0) {
+      onAddToast('Không có thiết bị nào trong danh sách xuất Google Doc!', 'error');
+      return;
+    }
+    try {
+      setIsExportingGoogleDoc(true);
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        token = res?.accessToken || null;
+      }
+      if (!token) return;
+
+      onAddToast('Đang tạo tài liệu Google Docs cho biên bản kiểm kê...', 'info');
+      const docRes = await exportInventoryReportToGoogleDoc(token, targetItems, {
+        currentUsername: inspectorName || currentUsername,
+        categoryFilter,
+        reportDate: auditDate,
+        reportTitle: `BIÊN BẢN KIỂM KÊ & HIỆN TRẠNG KHO VẬT TƯ CNS (${auditLocation})`
+      });
+      onAddToast(`Đã xuất thành công Google Doc: "${docRes.title}"!`, 'success');
+      window.open(docRes.webViewLink, '_blank');
+      onAddSystemAuditLog?.(
+        'REPORT_DISPATCH',
+        'Xuất Google Doc biên bản kiểm kê kho',
+        `Tạo Google Doc báo cáo kiểm kê ${targetItems.length} thiết bị bởi ${inspectorName}.`
+      );
+    } catch (err: any) {
+      console.error('Lỗi tạo Google Doc:', err);
+      onAddToast(err.message || 'Có lỗi xảy ra khi tạo Google Doc.', 'error');
+    } finally {
+      setIsExportingGoogleDoc(false);
+    }
+  };
 
   const handleExportPdf = async () => {
     if (targetItems.length === 0) {
@@ -770,6 +810,19 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
               className="py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               Đóng
+            </button>
+            <button
+              onClick={handleExportGoogleDoc}
+              disabled={isExportingGoogleDoc}
+              className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-blue-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              title="Tạo văn bản Google Doc trên Google Drive"
+            >
+              {isExportingGoogleDoc ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              <span>XUẤT GOOGLE DOCS</span>
             </button>
             <button
               onClick={handleExportPdf}

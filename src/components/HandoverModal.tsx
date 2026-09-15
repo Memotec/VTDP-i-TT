@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2 } from 'lucide-react';
+import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2, FileText } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { exportHandoverToPDF } from '../utils/pdfExporter.ts';
+import { exportHandoverToGoogleDoc } from '../services/googleDocsService.ts';
+import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
 export interface HandoverRow {
   id: string;
@@ -86,6 +88,8 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   const [deductStock, setDeductStock] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
+  const [isExportingGoogleDoc, setIsExportingGoogleDoc] = useState(false);
+
   const handleDirectExportPDF = async () => {
     if (handoverRows.length === 0) {
       onAddToast('Danh sách thiết bị bàn giao đang trống!', 'error');
@@ -120,6 +124,52 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
       onAddToast('Có lỗi xảy ra khi tạo tệp PDF biên bản bàn giao.', 'error');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleDirectExportGoogleDoc = async () => {
+    if (handoverRows.length === 0) {
+      onAddToast('Danh sách thiết bị bàn giao đang trống!', 'error');
+      return;
+    }
+    try {
+      setIsExportingGoogleDoc(true);
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        token = res?.accessToken || null;
+      }
+      if (!token) return;
+
+      if (onSaveHandoverToRegistry) {
+        onSaveHandoverToRegistry(deductStock);
+      }
+      onAddToast('Đang tạo tài liệu Google Docs cho biên bản bàn giao...', 'info');
+      const docRes = await exportHandoverToGoogleDoc(
+        token,
+        {
+          handoverNo,
+          handoverLocation,
+          handoverDay,
+          handoverMonth,
+          handoverYear,
+          handoverReason,
+          handoverGiverDept,
+          handoverGiverName,
+          handoverGiverPos,
+          handoverReceiverDept,
+          handoverReceiverName,
+          handoverReceiverPos
+        },
+        handoverRows
+      );
+      onAddToast(`Đã xuất thành công Google Doc: "${docRes.title}"!`, 'success');
+      window.open(docRes.webViewLink, '_blank');
+    } catch (err: any) {
+      console.error('Lỗi xuất Google Doc bàn giao:', err);
+      onAddToast(err.message || 'Có lỗi xảy ra khi tạo Google Doc biên bản.', 'error');
+    } finally {
+      setIsExportingGoogleDoc(false);
     }
   };
 
@@ -564,6 +614,20 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
                 LƯU VÀO SỔ THEO DÕI
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleDirectExportGoogleDoc}
+              disabled={handoverRows.length === 0 || isExportingGoogleDoc}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-5 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-blue-600/15 disabled:opacity-40"
+            >
+              {isExportingGoogleDoc ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              XUẤT GOOGLE DOCS
+            </button>
 
             <button
               type="button"

@@ -53,6 +53,7 @@ interface SettingsModalProps {
   itemCount: number;
   usageCount: number;
   onOpenGoogleDriveModal?: () => void;
+  onOpenGoogleDocsModal?: () => void;
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -76,6 +77,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   itemCount,
   usageCount,
   onOpenGoogleDriveModal,
+  onOpenGoogleDocsModal,
   onAddToast
 }) => {
   const [activeTab, setActiveTab] = useState<'STORAGE' | 'CLOUD' | 'FIREBASE' | 'CATEGORIES'>('STORAGE');
@@ -509,6 +511,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       <HardDrive className="w-4 h-4" />
                       <span>Mở Quản Lý Thư Mục QLVT_Backup & Đăng Nhập Drive</span>
+                    </button>
+                  )}
+
+                  {onOpenGoogleDocsModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenGoogleDocsModal();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Mở Quản Lý Văn Bản & Tài Liệu Google Docs</span>
                     </button>
                   )}
                 </div>
@@ -962,7 +978,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">Firestore Database ID</span>
                     <strong className="font-mono text-slate-800 dark:text-white text-xs block truncate">
-                      {firebaseConfig.firestoreDatabaseId}
+                      {(firebaseConfig as any).firestoreDatabaseId || '(default)'}
                     </strong>
                   </div>
                 </div>

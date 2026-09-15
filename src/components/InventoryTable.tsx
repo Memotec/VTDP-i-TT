@@ -16,6 +16,8 @@ interface InventoryTableProps {
   onEditItem: (item: InventoryItem) => void;
   onDeleteItem: (item: InventoryItem) => void;
   onOpenScanTarget: (item: InventoryItem) => void;
+  onOpenQrModal?: (item: InventoryItem) => void;
+  onOpenPublicLookup?: (item: InventoryItem) => void;
   onExportCsv: () => void;
   onExportPdf?: () => void;
   isExportingPdf?: boolean;
@@ -32,6 +34,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   onEditItem,
   onDeleteItem,
   onOpenScanTarget,
+  onOpenQrModal,
+  onOpenPublicLookup,
   onExportCsv,
   onExportPdf,
   isExportingPdf = false,
@@ -386,6 +390,16 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
 
                       <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
 
+                      {/* QR Modal Quick Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => (onOpenQrModal ? onOpenQrModal(item) : onSelectDetail(item))}
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                        title="Xem & Quét mã QR tra cứu điện thoại"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </button>
+
                       {/* Detail / History */}
                       <button
                         type="button"
@@ -578,6 +592,15 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => (onOpenQrModal ? onOpenQrModal(item) : onSelectDetail(item))}
+                    className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 border border-indigo-200/60 dark:border-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 cursor-pointer"
+                    title="Mã QR tra cứu điện thoại"
+                  >
+                    <QrCode className="w-4 h-4" />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => onOpenScanTarget(item)}

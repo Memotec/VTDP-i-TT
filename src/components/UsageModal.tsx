@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, FileText, History, Printer, Trash2, Search, Download, Loader2 } from 'lucide-react';
+import { X, FileText, History, Printer, Trash2, Search, Download, Loader2, ExternalLink } from 'lucide-react';
 import { InventoryItem, UsageSlip, Role } from '../types.ts';
 import { exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
+import { exportUsageSlipToGoogleDoc } from '../services/googleDocsService.ts';
+import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
 interface UsageModalProps {
   selectedItemForUsage: InventoryItem | null;
@@ -48,6 +50,26 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   const [usageSearchQuery, setUsageSearchQuery] = useState('');
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingDoc, setIsExportingDoc] = useState(false);
+
+  const handleExportGoogleDocSlip = async (slip: UsageSlip) => {
+    try {
+      setIsExportingDoc(true);
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        token = res?.accessToken || null;
+      }
+      if (!token) return;
+
+      const docRes = await exportUsageSlipToGoogleDoc(token, slip);
+      window.open(docRes.webViewLink, '_blank');
+    } catch (err) {
+      console.error('Lỗi xuất Google Doc phiếu báo sử dụng:', err);
+    } finally {
+      setIsExportingDoc(false);
+    }
+  };
 
   const handleExportPDFSlip = async (slip: UsageSlip) => {
     try {
@@ -534,7 +556,16 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                             <td className="py-3 px-3 text-right">
                               <div className="flex justify-end gap-2">
                                 <button
+                                  onClick={() => handleExportGoogleDocSlip(slip)}
+                                  disabled={isExportingDoc}
+                                  className="p-1.5 bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white dark:bg-blue-500/10 dark:text-blue-400 rounded-lg transition-colors cursor-pointer"
+                                  title="Xuất tài liệu Google Docs"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </button>
+                                <button
                                   onClick={() => handleExportPDFSlip(slip)}
+                                  disabled={isExportingPdf}
                                   className="p-1.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-500/10 dark:text-amber-400 rounded-lg transition-colors cursor-pointer"
                                   title="Xuất file PDF phiếu báo sử dụng"
                                 >

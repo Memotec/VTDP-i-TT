@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Clock,
@@ -12,10 +12,22 @@ import {
   Layers,
   Edit3,
   Send,
-  Printer
+  Printer,
+  ExternalLink,
+  Share2,
+  Check,
+  Smartphone,
+  Download,
+  Box,
+  ShieldCheck,
+  XCircle,
+  Copy,
+  Info,
+  History
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, Role } from '../types.ts';
+import { getEquipmentLookupUrl } from '../utils/qrParser.ts';
 
 interface ItemDetailDrawerProps {
   item: InventoryItem | null;
@@ -25,6 +37,8 @@ interface ItemDetailDrawerProps {
   onUsage: (item: InventoryItem) => void;
   onPrintQr?: (item: InventoryItem) => void;
   onPrintLabel?: (item: InventoryItem) => void;
+  onOpenQrModal?: (item: InventoryItem) => void;
+  onOpenPublicLookup?: (item: InventoryItem) => void;
 }
 
 export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
@@ -35,253 +49,491 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onUsage,
   onPrintQr,
   onPrintLabel,
+  onOpenQrModal,
+  onOpenPublicLookup,
 }) => {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'history'>('info');
+
   if (!item) return null;
 
+  const lookupUrl = getEquipmentLookupUrl(item);
+  const scanCode = item.warehouse || item.sn || item.id || '';
+
+  const handleCopy = (text: string, fieldName: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => {
+      setCopiedField(null);
+    }, 2000);
+  };
+
+  const handleDownloadQrPng = () => {
+    const svgElement = document.getElementById('item-window-qr-svg');
+    if (!svgElement) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width + 40;
+      canvas.height = img.height + 40;
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 20, 20);
+        const pngFile = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        const fileName = `QR_${scanCode.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+        downloadLink.download = fileName;
+        downloadLink.href = pngFile;
+        downloadLink.click();
+      }
+    };
+
+    img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgData)))}`;
+  };
+
   return (
-    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex justify-end z-[80000] animate-fade-in no-print">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-md h-screen shadow-2xl flex flex-col border-l border-slate-150 dark:border-slate-800 animate-slide-left">
-        {/* Drawer Header */}
-        <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-black bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900/40">
-                Chi tiết thiết bị CNS
-              </span>
-              <span className="text-xs font-bold bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
-                {item.category}
-              </span>
+    <div className="fixed inset-0 z-[80000] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto animate-fade-in no-print">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#111827] text-slate-900 dark:text-slate-100 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-auto animate-scale-up flex flex-col max-h-[92vh]">
+        
+        {/* Cửa sổ Header */}
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white px-5 sm:px-6 py-4 flex items-center justify-between shadow-md relative z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-xs shrink-0 shadow-inner">
+              <Box className="w-5 h-5 text-white" />
             </div>
-            <h3 className="font-black text-slate-900 dark:text-white text-base sm:text-lg line-clamp-1">
-              {item.name}
-            </h3>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-blue-200">
+                  THÔNG TIN CHI TIẾT THIẾT BỊ / VẬT TƯ
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold">
+                  {item.category || 'Vật tư CNS'}
+                </span>
+              </div>
+              <h2 className="text-sm sm:text-base font-black tracking-tight text-white line-clamp-1">
+                {item.name}
+              </h2>
+            </div>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 hover:text-slate-950 dark:hover:text-white text-slate-400 cursor-pointer rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
-            title="Đóng"
+            className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+            title="Đóng cửa sổ"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable details contents */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
-          {/* QR Code Identification Card with Print Buttons */}
-          <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 dark:from-slate-800/60 dark:to-slate-800/30 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center space-y-3.5">
-            {item.warehouse || item.sn ? (
-              <div className="p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <QRCodeSVG value={item.warehouse || item.sn} size={160} level="M" />
-              </div>
-            ) : (
-              <div className="w-40 h-40 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex items-center justify-center text-xs text-slate-400">
-                Chưa có mã QR
-              </div>
-            )}
-            <div className="space-y-1">
-              <div className="flex items-center justify-center gap-2 text-sm font-mono font-black text-indigo-600 dark:text-indigo-400">
-                <QrCode className="w-4 h-4" />
-                <span>{item.warehouse || item.sn || 'N/A'}</span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Mã QR định danh quản lý & vị trí kho dự phòng tại chỗ
-              </p>
-            </div>
-
-            {/* In nhãn / In QR nhanh cho 1 thiết bị */}
-            <div className="flex items-center gap-2 pt-1 w-full">
-              {onPrintQr && (
-                <button
-                  type="button"
-                  onClick={() => onPrintQr(item)}
-                  className="flex-1 py-2 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>In Mã QR</span>
-                </button>
-              )}
-              {onPrintLabel && (
-                <button
-                  type="button"
-                  onClick={() => onPrintLabel(item)}
-                  className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Tag className="w-3.5 h-3.5" />
-                  <span>In Tem Nhãn</span>
-                </button>
-              )}
-            </div>
+        {/* Navigation sub-tabs (Thông tin chung & Lịch sử) */}
+        <div className="px-5 sm:px-6 pt-3 pb-2 bg-slate-50/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('info')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'info'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>Thông Số Kỹ Thuật & QR</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'history'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Lịch Sử Kiểm Kê ({item.history?.length || 0})</span>
+            </button>
           </div>
 
-          {/* Equipment Technical Attributes */}
-          <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-700 space-y-4.5">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-black uppercase text-slate-800 dark:text-white tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2.5">
-              <FileText className="w-4 h-4 text-indigo-500" />
-              <span>Thông số & Vị trí kỹ thuật</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <Tag className="w-3.5 h-3.5 text-indigo-400" /> P/N - Model
-                </span>
-                <strong className="text-slate-800 dark:text-slate-200 font-semibold block text-sm">
-                  {item.pn || 'N/A'}
-                </strong>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <Hash className="w-3.5 h-3.5 text-indigo-400" /> Serial (S/N)
-                </span>
-                <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold block text-sm">
-                  {item.sn}
-                </strong>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-indigo-400" /> Số lượng tồn
-                </span>
-                <strong className="text-slate-800 dark:text-slate-200 font-black block text-sm">
-                  {item.qty} bộ / chiếc
-                </strong>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-indigo-400" /> Vị trí phân kho
-                </span>
-                <strong className="text-slate-800 dark:text-slate-200 font-semibold block text-sm">
-                  {item.loc || 'N/A'}
-                </strong>
-              </div>
-            </div>
-
-            {/* Audit Status block */}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-3.5 text-xs">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase block">
-                  Trạng thái kiểm định
-                </span>
-                {item.auditStatus === 'OK' ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-extrabold text-xs bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 px-2.5 py-1 rounded-lg">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> ĐỦ / HOẠT ĐỘNG TỐT
-                  </span>
-                ) : item.auditStatus === 'MISSING' ? (
-                  <span className="inline-flex items-center gap-1.5 text-rose-700 dark:text-rose-300 font-extrabold text-xs bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 px-2.5 py-1 rounded-lg">
-                    <AlertTriangle className="w-3.5 h-3.5" /> THIẾU / HỎNG HÓC
-                  </span>
-                ) : (
-                  <span className="text-slate-500 font-bold text-xs bg-slate-200/70 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
-                    CHƯA KIỂM KÊ
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase block">
-                  Ngày kiểm kê cuối
-                </span>
-                <strong className="text-slate-800 dark:text-slate-200 block font-mono text-xs sm:text-sm">
-                  {item.auditDate || 'Chưa ghi nhận'}
-                </strong>
-              </div>
-            </div>
-
-            {item.auditNote && (
-              <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-1">
-                <span className="text-xs font-extrabold text-slate-400 block uppercase tracking-wider">
-                  Ghi chú kiểm định:
-                </span>
-                <p className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm font-medium leading-relaxed italic">
-                  "{item.auditNote}"
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* History Timeline */}
-          <div className="space-y-3.5">
-            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-              <Clock className="w-4.5 h-4.5 text-indigo-500" />
-              <span className="text-xs sm:text-sm font-black uppercase text-slate-800 dark:text-white tracking-wider">
-                LỊCH SỬ KIỂM KÊ GẦN ĐÂY
+          {/* Quick status badge in subbar */}
+          <div className="hidden sm:flex items-center gap-2">
+            {item.qty === 0 ? (
+              <span className="px-2.5 py-1 bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-lg text-xs font-black flex items-center gap-1">
+                <XCircle className="w-3.5 h-3.5" /> Hết hàng (0)
               </span>
-            </div>
-
-            {!item.history || item.history.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 font-medium text-xs sm:text-sm bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-                Chưa có hoạt động kiểm kê lịch sử được lưu vết cho mã này.
-              </div>
+            ) : item.qty === 1 ? (
+              <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900 rounded-lg text-xs font-black flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> Còn 1 bộ
+              </span>
             ) : (
-              <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-3.5 pl-5 space-y-4.5">
-                {item.history.map((hist) => (
-                  <div key={hist.id} className="relative text-xs sm:text-sm">
-                    <div
-                      className={`absolute left-[-28px] top-1 w-4 h-4 rounded-full border-2 bg-white dark:bg-slate-900 ${
-                        hist.status === 'OK' ? 'border-emerald-500' : 'border-rose-500'
-                      }`}
-                    ></div>
-
-                    <div className="flex justify-between items-start">
-                      <strong
-                        className={
-                          hist.status === 'OK'
-                            ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-                            : 'text-rose-600 dark:text-rose-400 font-bold'
-                        }
-                      >
-                        {hist.status === 'OK' ? '● ĐỦ / HOẠT ĐỘNG TỐT' : '▲ THIẾU THIẾT BỊ'}
-                      </strong>
-                      <span className="text-xs text-slate-400 font-semibold">{hist.date}</span>
-                    </div>
-                    {hist.note && (
-                      <p className="text-slate-600 dark:text-slate-300 text-xs font-medium leading-relaxed mt-1">
-                        {hist.note}
-                      </p>
-                    )}
-                    <div className="text-xs text-slate-400 italic mt-1 font-semibold block">
-                      Người kiểm tra: {hist.user.toUpperCase()}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 rounded-lg text-xs font-black flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Tồn kho: {item.qty} bộ
+              </span>
             )}
           </div>
         </div>
 
-        {/* Drawer footer */}
-        <div className="px-6 py-4.5 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 flex justify-between gap-3 shrink-0">
-          <button
-            onClick={() => {
-              onClose();
-              if (role === 'admin') onEdit(item);
-            }}
-            disabled={role !== 'admin'}
-            className="flex-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-extrabold py-3 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer text-center disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-xs"
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Chỉnh sửa</span>
-          </button>
-          <button
-            onClick={() => {
-              onClose();
-              onUsage(item);
-            }}
-            className="flex-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-900/35 text-amber-700 dark:text-amber-400 font-extrabold py-3 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 shadow-xs"
-          >
-            <Send className="w-4 h-4" />
-            <span>Báo sử dụng</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-3 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer text-center shadow-xs"
-          >
-            Đóng
-          </button>
+        {/* Cửa sổ Thân Nội Dung (Scrollable Body) */}
+        <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-4.5 flex-1">
+          {activeTab === 'info' ? (
+            <div className="space-y-4.5">
+              
+              {/* Tên Thiết Bị & Khối Tổng Quan */}
+              <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 dark:from-slate-800/70 dark:to-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase text-blue-600 dark:text-blue-400">
+                      TÊN THIẾT BỊ / VẬT TƯ:
+                    </span>
+                  </div>
+                  {item.auditStatus === 'OK' && (
+                    <span className="px-2.5 py-0.5 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-900/40 rounded-lg text-xs font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Khớp thực tế
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug">
+                  {item.name}
+                </h1>
+
+                {/* Vị trí và thời gian kiểm kê */}
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400">
+                    <MapPin className="w-4 h-4 shrink-0" />
+                    <span>Vị trí kho: <strong>{item.loc || 'Kho dự phòng'}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span>Kiểm tra: {item.auditDate || 'Chưa ghi nhận'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bố Cục 2 Cột: Thông Số Kỹ Thuật (Trái) & Mã QR (Phải) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Cột Trái: Bảng Thông Số Định Danh */}
+                <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-2xs">
+                  <h3 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-500" />
+                    <span>THÔNG SỐ ĐỊNH DANH</span>
+                  </h3>
+
+                  {/* Mã Kho */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Mã Kho / Định Danh</span>
+                      <strong className="text-xs sm:text-sm font-mono font-black text-blue-600 dark:text-blue-400">
+                        {item.warehouse || 'Chưa cấp'}
+                      </strong>
+                    </div>
+                    {item.warehouse && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(item.warehouse!, 'warehouse')}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        title="Sao chép"
+                      >
+                        {copiedField === 'warehouse' ? (
+                          <Check className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Serial (S/N) */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Số Serial (S/N)</span>
+                      <strong className="text-xs sm:text-sm font-mono font-black text-slate-900 dark:text-white">
+                        {item.sn || 'N/A'}
+                      </strong>
+                    </div>
+                    {item.sn && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(item.sn, 'sn')}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        title="Sao chép"
+                      >
+                        {copiedField === 'sn' ? (
+                          <Check className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Part Number (P/N) */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Part Number (P/N)</span>
+                      <strong className="text-xs sm:text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {item.pn || 'N/A'}
+                      </strong>
+                    </div>
+                    {item.pn && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(item.pn!, 'pn')}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        title="Sao chép"
+                      >
+                        {copiedField === 'pn' ? (
+                          <Check className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Số lượng tồn kho */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Số Lượng Tồn Thực Tế</span>
+                      <strong className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                        {item.qty} bộ / chiếc
+                      </strong>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-200/70 dark:bg-slate-700 px-2 py-0.5 rounded">
+                      Khả dụng
+                    </span>
+                  </div>
+                </div>
+
+                {/* Cột Phải: Mã QR Định Danh Trực Quan */}
+                <div className="bg-gradient-to-br from-indigo-50/50 to-blue-50/30 dark:from-slate-800/70 dark:to-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center space-y-3 shadow-2xs">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black uppercase text-indigo-700 dark:text-indigo-400 tracking-wider">
+                      MÃ QR TRA CỨU ĐIỆN THOẠI
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Quét trực tiếp bằng camera điện thoại
+                    </p>
+                  </div>
+
+                  {/* Mã QR SVG */}
+                  <div 
+                    className="p-3 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:scale-[1.02] transition-transform"
+                    onClick={() => onOpenQrModal?.(item)}
+                    title="Bấm để phóng to hoặc tải mã QR"
+                  >
+                    <QRCodeSVG
+                      id="item-window-qr-svg"
+                      value={lookupUrl || scanCode}
+                      size={140}
+                      level="M"
+                      includeMargin={true}
+                    />
+                  </div>
+
+                  {/* Mã hiển thị */}
+                  <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-300 bg-white/80 dark:bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                    {scanCode}
+                  </div>
+
+                  {/* Các nút thao tác với mã QR */}
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 w-full pt-0.5">
+                    <button
+                      type="button"
+                      onClick={handleDownloadQrPng}
+                      className="py-1 px-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                      title="Tải ảnh QR PNG"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Tải QR</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(lookupUrl, 'url')}
+                      className="py-1 px-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                      title="Sao chép link tra cứu"
+                    >
+                      {copiedField === 'url' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Đã chép</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    {onOpenPublicLookup && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenPublicLookup(item);
+                        }}
+                        className="py-1 px-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                        title="Xem trang tra cứu điện thoại"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Xem Tra Cứu</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ghi chú & Công dụng */}
+              {item.notes && (
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+                  <span className="font-bold text-slate-500 uppercase block">Ghi chú & Công dụng:</span>
+                  <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                    {item.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Tab Lịch Sử Kiểm Kê */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-500" />
+                  <span>DÒNG THỜI GIAN KIỂM KÊ & ĐIỀU CHUYỂN</span>
+                </span>
+                <span className="text-xs text-slate-400 font-semibold">
+                  Tổng {item.history?.length || 0} lần ghi nhận
+                </span>
+              </div>
+
+              {!item.history || item.history.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 font-medium text-xs sm:text-sm bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  Chưa có hoạt động kiểm kê lịch sử được lưu vết cho thiết bị này.
+                </div>
+              ) : (
+                <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-3 pl-5 space-y-4">
+                  {item.history.map((hist) => (
+                    <div key={hist.id} className="relative text-xs sm:text-sm">
+                      <div
+                        className={`absolute left-[-26px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-slate-900 ${
+                          hist.status === 'OK' ? 'border-emerald-500 bg-emerald-500' : 'border-rose-500 bg-rose-500'
+                        }`}
+                      ></div>
+
+                      <div className="flex justify-between items-start">
+                        <strong
+                          className={
+                            hist.status === 'OK'
+                              ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                              : 'text-rose-600 dark:text-rose-400 font-bold'
+                          }
+                        >
+                          {hist.status === 'OK' ? '● ĐỦ / HOẠT ĐỘNG TỐT' : '▲ THIẾU / HỎNG'}
+                        </strong>
+                        <span className="text-xs text-slate-400 font-semibold">{hist.date}</span>
+                      </div>
+                      {hist.note && (
+                        <p className="text-slate-600 dark:text-slate-300 text-xs font-medium leading-relaxed mt-1">
+                          {hist.note}
+                        </p>
+                      )}
+                      <div className="text-[11px] text-slate-400 italic mt-0.5 font-semibold">
+                        Cán bộ kiểm tra: {hist.user.toUpperCase()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Cửa sổ Footer: Các nút thao tác nghiệp vụ */}
+        <div className="px-5 sm:px-6 py-3.5 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5">
+            {onPrintLabel && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onPrintLabel(item);
+                }}
+                className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="In tem nhãn dán thiết bị"
+              >
+                <Tag className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">In Tem Nhãn</span>
+                <span className="sm:hidden">In Tem</span>
+              </button>
+            )}
+
+            {onPrintQr && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onPrintQr(item);
+                }}
+                className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="In mã QR"
+              >
+                <Printer className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="hidden sm:inline">In Mã QR</span>
+                <span className="sm:hidden">In QR</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onUsage(item);
+              }}
+              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Lập phiếu báo sử dụng hoặc điều chuyển thiết bị này"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Báo Sử Dụng</span>
+            </button>
+
+            {role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEdit(item);
+                }}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Chỉnh sửa thông số thiết bị"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Sửa</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
+

@@ -13,10 +13,12 @@ interface DeployedRegistryTableProps {
   onPrintRecord: (record: DispatchedRecord) => void;
   onReturnRecord: (record: DispatchedRecord) => void;
   onDeleteRecord: (recordId: string) => void;
-  onCreateUsageSlip: () => void;
-  onCreateHandover: () => void;
-  onPrintFullRegistry: () => void;
-  onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onCreateUsageSlip?: () => void;
+  onCreateHandover?: () => void;
+  onCreateHandoverDoc?: () => void;
+  onPrintFullRegistry?: () => void;
+  onPrintRegistry?: () => void;
+  onAddToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React.memo(({
@@ -28,7 +30,9 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
   onDeleteRecord,
   onCreateUsageSlip,
   onCreateHandover,
+  onCreateHandoverDoc,
   onPrintFullRegistry,
+  onPrintRegistry,
   onAddToast
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,20 +41,45 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [isExportingRegistryPdf, setIsExportingRegistryPdf] = useState(false);
 
+  // Safe toast helper
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (typeof onAddToast === 'function') {
+      onAddToast(msg, type);
+    } else {
+      console.log(`[Toast ${type}]: ${msg}`);
+    }
+  };
+
+  const handleCreateHandover = () => {
+    if (typeof onCreateHandover === 'function') {
+      onCreateHandover();
+    } else if (typeof onCreateHandoverDoc === 'function') {
+      onCreateHandoverDoc();
+    }
+  };
+
+  const handlePrintFull = () => {
+    if (typeof onPrintFullRegistry === 'function') {
+      onPrintFullRegistry();
+    } else if (typeof onPrintRegistry === 'function') {
+      onPrintRegistry();
+    }
+  };
+
   const handleExportPdfRegistry = async () => {
     if (filteredRecords.length === 0) {
-      onAddToast('Không có dữ liệu sổ theo dõi nào để xuất PDF!', 'error');
+      showToast('Không có dữ liệu sổ theo dõi nào để xuất PDF!', 'error');
       return;
     }
     try {
       setIsExportingRegistryPdf(true);
-      onAddToast('Đang tạo tệp PDF Sổ Tổng Hợp Theo Dõi Thiết Bị...', 'info');
+      showToast('Đang tạo tệp PDF Sổ Tổng Hợp Theo Dõi Thiết Bị...', 'info');
       const { exportDispatchedRegistryToPDF } = await import('../utils/pdfExporter.ts');
       await exportDispatchedRegistryToPDF(filteredRecords);
-      onAddToast(`Đã xuất tệp PDF Sổ Theo Dõi (${filteredRecords.length} hồ sơ) thành công!`, 'success');
+      showToast(`Đã xuất tệp PDF Sổ Theo Dõi (${filteredRecords.length} hồ sơ) thành công!`, 'success');
     } catch (err) {
       console.error('Lỗi xuất PDF sổ tổng hợp:', err);
-      onAddToast('Có lỗi phát sinh khi tạo tệp PDF sổ tổng hợp.', 'error');
+      showToast('Có lỗi phát sinh khi tạo tệp PDF sổ tổng hợp.', 'error');
     } finally {
       setIsExportingRegistryPdf(false);
     }
@@ -135,7 +164,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
   // Export Excel specifically for deployed and handed-over equipment
   const handleExportExcel = async () => {
     if (records.length === 0) {
-      onAddToast('Không có dữ liệu thiết bị đã bàn giao để xuất Excel!', 'error');
+      showToast('Không có dữ liệu thiết bị đã bàn giao để xuất Excel!', 'error');
       return;
     }
 
@@ -170,9 +199,9 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
 
       const dateStr = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `So_Theo_Doi_Thiet_Bi_Ban_Giao_Su_Dung_CNS_${dateStr}.xlsx`);
-      onAddToast('Đã xuất Excel Sổ theo dõi thiết bị bàn giao & sử dụng thành công!', 'success');
+      showToast('Đã xuất Excel Sổ theo dõi thiết bị bàn giao & sử dụng thành công!', 'success');
     } catch {
-      onAddToast('Có lỗi xảy ra khi tạo file Excel!', 'error');
+      showToast('Có lỗi xảy ra khi tạo file Excel!', 'error');
     }
   };
 
@@ -314,7 +343,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             </button>
 
             <button
-              onClick={onPrintFullRegistry}
+              onClick={handlePrintFull}
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
               title="In Sổ Tổng Hợp Theo Dõi Thiết Bị Đã Bàn Giao (Chuẩn A4)"
             >
@@ -325,7 +354,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden sm:block mx-0.5"></div>
 
             <button
-              onClick={onCreateHandover}
+              onClick={handleCreateHandover}
               className="px-3.5 py-2 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-blue-500/20"
               title="Lập biên bản bàn giao tài sản, công cụ mới"
             >
@@ -454,7 +483,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             </p>
             <div className="flex justify-center gap-3 pt-2">
               <button
-                onClick={onCreateHandover}
+                onClick={handleCreateHandover}
                 className="bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs"
               >
                 Lập Biên Bản Bàn Giao

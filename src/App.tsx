@@ -3398,7 +3398,7 @@ export default function App() {
                 onReturnRecord={(record) => setSelectedDispatchedForReturn(record)}
                 onDeleteRecord={handleDeleteDispatchedRecord}
                 onPrintRecord={handlePrintDispatchedRecord}
-                onPrintRegistry={handlePrintDispatchedRegistry}
+                onPrintFullRegistry={handlePrintDispatchedRegistry}
                 onCreateUsageSlip={() => {
                   if (inventory.length > 0) {
                     setSelectedItemForUsage(inventory[0]);
@@ -3406,7 +3406,7 @@ export default function App() {
                     addToast('Kho vật tư chưa có thiết bị để xuất sử dụng!', 'error');
                   }
                 }}
-                onCreateHandoverDoc={() => {
+                onCreateHandover={() => {
                   setIsHandoverModalOpen(true);
                   if (handoverRows.length === 0 && inventory.length > 0) {
                     const initialRows: HandoverRow[] = inventory.slice(0, 1).map(item => ({
@@ -3422,6 +3422,7 @@ export default function App() {
                     setHandoverRows(initialRows);
                   }
                 }}
+                onAddToast={addToast}
               />
             </div>
           ) : activeWorkspaceTab === 'AUDIT_LOG' ? (

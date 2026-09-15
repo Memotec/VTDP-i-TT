@@ -8,10 +8,10 @@ import { InventoryItem, DispatchedRecord, UsageSlip, SystemAuditLogEntry, SyncQu
 import { INITIAL_INVENTORY, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS, CATEGORIES } from '../initialData.ts';
 
 export const STORAGE_KEYS = {
-  INVENTORY: 'cns_inventory_v30_stable',
+  INVENTORY: 'cns_inventory_v31_sheet',
   DISPATCHED: 'cns_dispatched_records_v1',
   USAGE_SLIPS: 'cns_usage_slips_v1',
-  CATEGORIES: 'cns_categories_v30',
+  CATEGORIES: 'cns_categories_v31',
   AUDIT_LOGS: 'cns_system_audit_logs_v1',
   SYNC_QUEUE: 'cns_sync_queue_v1',
   CONFLICTS: 'cns_sync_conflicts_v1',

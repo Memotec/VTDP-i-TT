@@ -461,21 +461,103 @@ export default function App() {
       console.warn('Firebase Firestore test connection:', err);
     });
 
+    let isFirstInvSnapshot = true;
+    let isFirstRecordSnapshot = true;
+
     // 2. Realtime listener for Inventory from Firestore
     const unsubInv = subscribeToInventory(
       (firestoreItems) => {
-        if (firestoreItems && firestoreItems.length > 0) {
-          // Filter out items that have been explicitly deleted locally
-          const validItems = firestoreItems.filter(item => !LocalDatabase.isItemDeleted(item.id, item.sn));
-          setInventory(prev => {
-            // Merge with local items if local was empty or older
-            if (prev.length === 0) {
-              LocalDatabase.saveInventory(validItems);
-              return validItems;
-            }
-            return prev;
+        if (!firestoreItems) return;
+        // Filter out items that have been explicitly deleted locally
+        const validItems = firestoreItems.filter(item => !LocalDatabase.isItemDeleted(item.id, item.sn));
+        if (validItems.length === 0) return;
+
+        setInventory(prev => {
+          if (prev.length === 0) {
+            LocalDatabase.saveInventory(validItems);
+            return validItems;
+          }
+
+          const currentQueue = syncService.getState().queue;
+          const pendingIds = new Set(
+            currentQueue.filter(q => q.syncStatus === 'pending' || q.syncStatus === 'syncing').map(q => q.entityId)
+          );
+
+          const localMapById = new Map<string, InventoryItem>();
+          const localMapBySn = new Map<string, InventoryItem>();
+          prev.forEach(item => {
+            localMapById.set(item.id, item);
+            if (item.sn) localMapBySn.set(item.sn.trim().toLowerCase(), item);
           });
-        }
+
+          let hasChanges = false;
+          const merged: InventoryItem[] = [];
+          const matchedLocalIds = new Set<string>();
+
+          validItems.forEach(cloudItem => {
+            const cleanSn = (cloudItem.sn || '').trim().toLowerCase();
+            const localMatch = localMapById.get(cloudItem.id) || (cleanSn ? localMapBySn.get(cleanSn) : undefined);
+
+            if (localMatch) {
+              matchedLocalIds.add(localMatch.id);
+              if (pendingIds.has(localMatch.id)) {
+                // Keep local unpushed change
+                merged.push(localMatch);
+              } else {
+                // Check if cloud has different data
+                const isDifferent =
+                  Number(localMatch.qty) !== Number(cloudItem.qty) ||
+                  (localMatch.auditStatus || '') !== (cloudItem.auditStatus || '') ||
+                  (localMatch.name || '') !== (cloudItem.name || '') ||
+                  (localMatch.loc || '') !== (cloudItem.loc || '') ||
+                  (localMatch.warehouse || '') !== (cloudItem.warehouse || '') ||
+                  (localMatch.auditNote || '') !== (cloudItem.auditNote || '');
+
+                if (isDifferent) {
+                  hasChanges = true;
+                  merged.push({
+                    ...cloudItem,
+                    id: localMatch.id,
+                    history: (cloudItem.history && cloudItem.history.length > 0) ? cloudItem.history : (localMatch.history || []),
+                    syncStatus: 'synced'
+                  });
+                } else {
+                  merged.push(localMatch);
+                }
+              }
+            } else {
+              // New item added on cloud
+              hasChanges = true;
+              merged.push({
+                ...cloudItem,
+                syncStatus: 'synced'
+              });
+            }
+          });
+
+          // Retain local items not yet in cloud (unless deleted)
+          prev.forEach(localItem => {
+            if (!matchedLocalIds.has(localItem.id) && !LocalDatabase.isItemDeleted(localItem.id, localItem.sn)) {
+              merged.push(localItem);
+            }
+          });
+
+          if (hasChanges) {
+            LocalDatabase.saveInventory(merged);
+            const nowStr = new Date().toLocaleTimeString('vi-VN');
+            setSyncConfig(conf => ({ ...conf, lastSynced: nowStr }));
+            setSyncStatus('success');
+            setSyncStatusDetail(`Đã tự động đồng bộ dữ liệu mới nhất từ Cloud (${nowStr}).`);
+            if (!isFirstInvSnapshot) {
+              addToast(`☁️ Cloud: Tự động tải & cập nhật dữ liệu kho mới (${nowStr})!`, 'info');
+            }
+            return merged;
+          }
+
+          return prev;
+        });
+
+        isFirstInvSnapshot = false;
       },
       (err) => console.warn('Firestore inventory listener:', err)
     );
@@ -483,15 +565,51 @@ export default function App() {
     // 3. Realtime listener for Dispatched Records from Firestore
     const unsubRecords = subscribeToDispatchedRecords(
       (firestoreRecords) => {
-        if (firestoreRecords && firestoreRecords.length > 0) {
-          setDispatchedRecords(prev => {
-            if (prev.length === 0) {
+        if (!firestoreRecords) return;
+
+        setDispatchedRecords(prev => {
+          if (prev.length === 0) {
+            if (firestoreRecords.length > 0) {
               LocalDatabase.saveDispatchedRecords(firestoreRecords);
               return firestoreRecords;
             }
             return prev;
+          }
+
+          const localMap = new Map<string, DispatchedRecord>(prev.map(r => [r.id, r]));
+          let hasChanges = false;
+          const merged = [...prev];
+
+          firestoreRecords.forEach(cloudRecord => {
+            const existing = localMap.get(cloudRecord.id);
+            if (!existing) {
+              hasChanges = true;
+              merged.unshift(cloudRecord);
+            } else {
+              if (
+                existing.status !== cloudRecord.status ||
+                existing.returnedDate !== cloudRecord.returnedDate ||
+                existing.returnedQty !== cloudRecord.returnedQty
+              ) {
+                hasChanges = true;
+                const idx = merged.findIndex(r => r.id === cloudRecord.id);
+                if (idx !== -1) merged[idx] = cloudRecord;
+              }
+            }
           });
-        }
+
+          if (hasChanges) {
+            LocalDatabase.saveDispatchedRecords(merged);
+            if (!isFirstRecordSnapshot) {
+              addToast('☁️ Cloud: Đã tự động đồng bộ sổ theo dõi trang thiết bị mới!', 'info');
+            }
+            return merged;
+          }
+
+          return prev;
+        });
+
+        isFirstRecordSnapshot = false;
       },
       (err) => console.warn('Firestore dispatched listener:', err)
     );
@@ -2986,12 +3104,14 @@ export default function App() {
         <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[#1E2430] dark:bg-[#1E2430]">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 px-8 py-10 sm:px-10 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-500/20">
+              <div className="w-16 h-16 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/25">
                 <QrCode className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">KHO CNS & ATM</h1>
-              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-2.5 uppercase tracking-widest">
-                Đội Thông Tin Hàng Không
+              <h1 className="text-2xl sm:text-[26px] font-black text-slate-900 dark:text-white tracking-tight leading-snug">
+                Kho Vật tư dự phòng Đội Thông tin -TT BĐKT
+              </h1>
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-2.5 uppercase tracking-wider">
+                Hệ Thống Quản Lý & Kiểm Kê Trang Thiết Bị
               </p>
             </div>
 

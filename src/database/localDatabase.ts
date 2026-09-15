@@ -182,6 +182,26 @@ export class LocalDatabase {
     }
   }
 
+  // Usage Slips
+  static getUsageSlips(): UsageSlip[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USAGE_SLIPS);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static saveUsageSlips(slips: UsageSlip[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USAGE_SLIPS, JSON.stringify(slips));
+    } catch (err) {
+      console.error('LocalDatabase.saveUsageSlips error:', err);
+    }
+  }
+
   // Audit Logs
   static getAuditLogs(): SystemAuditLogEntry[] {
     try {

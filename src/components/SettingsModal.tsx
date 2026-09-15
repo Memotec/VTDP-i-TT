@@ -31,6 +31,7 @@ import { playScanBeep } from '../utils/audio.ts';
 import { APPS_SCRIPT_SOURCE_CODE } from './AppsScriptFixModal.tsx';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { testFirestoreConnection } from '../firebase.ts';
+import { STORAGE_KEYS } from '../database/localDatabase.ts';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -183,10 +184,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Estimate storage usage
   const estimateStorageSize = () => {
     try {
-      const invStr = localStorage.getItem('cns_inventory_v30_stable') || '';
-      const usageStr = localStorage.getItem('cns_usage_slips_v1') || '';
-      const catStr = localStorage.getItem('cns_categories_v30') || '';
-      const totalBytes = (invStr.length + usageStr.length + catStr.length) * 2;
+      const invStr = localStorage.getItem(STORAGE_KEYS.INVENTORY) || '';
+      const usageStr = localStorage.getItem(STORAGE_KEYS.USAGE_SLIPS) || '';
+      const catStr = localStorage.getItem(STORAGE_KEYS.CATEGORIES) || '';
+      const dispStr = localStorage.getItem(STORAGE_KEYS.DISPATCHED) || '';
+      const auditStr = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS) || '';
+      const totalBytes = (invStr.length + usageStr.length + catStr.length + dispStr.length + auditStr.length) * 2;
       return (totalBytes / 1024).toFixed(1);
     } catch {
       return '12.4';

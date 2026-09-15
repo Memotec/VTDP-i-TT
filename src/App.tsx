@@ -19,7 +19,7 @@ import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
 import { getAccessToken } from './services/authService.ts';
 import { uploadToDrive } from './services/googleDriveService.ts';
-import { LocalDatabase } from './database/localDatabase.ts';
+import { LocalDatabase, STORAGE_KEYS } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
 import { CloudService } from './services/cloudService.ts';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
@@ -94,8 +94,8 @@ const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
 ];
 
 export default function App() {
-  // Inventory state
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  // Inventory state - initialized directly from LocalDatabase to prevent empty state flash
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => LocalDatabase.getInventory());
   const [role, setRole] = useState<Role>(() => {
     const saved = localStorage.getItem('cns_session_active');
     if (saved === 'admin' || saved === 'guest') return saved as Role;
@@ -137,16 +137,7 @@ export default function App() {
   const [isLowStockDropdownOpen, setIsLowStockDropdownOpen] = useState(false);
 
   // Categories list
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('cns_categories_v30');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch { /* fallback */ }
-    }
-    return CATEGORIES;
-  });
+  const [categories, setCategories] = useState<string[]>(() => LocalDatabase.getCategories());
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
 
@@ -174,29 +165,11 @@ export default function App() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED' | 'AUDIT_LOG'>('INVENTORY');
 
   // System Audit Log state
-  const [auditLogs, setAuditLogs] = useState<SystemAuditLogEntry[]>(() => {
-    const saved = localStorage.getItem('cns_system_audit_logs_v1');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch { /* fallback */ }
-    }
-    return INITIAL_SYSTEM_AUDIT_LOGS;
-  });
+  const [auditLogs, setAuditLogs] = useState<SystemAuditLogEntry[]>(() => LocalDatabase.getAuditLogs());
   const [isAuditLogModalOpen, setIsAuditLogModalOpen] = useState(false);
 
   // Dispatched & Deployed Equipment Registry state
-  const [dispatchedRecords, setDispatchedRecords] = useState<DispatchedRecord[]>(() => {
-    const saved = localStorage.getItem('cns_dispatched_records_v1');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch { /* fallback */ }
-    }
-    return INITIAL_DISPATCHED_RECORDS;
-  });
+  const [dispatchedRecords, setDispatchedRecords] = useState<DispatchedRecord[]>(() => LocalDatabase.getDispatchedRecords());
   const [selectedDispatchedDetail, setSelectedDispatchedDetail] = useState<DispatchedRecord | null>(null);
   const [selectedDispatchedForReturn, setSelectedDispatchedForReturn] = useState<DispatchedRecord | null>(null);
 
@@ -216,15 +189,7 @@ export default function App() {
   const [handoverRows, setHandoverRows] = useState<HandoverRow[]>([]);
 
   // Equipment Usage state
-  const [usageSlips, setUsageSlips] = useState<UsageSlip[]>(() => {
-    const saved = localStorage.getItem('cns_usage_slips_v1');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch { /* fallback */ }
-    }
-    return [];
-  });
+  const [usageSlips, setUsageSlips] = useState<UsageSlip[]>(() => LocalDatabase.getUsageSlips());
 
   // Cloud Sync configurations
   const [syncConfig, setSyncConfig] = useState<SyncConfig>(() => {
@@ -373,19 +338,18 @@ export default function App() {
     const timer = setInterval(() => {
       try {
         if (inventoryRef.current && inventoryRef.current.length > 0) {
-          localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(inventoryRef.current));
+          LocalDatabase.saveInventory(inventoryRef.current);
         }
         if (usageSlipsRef.current) {
-          localStorage.setItem('cns_usage_slips_v1', JSON.stringify(usageSlipsRef.current));
+          LocalDatabase.saveUsageSlips(usageSlipsRef.current);
         }
         if (dispatchedRecordsRef.current) {
-          localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(dispatchedRecordsRef.current));
+          LocalDatabase.saveDispatchedRecords(dispatchedRecordsRef.current);
         }
         if (categoriesRef.current) {
-          localStorage.setItem('cns_categories_v30', JSON.stringify(categoriesRef.current));
+          LocalDatabase.saveCategories(categoriesRef.current);
         }
         const nowStr = new Date().toLocaleTimeString('vi-VN');
-        localStorage.setItem('cns_last_saved_time', nowStr);
         setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
 
         if (storageConfig.showAutoSaveToast) {
@@ -404,19 +368,17 @@ export default function App() {
     const flushDataToLocalStorage = () => {
       try {
         if (inventoryRef.current && inventoryRef.current.length > 0) {
-          localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(inventoryRef.current));
+          LocalDatabase.saveInventory(inventoryRef.current);
         }
         if (usageSlipsRef.current) {
-          localStorage.setItem('cns_usage_slips_v1', JSON.stringify(usageSlipsRef.current));
+          LocalDatabase.saveUsageSlips(usageSlipsRef.current);
         }
         if (dispatchedRecordsRef.current) {
-          localStorage.setItem('cns_dispatched_records_v1', JSON.stringify(dispatchedRecordsRef.current));
+          LocalDatabase.saveDispatchedRecords(dispatchedRecordsRef.current);
         }
         if (categoriesRef.current) {
-          localStorage.setItem('cns_categories_v30', JSON.stringify(categoriesRef.current));
+          LocalDatabase.saveCategories(categoriesRef.current);
         }
-        const nowStr = new Date().toLocaleTimeString('vi-VN');
-        localStorage.setItem('cns_last_saved_time', nowStr);
       } catch (err) {
         console.warn('Emergency flush error:', err);
       }
@@ -464,18 +426,6 @@ export default function App() {
       if (!savedTheme) {
         localStorage.setItem('cns_theme', 'dark');
       }
-    }
-
-    const localInv = localStorage.getItem('cns_inventory_v30_stable');
-    if (localInv) {
-      try {
-        setInventory(JSON.parse(localInv));
-      } catch {
-        setInventory(INITIAL_INVENTORY);
-      }
-    } else {
-      setInventory(INITIAL_INVENTORY);
-      localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(INITIAL_INVENTORY));
     }
 
     const savedRole = localStorage.getItem('cns_session_active');
@@ -592,7 +542,7 @@ export default function App() {
   const saveAuditLogsLocally = (newLogs: SystemAuditLogEntry[]) => {
     setAuditLogs(newLogs);
     try {
-      localStorage.setItem('cns_system_audit_logs_v1', JSON.stringify(newLogs));
+      LocalDatabase.saveAuditLogs(newLogs);
     } catch (err) {
       console.warn('Audit logs save error:', err);
     }
@@ -838,11 +788,10 @@ export default function App() {
 
   const handleManualSaveLocalStorage = () => {
     try {
-      localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(inventory));
-      localStorage.setItem('cns_usage_slips_v1', JSON.stringify(usageSlips));
-      localStorage.setItem('cns_categories_v30', JSON.stringify(categories));
+      LocalDatabase.saveInventory(inventory);
+      LocalDatabase.saveUsageSlips(usageSlips);
+      LocalDatabase.saveCategories(categories);
       const nowStr = new Date().toLocaleTimeString('vi-VN');
-      localStorage.setItem('cns_last_saved_time', nowStr);
       setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
       addToast(`Đã lưu toàn bộ ${inventory.length} thiết bị vào LocalStorage!`, 'success');
       playScanBeep(1000, 0.15);
@@ -859,9 +808,8 @@ export default function App() {
       message: 'Bạn có chắc chắn muốn đặt lại cơ sở dữ liệu về danh sách thiết bị CNS tiêu chuẩn ban đầu?',
       onConfirm: () => {
         setInventory(INITIAL_INVENTORY);
-        localStorage.setItem('cns_inventory_v30_stable', JSON.stringify(INITIAL_INVENTORY));
+        LocalDatabase.saveInventory(INITIAL_INVENTORY);
         const nowStr = new Date().toLocaleTimeString('vi-VN');
-        localStorage.setItem('cns_last_saved_time', nowStr);
         setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
         addToast('Đã khôi phục thành công danh sách thiết bị mẫu CNS ban đầu!', 'success');
         playScanBeep(1000, 0.15);
@@ -872,7 +820,7 @@ export default function App() {
 
   const saveCategoriesLocally = (newCats: string[]) => {
     setCategories(newCats);
-    localStorage.setItem('cns_categories_v30', JSON.stringify(newCats));
+    LocalDatabase.saveCategories(newCats);
     // Automatically trigger debounced push to Cloud Google Sheet
     syncService.scheduleDebouncedPush();
     // Sync to Firestore
@@ -1341,11 +1289,12 @@ export default function App() {
     try {
       setIsExportingInventoryPdf(true);
       addToast('Đang khởi tạo tệp PDF Báo cáo tồn kho Đội Thông Tin...', 'info');
+      const isFilteredCat = selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'Tất cả loại';
       await exportInventoryReportToPDF(filteredInventory, {
         currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
         categoryFilter: selectedCategory,
         searchQuery: searchQuery,
-        reportTitle: selectedCategory !== 'ALL' 
+        reportTitle: isFilteredCat
           ? `BÁO CÁO TỒN KHO & HIỆN TRẠNG THIẾT BỊ (${selectedCategory.toUpperCase()})`
           : 'BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG TẠI CHỖ',
         reportDate: new Date().toLocaleDateString('vi-VN')
@@ -2401,7 +2350,7 @@ export default function App() {
   const handleSubmitUsage = (newSlip: UsageSlip, deductInv: boolean) => {
     const nextSlips = [newSlip, ...usageSlips];
     setUsageSlips(nextSlips);
-    localStorage.setItem('cns_usage_slips_v1', JSON.stringify(nextSlips));
+    LocalDatabase.saveUsageSlips(nextSlips);
 
     // Also register into the centralized Dispatched Equipment Registry
     const rawDispatchRecord: DispatchedRecord = {
@@ -3968,12 +3917,12 @@ export default function App() {
             onDeleteSlip={(slipId) => {
               const remaining = usageSlips.filter(s => s.id !== slipId);
               setUsageSlips(remaining);
-              localStorage.setItem('cns_usage_slips_v1', JSON.stringify(remaining));
+              LocalDatabase.saveUsageSlips(remaining);
               addToast('Đã xóa phiếu báo sử dụng.', 'success');
             }}
             onClearHistory={() => {
               setUsageSlips([]);
-              localStorage.removeItem('cns_usage_slips_v1');
+              LocalDatabase.saveUsageSlips([]);
               addToast('Đã xóa trắng lịch sử phiếu sử dụng.', 'info');
             }}
             onPrintSlip={handlePrintUsageSlip}

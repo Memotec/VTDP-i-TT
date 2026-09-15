@@ -8,6 +8,7 @@ interface ItemFormModalProps {
   editingItem: InventoryItem | null;
   categories: string[];
   initialSn?: string;
+  initialWarehouse?: string;
   onSaveCategory: (newCategory: string) => void;
   onSubmit: (formData: {
     name: string;
@@ -26,6 +27,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   editingItem,
   categories,
   initialSn,
+  initialWarehouse,
   onSaveCategory,
   onSubmit
 }) => {
@@ -56,7 +58,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         setName('');
         setPn('');
         setSn(initialSn || '');
-        setWarehouse('');
+        setWarehouse(initialWarehouse || '');
         setLoc('');
         setQty(1);
         setCategory(categories.find(c => c !== 'Tất cả loại') || 'VHF AM');
@@ -64,7 +66,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setIsAddingNewCat(false);
       setNewCatInput('');
     }
-  }, [isOpen, editingItem, categories, initialSn]);
+  }, [isOpen, editingItem, categories, initialSn, initialWarehouse]);
 
   if (!isOpen) return null;
 

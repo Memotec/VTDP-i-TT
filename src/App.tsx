@@ -148,6 +148,8 @@ export default function App() {
   // Item form modal state
   const [isItemFormModalOpen, setIsItemFormModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [initialAddSn, setInitialAddSn] = useState<string>('');
+  const [initialAddWarehouse, setInitialAddWarehouse] = useState<string>('');
 
   // Modals & Drawers state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -285,6 +287,21 @@ export default function App() {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
   }, []);
+
+  const handleAddNewWithCode = useCallback((code: string) => {
+    setIsScannerOpen(false);
+    setEditingItem(null);
+    const clean = code.trim().toUpperCase();
+    if (/^(KHO|MA|CNS|WH|BIN|RACK|SHELF)/i.test(clean) || clean.includes('KHO')) {
+      setInitialAddWarehouse(clean);
+      setInitialAddSn('');
+    } else {
+      setInitialAddSn(clean);
+      setInitialAddWarehouse('');
+    }
+    setIsItemFormModalOpen(true);
+    addToast(`Đã mở biểu mẫu thêm mới thiết bị với mã "${code}"`, 'info');
+  }, [addToast]);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -1585,28 +1602,30 @@ export default function App() {
     }
   };
 
-  // Scanning logic
-  const handleScannedCode = (code: string, status: 'OK' | 'MISSING', note: string): boolean => {
-    if (!code.trim()) return false;
-    const cleanCode = code.trim().toUpperCase();
-
-    const matchingItemsIdx = inventoryRef.current.reduce<number[]>((acc, item, idx) => {
-      if (
-        (item.warehouse && item.warehouse.toUpperCase() === cleanCode) ||
-        item.sn.toUpperCase() === cleanCode
-      ) {
-        acc.push(idx);
-      }
-      return acc;
-    }, []);
-
-    if (matchingItemsIdx.length === 0) {
-      playScanBeep(200, 0.4);
-      return false;
+  // Scanning logic for QR code & Barcode audit
+  const handleScannedCode = (code: string, status: 'OK' | 'MISSING', note: string) => {
+    if (!code || !code.trim()) {
+      return { success: false, message: 'Mã quét rỗng' };
     }
 
+    const currentInventory = inventoryRef.current && inventoryRef.current.length > 0
+      ? inventoryRef.current
+      : LocalDatabase.getInventory();
+
+    const matchResult = findMatchingInventoryItems(code, currentInventory);
+
+    if (!matchResult.matched || matchResult.matchedIndices.length === 0) {
+      playScanBeep(200, 0.4);
+      addToast(`Không tìm thấy thiết bị nào khớp với mã "${code}"`, 'error');
+      return {
+        success: false,
+        message: `Không tìm thấy thiết bị nào khớp với mã "${code}". Bạn có thể nhấn nút bên dưới để thêm mới thiết bị vào kho.`
+      };
+    }
+
+    const matchingItemsIdx = matchResult.matchedIndices;
     const nowStr = new Date().toLocaleString('vi-VN');
-    const updated = [...inventoryRef.current];
+    const updated = [...currentInventory];
 
     matchingItemsIdx.forEach(idx => {
       const i = updated[idx];
@@ -1614,7 +1633,7 @@ export default function App() {
         id: `h-${Date.now()}-${idx}`,
         status: status,
         date: nowStr,
-        note: note.trim() || 'Kiểm kê tự động bằng hệ thống quét QR',
+        note: note.trim() || `Kiểm kê qua mã QR/Barcode (${matchResult.matchDescription})`,
         user: currentUsername || roleRef.current || 'guest'
       };
 
@@ -1622,7 +1641,7 @@ export default function App() {
         ...i,
         auditStatus: status,
         auditDate: nowStr,
-        auditNote: note.trim() || 'Quét mã xác nhận Đủ',
+        auditNote: note.trim() || (status === 'OK' ? 'Quét mã xác nhận Đủ / Hoạt động tốt' : 'Quét mã xác nhận Thiếu / Cần bảo trì'),
         history: i.history ? [entry, ...i.history] : [entry]
       }, currentUsername || 'guest', false);
     });
@@ -1631,15 +1650,18 @@ export default function App() {
     matchingItemsIdx.forEach(idx => {
       const item = updated[idx];
       syncService.enqueue('equipment', item.id, 'STATUS_CHANGE', item, currentUsername);
+      saveInventoryItemToFirestore(item).catch(err => console.warn('Firestore item sync:', err));
     });
-    playScanBeep(status === 'OK' ? 1047 : 330, 0.16);
-    addToast(`Quét thành công! Thiết bị đã được đánh dấu ${status === 'OK' ? 'ĐỦ' : 'THIẾU'}.`, 'success');
 
+    playScanBeep(status === 'OK' ? 1047 : 330, 0.16);
     const firstMatched = updated[matchingItemsIdx[0]];
+    const statusText = status === 'OK' ? 'ĐỦ / HOẠT ĐỘNG TỐT (OK)' : 'THIẾU / CẦN XỬ LÝ (MISSING)';
+    addToast(`Đã kiểm kê thành công: ${firstMatched.name} [${statusText}]`, 'success');
+
     addSystemAuditLog(
       'INVENTORY_AUDIT',
       'Quét mã QR / Barcode kiểm kê',
-      `Quét mã "${cleanCode}" xác nhận trạng thái ${status === 'OK' ? 'ĐẠT CHUẨN (OK)' : 'CẦN XỬ LÝ (THIẾU)'} cho ${matchingItemsIdx.length} thiết bị (vd: ${firstMatched?.name || cleanCode})`,
+      `Quét mã "${code}" (${matchResult.matchDescription}) xác nhận trạng thái ${statusText} cho ${matchingItemsIdx.length} thiết bị (vd: ${firstMatched?.name || code})`,
       {
         id: firstMatched?.id,
         name: firstMatched?.name,
@@ -1649,7 +1671,11 @@ export default function App() {
       }
     );
 
-    return true;
+    return {
+      success: true,
+      item: firstMatched,
+      message: `Đã ghi nhận kiểm kê [${statusText}]: ${firstMatched.name} (${matchResult.matchDescription})`
+    };
   };
 
   // Utility to check if inventory items actually changed to avoid wasteful React re-renders and disk writes
@@ -4203,6 +4229,11 @@ export default function App() {
             inventory={inventory}
             scanTargetItem={scanTargetItem}
             onScanned={handleScannedCode}
+            onAddNewWithCode={handleAddNewWithCode}
+            onViewItemDetail={(item) => {
+              setIsScannerOpen(false);
+              setSelectedItemDetail(item);
+            }}
           />
         </Suspense>
       )}
@@ -4215,9 +4246,13 @@ export default function App() {
             onClose={() => {
               setIsItemFormModalOpen(false);
               setEditingItem(null);
+              setInitialAddSn('');
+              setInitialAddWarehouse('');
             }}
             editingItem={editingItem}
             categories={categories}
+            initialSn={initialAddSn}
+            initialWarehouse={initialAddWarehouse}
             onSaveCategory={(newCat) => {
               const updated = [...categories, newCat];
               saveCategoriesLocally(updated);

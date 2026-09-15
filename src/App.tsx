@@ -3261,7 +3261,7 @@ export default function App() {
                 }`}
               >
                 <Activity className="w-4.5 h-4.5 shrink-0" />
-                <span className="flex-1 text-left truncate">Nhật Ký Kiểm Toán</span>
+                <span className="flex-1 text-left truncate">Nhật Ký Hệ Thống</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${activeWorkspaceTab === 'AUDIT_LOG' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {auditLogs.length}
                 </span>
@@ -3383,7 +3383,7 @@ export default function App() {
                 <div className="min-w-0">
                   <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
                     <span>
-                      {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao & Điều Chuyển' : 'Nhật Ký Kiểm Toán Hệ Thống'}
+                      {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao & Điều Chuyển' : 'Nhật Ký Hệ Thống'}
                     </span>
                     <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-[#2563EB] dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-900 hidden sm:inline-flex items-center">
                       {activeWorkspaceTab === 'INVENTORY' ? `${inventory.length} vật tư` : activeWorkspaceTab === 'DISPATCHED' ? `${dispatchedRecords.length} hồ sơ` : `${auditLogs.length} bản ghi`}
@@ -3530,7 +3530,7 @@ export default function App() {
           ) : activeWorkspaceTab === 'AUDIT_LOG' ? (
             /* SYSTEM AUDIT LOG WORKSPACE VIEW */
             <div className="mt-6">
-              <Suspense fallback={<div className="p-12 text-center text-slate-500 font-bold">Đang tải nhật ký kiểm toán hệ thống...</div>}>
+              <Suspense fallback={<div className="p-12 text-center text-slate-500 font-bold">Đang tải nhật ký hệ thống...</div>}>
                 <SystemAuditLogView
                   logs={auditLogs}
                   role={role}

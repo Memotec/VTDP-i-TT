@@ -273,7 +273,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>SỔ NHẬT KÝ KIỂM TOÁN HỆ THỐNG CNS/ATM</title>
+          <title>SỔ NHẬT KÝ HỆ THỐNG CNS/ATM</title>
           <style>
             body { font-family: 'Times New Roman', serif; margin: 20px; color: #000; }
             .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
@@ -301,7 +301,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
             </tr>
           </table>
 
-          <div class="title">SỔ NHẬT KÝ KIỂM TOÁN HỆ THỐNG / SYSTEM AUDIT LOG</div>
+          <div class="title">SỔ NHẬT KÝ HỆ THỐNG / SYSTEM AUDIT LOG</div>
           <div class="subtitle">(Ghi nhận toàn bộ thao tác Thêm mới, Chỉnh sửa, Xóa, Bàn giao & Kiểm kê thiết bị CNS/ATM)</div>
 
           <table class="table-main">
@@ -340,7 +340,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
       </html>
     `);
     win.document.close();
-    onAddToast('Đã khởi tạo in Sổ Nhật Ký Kiểm Toán Hệ Thống!', 'success');
+    onAddToast('Đã khởi tạo in Sổ Nhật Ký Hệ Thống!', 'success');
   };
 
   return (
@@ -357,7 +357,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  NHẬT KÝ KIỂM TOÁN HỆ THỐNG
+                  NHẬT KÝ HỆ THỐNG
                 </h2>
                 <span className="bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-extrabold text-[11px] px-3 py-1 rounded-full border border-indigo-200 dark:border-indigo-800 uppercase tracking-wider flex items-center gap-1">
                   <Activity className="w-3 h-3 text-indigo-500" />
@@ -376,7 +376,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
               type="button"
               onClick={handleExportExcel}
               className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-              title="Xuất file Excel toàn bộ lịch sử kiểm toán"
+              title="Xuất file Excel toàn bộ lịch sử hệ thống"
             >
               <Download className="w-4 h-4" />
               <span>Xuất Excel (.xlsx)</span>
@@ -386,7 +386,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
               type="button"
               onClick={handlePrintAuditReport}
               className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-black text-xs sm:text-sm rounded-2xl shadow-xs transition-all cursor-pointer"
-              title="In bản cứng Sổ Nhật Ký Kiểm Toán"
+              title="In bản cứng Sổ Nhật Ký Hệ Thống"
             >
               <Printer className="w-4 h-4 text-indigo-500" />
               <span>In Nhật Ký</span>
@@ -708,7 +708,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    Chi Tiết Bản Ghi Kiểm Toán
+                    Chi Tiết Bản Ghi Nhật Ký Hệ Thống
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Mã bản ghi: {selectedLogDetail.id}

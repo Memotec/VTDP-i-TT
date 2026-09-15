@@ -1,29 +1,32 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import {
-  QrCode, Search, Database, RefreshCw, Plus, Edit,
-  Trash2, User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
+  QrCode, Search, Database, RefreshCw, Edit,
+  User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
-  FileText, ArrowRightLeft, Layers, Info, Crown, ShieldCheck, Shield, Key, AlertTriangle,
-  Smartphone, Download, Sparkles, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud
+  FileText, ArrowRightLeft, Layers, Crown, AlertTriangle,
+  Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
-import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS } from './initialData.ts';
+import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
-import { PrintTemplates, PrintLayoutType } from './components/PrintTemplates.tsx';
+import { PrintTemplates } from './components/PrintTemplates.tsx';
 import type { PrintMode } from './components/PrintPreviewModal.tsx';
 import { StatsCards } from './components/StatsCards.tsx';
 import type { HandoverRow } from './components/HandoverModal.tsx';
 import { InventoryTable } from './components/InventoryTable.tsx';
 import { MobileAppDock, MobileTab } from './components/MobileAppDock.tsx';
+import { MobileAppHeader } from './components/MobileAppHeader.tsx';
+import { MobileDrawerMenu } from './components/MobileDrawerMenu.tsx';
+import { MobileInstallBanner } from './components/MobileInstallBanner.tsx';
+import { usePWAInstall } from './hooks/usePWAInstall.ts';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
 import { getAccessToken, googleSignIn } from './services/authService.ts';
 import { uploadToDrive } from './services/googleDriveService.ts';
-import { LocalDatabase, STORAGE_KEYS } from './database/localDatabase.ts';
+import { LocalDatabase } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
 import { CloudService } from './services/cloudService.ts';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
-import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
 import { safePrintHtml, exportInventoryReportToPDF } from './utils/pdfExporter.ts';
@@ -44,6 +47,7 @@ import {
 } from './services/firebaseFirestoreService.ts';
 
 // Lazy-loaded modals and tabs for bundle size optimization and high performance
+const AppsScriptFixModal = React.lazy(() => import('./components/AppsScriptFixModal.tsx').then(m => ({ default: m.AppsScriptFixModal })));
 const PrintPreviewModal = React.lazy(() => import('./components/PrintPreviewModal.tsx').then(m => ({ default: m.PrintPreviewModal })));
 const ScannerModal = React.lazy(() => import('./components/ScannerModal.tsx').then(m => ({ default: m.ScannerModal })));
 const ItemDetailDrawer = React.lazy(() => import('./components/ItemDetailDrawer.tsx').then(m => ({ default: m.ItemDetailDrawer })));
@@ -137,13 +141,10 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả loại');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'MISSING' | 'UNCHECKED' | 'LOW_STOCK'>('ALL');
-  const [isLowStockBannerDismissed, setIsLowStockBannerDismissed] = useState(false);
   const [isLowStockDropdownOpen, setIsLowStockDropdownOpen] = useState(false);
 
   // Categories list
   const [categories, setCategories] = useState<string[]>(() => LocalDatabase.getCategories());
-  const [isAddingNewCat, setIsAddingNewCat] = useState(false);
-  const [newCatInput, setNewCatInput] = useState('');
 
   // Item form modal state
   const [isItemFormModalOpen, setIsItemFormModalOpen] = useState(false);
@@ -175,6 +176,9 @@ export default function App() {
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
   const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED' | 'AUDIT_LOG'>('INVENTORY');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const { isInstallable: pwaInstallable, isInstalled: pwaInstalled, installPwa } = usePWAInstall();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // System Audit Log state
   const [auditLogs, setAuditLogs] = useState<SystemAuditLogEntry[]>(() => LocalDatabase.getAuditLogs());
@@ -547,20 +551,23 @@ export default function App() {
     };
   }, [storageConfig.warnOnClose]);
 
+  // Synchronize darkMode changes to HTML classList, localStorage, and theme-color meta tag
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('cns_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('cns_theme', 'light');
+    }
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', darkMode ? '#0f172a' : '#2563EB');
+    }
+  }, [darkMode]);
+
   // Initialization
   useEffect(() => {
-    const savedTheme = localStorage.getItem('cns_theme');
-    if (savedTheme === 'light') {
-      setDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-      if (!savedTheme) {
-        localStorage.setItem('cns_theme', 'dark');
-      }
-    }
-
     const savedRole = localStorage.getItem('cns_session_active');
     const savedUsername = localStorage.getItem('cns_current_username');
     if (savedRole === 'admin' || savedRole === 'guest') {
@@ -1223,17 +1230,9 @@ export default function App() {
     addToast('Đã đăng xuất tài khoản.', 'info');
   };
 
-  const toggleTheme = () => {
-    const newVal = !darkMode;
-    setDarkMode(newVal);
-    if (newVal) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('cns_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('cns_theme', 'light');
-    }
-  };
+  const toggleTheme = useCallback(() => {
+    setDarkMode(prev => !prev);
+  }, []);
 
   const clearForm = () => {
     setEditingItem(null);
@@ -3369,8 +3368,8 @@ export default function App() {
       ) : (
         /* MODERN ENTERPRISE DASHBOARD LAYOUT */
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-800 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
-          {/* Left Sidebar */}
-          <aside className="w-full md:w-72 bg-white dark:bg-[#131B2E] border-r border-[#E2E8F0] dark:border-slate-800 flex flex-col shrink-0">
+          {/* Left Sidebar (Desktop Only) */}
+          <aside className="hidden md:flex md:w-72 bg-white dark:bg-[#131B2E] border-r border-[#E2E8F0] dark:border-slate-800 flex-col shrink-0">
             {/* Sidebar Brand Header */}
             <div className="p-5 border-b border-[#E2E8F0] dark:border-slate-800 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
@@ -3557,8 +3556,47 @@ export default function App() {
 
           {/* Right Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Top Enterprise Header */}
-            <header className="bg-white dark:bg-[#131B2E] border-b border-[#E2E8F0] dark:border-slate-800 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+            {/* Mobile PWA Installation Promotion Banner */}
+            <MobileInstallBanner
+              isInstallable={pwaInstallable}
+              isInstalled={pwaInstalled}
+              onInstall={installPwa}
+            />
+
+            {/* Mobile Dedicated Application Header (Mobile screens only) */}
+            <MobileAppHeader
+              activeWorkspaceTab={activeWorkspaceTab}
+              inventoryCount={inventory.length}
+              dispatchedCount={dispatchedRecords.length}
+              auditLogsCount={auditLogs.length}
+              lowStockCount={lowStockItems.length}
+              role={role}
+              currentUsername={currentUsername}
+              userFullName={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName}
+              darkMode={darkMode}
+              onToggleDarkMode={toggleTheme}
+              onOpenMenu={() => setIsMobileDrawerOpen(true)}
+              onOpenScanner={() => {
+                setScanTargetItem(null);
+                setIsScannerOpen(true);
+                playScanBeep(1000, 0.1);
+              }}
+              onAddNewItem={role === 'admin' ? handleOpenAddNewModal : undefined}
+              onToggleSearch={() => {
+                if (searchInputRef.current) {
+                  searchInputRef.current.focus();
+                  searchInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }}
+              onOpenLowStock={() => setIsLowStockDropdownOpen(true)}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenConflictModal={() => setIsConflictModalOpen(true)}
+              onOpenAppsScriptFix={() => setIsAppsScriptFixOpen(true)}
+              onPullCloud={() => fetchCloudData(undefined, false, false)}
+            />
+
+            {/* Top Enterprise Header (Desktop screens only) */}
+            <header className="hidden md:flex bg-white dark:bg-[#131B2E] border-b border-[#E2E8F0] dark:border-slate-800 px-6 py-4 items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="min-w-0">
                   <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
@@ -3618,7 +3656,7 @@ export default function App() {
                           {lowStockItems.length} mã
                         </span>
                       </div>
-                      <div className="max-h-60 overflow-y-auto custom-scrollbar my-2 divide-y divide-slate-100 dark:divide-slate-800">
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar my-2 divide-y divide-slate-100 dark:border-slate-800">
                         {lowStockItems.length === 0 ? (
                           <p className="py-6 text-center text-xs text-slate-400">Tất cả thiết bị đều an toàn (&gt; 1 cái).</p>
                         ) : (
@@ -3675,8 +3713,8 @@ export default function App() {
               </div>
             </header>
 
-            {/* Dashboard Content Body */}
-            <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
+            {/* Dashboard Content Body with Mobile-Optimized Padding */}
+            <main className="flex-1 px-3 py-3 sm:px-6 sm:py-6 lg:p-8 space-y-4 sm:space-y-6 pb-28 md:pb-8 max-w-[1600px] w-full mx-auto">
 
 
           {activeWorkspaceTab === 'DISPATCHED' ? (
@@ -3747,6 +3785,7 @@ export default function App() {
             <div className="relative flex-1 max-w-full xl:max-w-md">
               <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -4490,6 +4529,7 @@ export default function App() {
         <Suspense fallback={null}>
           <PrintPreviewModal
             isOpen={isPrintPreviewOpen}
+            initialMode={activePrintMode}
             onClose={() => {
               setIsPrintPreviewOpen(false);
               setPrintLayout('NONE');
@@ -4534,11 +4574,7 @@ export default function App() {
             } else if (tab === 'reports') {
               handleOpenPrintCenter('AUDIT_REPORT');
             } else if (tab === 'admin') {
-              if (role === 'admin') {
-                setIsAdminAccountModalOpen(true);
-              } else {
-                setIsSettingsOpen(true);
-              }
+              setIsMobileDrawerOpen(true);
             }
           }}
           onOpenScanner={() => {
@@ -4552,6 +4588,35 @@ export default function App() {
           role={role}
         />
       )}
+
+      {/* Mobile Drawer Menu / Profile Sheet */}
+      <MobileDrawerMenu
+        isOpen={isMobileDrawerOpen}
+        onClose={() => setIsMobileDrawerOpen(false)}
+        role={role}
+        currentUsername={currentUsername}
+        userFullName={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName}
+        inventoryCount={inventory.length}
+        dispatchedCount={dispatchedRecords.length}
+        auditLogsCount={auditLogs.length}
+        activeWorkspaceTab={activeWorkspaceTab}
+        onSelectWorkspaceTab={(tab) => {
+          setActiveWorkspaceTab(tab);
+          if (tab === 'INVENTORY') setMobileTab('inventory');
+          else if (tab === 'DISPATCHED') setMobileTab('dispatched');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenPrintCenter={() => handleOpenPrintCenter('AUDIT_REPORT')}
+        onOpenGoogleDrive={() => setIsGoogleDriveModalOpen(true)}
+        onOpenAdminAccounts={() => setIsAdminAccountModalOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSystemAuditLogs={() => setIsAuditLogModalOpen(true)}
+        onLogout={handleLogout}
+        darkMode={darkMode}
+        onToggleDarkMode={toggleTheme}
+        canInstallPwa={pwaInstallable}
+        onInstallPwa={installPwa}
+      />
 
       {/* Conflict Resolution Modal for Cloud vs Local Concurrency */}
       {isConflictModalOpen && (
@@ -4579,14 +4644,18 @@ export default function App() {
       )}
 
       {/* Google Apps Script Frozen Rows Fix Modal */}
-      <AppsScriptFixModal
-        isOpen={isAppsScriptFixOpen}
-        onClose={() => setIsAppsScriptFixOpen(false)}
-        isSyncing={syncStatus === 'syncing'}
-        onRetrySync={async () => {
-          await syncToCloud();
-        }}
-      />
+      {isAppsScriptFixOpen && (
+        <Suspense fallback={null}>
+          <AppsScriptFixModal
+            isOpen={isAppsScriptFixOpen}
+            onClose={() => setIsAppsScriptFixOpen(false)}
+            isSyncing={syncStatus === 'syncing'}
+            onRetrySync={async () => {
+              await syncToCloud();
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

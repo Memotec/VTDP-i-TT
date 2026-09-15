@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Layers, CheckSquare, Activity, XCircle, Check, AlertTriangle } from 'lucide-react';
+import { Layers, CheckSquare, Activity, XCircle, Check, AlertTriangle, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { AuditStats, InventoryItem } from '../types.ts';
 
@@ -10,6 +10,8 @@ interface StatsCardsProps {
 }
 
 export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, inventory, onFilterLowStock }) => {
+  const [isMobileExpanded, setIsMobileExpanded] = React.useState(false);
+
   const { totalOk, totalMissing, totalUnchecked, totalAll, lowStockCount, chartData, ratioOk, ratioMissing, ratioUnchecked } = useMemo(() => {
     let ok = 0;
     let missing = 0;
@@ -58,9 +60,67 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
   }, [inventory]);
 
   return (
-    <div className="space-y-6" id="stats-section">
-      {/* Top 5 Metric Cards */}
-      <section className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+    <div className="space-y-4 sm:space-y-6" id="stats-section">
+      {/* Mobile Compact KPI Strip */}
+      <div className="md:hidden bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xs">
+        <div className="grid grid-cols-3 gap-2 text-center divide-x divide-slate-100 dark:divide-slate-800">
+          {/* Col 1: Tồn kho */}
+          <div className="px-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tồn Kho</span>
+            <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+              {stats.totalQty} <span className="text-[10px] font-semibold text-slate-400">cái</span>
+            </div>
+            {lowStockCount > 0 && onFilterLowStock && (
+              <button
+                type="button"
+                onClick={onFilterLowStock}
+                className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-700"
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {lowStockCount} ≤1
+              </button>
+            )}
+          </div>
+
+          {/* Col 2: Tiến độ */}
+          <div className="px-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kiểm Kê</span>
+            <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+              {stats.checkedCount}<span className="text-[10px] font-semibold text-slate-400">/{stats.totalItems}</span>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block mt-1">
+              {Math.round((stats.checkedCount / (stats.totalItems || 1)) * 100)}% xong
+            </span>
+          </div>
+
+          {/* Col 3: An toàn */}
+          <div className="px-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">An Toàn</span>
+            <div className="text-base font-black text-blue-600 dark:text-blue-400 mt-0.5">
+              {stats.healthRate}%
+            </div>
+            <span className={`text-[10px] font-bold block mt-1 ${stats.missingCount > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+              {stats.missingCount > 0 ? `${stats.missingCount} thiếu` : 'Đủ bộ'}
+            </span>
+          </div>
+        </div>
+
+        {/* Expand / Collapse Button for Mobile */}
+        <button
+          type="button"
+          onClick={() => setIsMobileExpanded(!isMobileExpanded)}
+          className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 cursor-pointer active:scale-98 transition-transform"
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>{isMobileExpanded ? 'Thu gọn biểu đồ thống kê' : 'Xem biểu đồ & số liệu chi tiết'}</span>
+          {isMobileExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+
+      {/* Full Metric Cards & Charts (Always shown on desktop, expandable on mobile) */}
+      <div className={`${isMobileExpanded ? 'block' : 'hidden md:block'} space-y-6`}>
+        {/* Top 5 Metric Cards */}
+        <section className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between col-span-2 sm:col-span-1 transition-all hover:border-blue-300 dark:hover:border-blue-800">
           <div className="space-y-1">
             <p className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Danh mục quản lý</p>
@@ -236,6 +296,7 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
             <span className="text-xs font-extrabold text-slate-500 tracking-wider">CÁI / BỘ</span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

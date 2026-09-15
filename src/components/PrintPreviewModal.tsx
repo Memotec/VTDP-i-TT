@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Printer, 
   X, 
@@ -42,6 +42,7 @@ interface PrintPreviewModalProps {
   currentUsername: string;
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   syncConfig?: SyncConfig;
+  initialMode?: PrintMode;
   onAddSystemAuditLog?: (
     actionType: AuditActionType,
     actionTitle: string,
@@ -66,11 +67,18 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   currentUsername,
   onAddToast,
   syncConfig,
+  initialMode,
   onAddSystemAuditLog
 }) => {
-  const [printMode, setPrintMode] = useState<PrintMode>('QR');
+  const [printMode, setPrintMode] = useState<PrintMode>(initialMode || 'QR');
   const [scope, setScope] = useState<'ALL' | 'FILTERED'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    if (initialMode) {
+      setPrintMode(initialMode);
+    }
+  }, [initialMode]);
   
   // Audit Report form custom fields
   const [inspectorName, setInspectorName] = useState(currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Nguyễn Văn Khải');

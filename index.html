@@ -12,9 +12,25 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="QL Kho Vật Tư Đội TT" />
     <meta name="application-name" content="Quản Lý Kho Vật Tư Dự Phòng Đội Thông Tin" />
-    <meta name="theme-color" content="#BDBDBF" />
+    <meta name="theme-color" content="#0f172a" />
     <meta name="msapplication-TileColor" content="#2563EB" />
     <meta name="format-detection" content="telephone=no" />
+    
+    <!-- Dark Mode Immediate Hydration Script -->
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('cns_theme');
+          if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#2563EB');
+          } else {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     
     <!-- Manifest & App Icons -->
     <link rel="manifest" href="/manifest.json" />

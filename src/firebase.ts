@@ -1,12 +1,44 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  setLogLevel,
+  doc,
+  getDocFromServer,
+  Firestore
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = (firebaseConfig as any).firestoreDatabaseId
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(app); /* CRITICAL: The app will break without this line */
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Set Firestore log level to 'error' to avoid noisy connection retry messages
+try {
+  setLogLevel('error');
+} catch {
+  // Ignored if already set
+}
+
+const firestoreDatabaseId = (firebaseConfig as any).firestoreDatabaseId;
+
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true,
+      ignoreUndefinedProperties: true,
+    },
+    firestoreDatabaseId
+  );
+} catch {
+  // If Firestore is already initialized on this app instance (e.g. during HMR/hot reload)
+  firestoreInstance = firestoreDatabaseId
+    ? getFirestore(app, firestoreDatabaseId)
+    : getFirestore(app);
+}
+
+export const db = firestoreInstance;
 export const auth = getAuth(app);
 
 export async function testFirestoreConnection(): Promise<boolean> {

@@ -17,6 +17,8 @@ interface InventoryTableProps {
   onDeleteItem: (item: InventoryItem) => void;
   onOpenScanTarget: (item: InventoryItem) => void;
   onExportCsv: () => void;
+  onExportPdf?: () => void;
+  isExportingPdf?: boolean;
   onAddNewItem?: () => void;
 }
 
@@ -31,6 +33,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   onDeleteItem,
   onOpenScanTarget,
   onExportCsv,
+  onExportPdf,
+  isExportingPdf = false,
   onAddNewItem
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -111,6 +115,19 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
             >
               <Plus className="w-4 h-4" />
               <span>+ Thêm Thiết Bị</span>
+            </button>
+          )}
+
+          {onExportPdf && (
+            <button
+              type="button"
+              onClick={onExportPdf}
+              disabled={isExportingPdf}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border border-rose-200/80 dark:border-rose-900/60 shadow-xs active:scale-95 disabled:opacity-60"
+              title="Xuất danh sách thiết bị đang lọc thành tệp PDF chuyên nghiệp có logo Đội Thông Tin"
+            >
+              <FileText className={`w-4 h-4 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-pulse' : ''}`} />
+              <span>{isExportingPdf ? 'Đang xuất PDF...' : 'Xuất Báo Cáo PDF'}</span>
             </button>
           )}
 

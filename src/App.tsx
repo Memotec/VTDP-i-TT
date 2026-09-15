@@ -26,7 +26,7 @@ import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppsScriptFixModal } from './components/AppsScriptFixModal.tsx';
 import { ConflictItem } from './types.ts';
 import { findMatchingInventoryItems } from './utils/qrParser.ts';
-import { safePrintHtml } from './utils/pdfExporter.ts';
+import { safePrintHtml, exportInventoryReportToPDF } from './utils/pdfExporter.ts';
 import {
   testFirestoreConnection,
   batchSaveInventoryToFirestore,
@@ -319,6 +319,7 @@ export default function App() {
   const [printLayout, setPrintLayout] = useState<'NONE' | 'QR' | 'LABEL'>('NONE');
   const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isExportingInventoryPdf, setIsExportingInventoryPdf] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('cns_theme');
@@ -1329,6 +1330,38 @@ export default function App() {
       'Xuất dữ liệu kho CSV',
       `Đã xuất ${filteredInventory.length} mục thiết bị ra file CSV với bộ lọc hiện tại.`
     );
+  };
+
+  const handleExportFilteredInventoryPdf = async () => {
+    if (filteredInventory.length === 0) {
+      addToast('Không có thiết bị nào trong danh sách đang lọc để xuất PDF!', 'error');
+      return;
+    }
+
+    try {
+      setIsExportingInventoryPdf(true);
+      addToast('Đang khởi tạo tệp PDF Báo cáo tồn kho Đội Thông Tin...', 'info');
+      await exportInventoryReportToPDF(filteredInventory, {
+        currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
+        categoryFilter: selectedCategory,
+        searchQuery: searchQuery,
+        reportTitle: selectedCategory !== 'ALL' 
+          ? `BÁO CÁO TỒN KHO & HIỆN TRẠNG THIẾT BỊ (${selectedCategory.toUpperCase()})`
+          : 'BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG TẠI CHỖ',
+        reportDate: new Date().toLocaleDateString('vi-VN')
+      });
+      addToast(`Đã xuất thành công tệp PDF Báo cáo tồn kho (${filteredInventory.length} thiết bị)!`, 'success');
+      addSystemAuditLog(
+        'REPORT_DISPATCH',
+        'Xuất Báo Cáo Tồn Kho PDF',
+        `Xuất báo cáo tồn kho PDF cho ${filteredInventory.length} thiết bị (Chuyên mục: ${selectedCategory}, Tìm kiếm: "${searchQuery || 'Tất cả'}").`
+      );
+    } catch (err) {
+      console.error('Lỗi khi xuất PDF tồn kho:', err);
+      addToast('Có lỗi xảy ra khi xuất PDF. Vui lòng thử lại!', 'error');
+    } finally {
+      setIsExportingInventoryPdf(false);
+    }
   };
 
   // Scanning logic
@@ -3577,7 +3610,18 @@ export default function App() {
                 {isExportDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          handleExportFilteredInventoryPdf();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <FileText className="w-4 h-4 text-rose-600" />
+                        <span>Xuất Báo Cáo Tồn Kho PDF (.pdf)</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -3597,7 +3641,7 @@ export default function App() {
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 rounded-xl transition-colors cursor-pointer text-left"
                       >
-                        <FileText className="w-4 h-4 text-emerald-600" />
+                        <FileDown className="w-4 h-4 text-emerald-600" />
                         <span>Xuất Danh Sách CSV (.csv)</span>
                       </button>
                       <button
@@ -3836,6 +3880,8 @@ export default function App() {
                 playScanBeep(1000, 0.1);
               }}
               onExportCsv={handleExportCsv}
+              onExportPdf={handleExportFilteredInventoryPdf}
+              isExportingPdf={isExportingInventoryPdf}
               onAddNewItem={handleOpenAddNewModal}
             />
           </div>

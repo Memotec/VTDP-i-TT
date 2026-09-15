@@ -13,8 +13,17 @@ export async function testFirestoreConnection(): Promise<boolean> {
     console.log('Firebase Firestore connection verified.');
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase Firestore offline or initializing.');
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errCode = (error as any)?.code;
+    if (
+      errMsg.includes('the client is offline') || 
+      errMsg.includes('Could not reach Cloud Firestore') ||
+      errCode === 'unavailable' ||
+      errCode === 'failed-precondition'
+    ) {
+      console.warn('Firebase Firestore is operating in offline mode or waiting for connection.');
+    } else {
+      console.warn('Firebase Firestore test connection check:', errMsg);
     }
     return false;
   }

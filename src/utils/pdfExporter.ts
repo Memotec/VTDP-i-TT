@@ -507,18 +507,25 @@ export async function exportAuditReportToPDF(
 
   const html = `
     <div style="padding: 12mm 15mm; box-sizing: border-box; background: #fff; width: 210mm;">
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; border-bottom: 2px solid #1e3a8a; padding-bottom: 6px;">
         <tr>
-          <td style="width: 45%; text-align: center; vertical-align: top;">
-            <div style="font-size: 9.5pt; font-weight: bold; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
-            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;"><u>ĐỘI THÔNG TIN</u></div>
-            <div style="font-size: 9.5pt; font-style: italic; margin-top: 4px;">Số: ......./BB-ĐTT-KK</div>
+          <td style="width: 52%; text-align: left; vertical-align: middle; padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 48px; height: 48px; flex-shrink: 0;">
+                ${DOI_THONG_TIN_LOGO_SVG}
+              </div>
+              <div>
+                <div style="font-size: 8pt; color: #475569; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+                <div style="font-size: 9pt; font-weight: bold; text-transform: uppercase;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
+                <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #1e40af; margin-top: 1px;"><u>ĐỘI THÔNG TIN</u></div>
+                <div style="font-size: 8pt; font-style: italic; color: #64748b;">Số: ......./BB-ĐTT-KK</div>
+              </div>
+            </div>
           </td>
-          <td style="width: 55%; text-align: center; vertical-align: top;">
-            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+          <td style="width: 48%; text-align: center; vertical-align: middle; padding-bottom: 6px;">
+            <div style="font-size: 9.5pt; font-weight: bold; text-transform: uppercase;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
             <div style="font-size: 10.5pt; font-weight: bold; margin-top: 2px;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
-            <div style="font-size: 10pt; font-style: italic; margin-top: 4px;">TP. Hồ Chí Minh, ngày ${auditDate}</div>
+            <div style="font-size: 8.5pt; font-style: italic; margin-top: 4px;">TP. Hồ Chí Minh, ngày ${auditDate}</div>
           </td>
         </tr>
       </table>
@@ -615,6 +622,218 @@ export async function exportAuditReportToPDF(
 
   const fileName = `BienBan_KiemKe_Kho_${auditDate.replace(/[\/\\]/g, '-')}.pdf`;
   await renderHtmlToPdf(html, fileName);
+}
+
+/**
+ * SVG Logo Đội Thông Tin - CNS/ATM
+ */
+export const DOI_THONG_TIN_LOGO_SVG = `
+<svg width="58" height="58" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="48" fill="#0F172A" stroke="#2563EB" stroke-width="3"/>
+  <circle cx="50" cy="50" r="41" fill="#1E293B" stroke="#38BDF8" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <path d="M50 16 A34 34 0 0 1 84 50" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M50 25 A25 25 0 0 1 75 50" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/>
+  <path d="M50 34 A16 16 0 0 1 66 50" stroke="#93C5FD" stroke-width="1.5" stroke-linecap="round"/>
+  <polygon points="50,42 43,76 57,76" fill="#CBD5E1"/>
+  <line x1="41" y1="62" x2="59" y2="62" stroke="#94A3B8" stroke-width="2"/>
+  <line x1="45" y1="52" x2="55" y2="52" stroke="#94A3B8" stroke-width="1.5"/>
+  <circle cx="50" cy="40" r="4" fill="#EF4444"/>
+  <path d="M20 68 Q35 63 50 68 Q65 63 80 68 Q65 74 50 72 Q35 74 20 68 Z" fill="#F59E0B"/>
+  <text x="50" y="89" fill="#FFFFFF" font-family="'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="900" text-anchor="middle" letter-spacing="0.6">ĐỘI THÔNG TIN</text>
+</svg>
+`;
+
+export interface InventoryExportOptions {
+  currentUsername?: string;
+  categoryFilter?: string;
+  searchQuery?: string;
+  reportTitle?: string;
+  reportDate?: string;
+  warehouseLocation?: string;
+  inspectorName?: string;
+  notes?: string;
+}
+
+/**
+ * 5. Xuất BÁO CÁO TỒN KHO HIỆN TẠI (ĐÃ LỌC) THÀNH PDF CHUYÊN NGHIỆP CÓ LOGO ĐỘI THÔNG TIN
+ */
+export async function exportInventoryReportToPDF(
+  filteredItems: InventoryItem[],
+  options: InventoryExportOptions = {}
+) {
+  const now = new Date();
+  const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
+  const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const username = options.currentUsername || options.inspectorName || 'Kỹ sư Quản lý Kho';
+  const category = options.categoryFilter && options.categoryFilter !== 'ALL' ? options.categoryFilter : 'Tất cả chuyên mục';
+  const search = options.searchQuery ? `Từ khóa: "${options.searchQuery}"` : 'Toàn bộ';
+  
+  const totalQty = filteredItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+  const okItems = filteredItems.filter(item => item.auditStatus === 'OK');
+  const missingItems = filteredItems.filter(item => item.auditStatus === 'MISSING');
+  const uncheckedItems = filteredItems.filter(item => !item.auditStatus);
+  const okQty = okItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+  const missingQty = missingItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+  const rowsHtml = filteredItems.map((item, idx) => {
+    const statusBg = item.auditStatus === 'OK' ? '#dcfce7' : (item.auditStatus === 'MISSING' ? '#fee2e2' : '#f1f5f9');
+    const statusColor = item.auditStatus === 'OK' ? '#15803d' : (item.auditStatus === 'MISSING' ? '#b91c1c' : '#475569');
+    const statusText = item.auditStatus === 'OK' ? 'ĐỦ / ĐẠT' : (item.auditStatus === 'MISSING' ? 'THIẾU / HỎNG' : 'CHƯA KIỂM');
+
+    return `
+      <tr style="background-color: ${idx % 2 === 1 ? '#fcfcfc' : '#ffffff'};">
+        <td style="border: 1px solid #cbd5e1; padding: 6px 3px; text-align: center; font-size: 9pt; font-weight: bold; color: #475569;">${idx + 1}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center; font-family: monospace; font-size: 8.5pt; font-weight: bold; color: #1e3a8a;">
+          ${item.warehouse || '-'}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left;">
+          <div style="font-size: 9.5pt; font-weight: bold; color: #0f172a;">${item.name}</div>
+          <div style="font-size: 8pt; color: #64748b; margin-top: 1px;">Chủng loại: <strong>${item.category || 'Vật tư CNS'}</strong></div>
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center; font-family: monospace; font-size: 9pt; color: #334155;">
+          ${item.pn || '-'}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center; font-family: monospace; font-size: 9pt; font-weight: bold; color: #0f172a;">
+          ${item.sn || '-'}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: left; font-size: 8.5pt; color: #334155;">
+          ${item.loc || '-'}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 3px; text-align: center; font-size: 10pt; font-weight: bold; color: #0f172a;">
+          ${item.qty}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center;">
+          <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: ${statusBg}; color: ${statusColor}; font-weight: bold; font-size: 8pt; border: 1px solid ${statusColor}33;">
+            ${statusText}
+          </span>
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; font-size: 8pt; color: #475569; font-style: italic;">
+          ${item.auditNote || (item.auditDate ? `Đã kiểm ${item.auditDate}` : 'Đang lưu kho dự phòng')}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <div style="padding: 10mm 12mm 10mm 12mm; box-sizing: border-box; background: #ffffff; width: 297mm; color: #0f172a; font-family: 'Times New Roman', Times, serif;">
+      
+      <!-- TOP HEADER WITH OFFICIAL LOGO & NATIONAL EMBLEM -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px;">
+        <tr>
+          <td style="width: 52%; vertical-align: middle; text-align: left; padding-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 54px; height: 54px; flex-shrink: 0;">
+                ${DOI_THONG_TIN_LOGO_SVG}
+              </div>
+              <div>
+                <div style="font-size: 8pt; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
+                <div style="font-size: 9pt; font-weight: bold; color: #0f172a; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM - TRUNG TÂM BĐKT</div>
+                <div style="font-size: 10.5pt; font-weight: bold; color: #1e40af; text-transform: uppercase; margin-top: 1px;">
+                  <u>ĐỘI THÔNG TIN (CNS/ATM)</u>
+                </div>
+                <div style="font-size: 8pt; color: #64748b; font-style: italic; margin-top: 2px;">Hệ thống Quản lý Vật tư Dự phòng & Kiểm kê Kỹ thuật</div>
+              </div>
+            </div>
+          </td>
+          <td style="width: 48%; vertical-align: middle; text-align: center; padding-bottom: 8px;">
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #0f172a;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+            <div style="font-size: 11pt; font-weight: bold; color: #0f172a; margin-top: 1px;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+            <div style="font-size: 8.5pt; font-style: italic; color: #475569; margin-top: 4px;">TP. Hồ Chí Minh, ngày ${dateStr} (Trích xuất: ${timeStr})</div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- DOCUMENT TITLE -->
+      <div style="text-align: center; margin: 10px 0 10px 0;">
+        <h1 style="font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; color: #1e3a8a;">
+          ${options.reportTitle || 'BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG TẠI CHỖ'}
+        </h1>
+        <div style="font-size: 9pt; font-style: italic; margin-top: 3px; color: #475569;">
+          (Dữ liệu trích xuất theo danh mục đã lọc • Phục vụ công tác bảo đảm kỹ thuật thông tin, dẫn đường, giám sát)
+        </div>
+      </div>
+
+      <!-- FILTER & SUMMARY METRICS BAR -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <tr>
+          <td style="width: 50%; padding: 8px 12px; vertical-align: top; border-right: 1px solid #e2e8f0; font-size: 9pt; line-height: 1.5;">
+            <div>• Phân loại lọc: <strong>${category}</strong></div>
+            <div>• Điều kiện tìm kiếm: <strong>${search}</strong></div>
+            <div>• Vị trí kho kiểm tra: <strong>${options.warehouseLocation || 'Kho Vật tư Dự phòng Đội Thông Tin - Tầng 3 Đài KSKLL'}</strong></div>
+            <div>• Người trích xuất: <strong>${username}</strong></div>
+          </td>
+          <td style="width: 50%; padding: 8px 12px; vertical-align: top; font-size: 9pt; line-height: 1.5;">
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+              <div>
+                • Tổng số danh mục: <strong style="color: #1e40af; font-size: 10pt;">${filteredItems.length}</strong> mã<br/>
+                • Tổng số hiện vật: <strong style="color: #1e40af; font-size: 10pt;">${totalQty}</strong> chiếc/bộ<br/>
+                • Tỷ lệ đạt chuẩn: <strong style="color: #15803d; font-size: 10pt;">${filteredItems.length > 0 ? Math.round((okItems.length / filteredItems.length) * 100) : 0}%</strong>
+              </div>
+              <div style="padding-left: 10px; border-left: 1px dashed #cbd5e1;">
+                • Đủ / Tốt: <strong style="color: #15803d;">${okItems.length} mã (${okQty} món)</strong><br/>
+                • Thiếu / Cảnh báo: <strong style="color: #b91c1c;">${missingItems.length} mã (${missingQty} món)</strong><br/>
+                • Chưa đối soát: <strong style="color: #475569;">${uncheckedItems.length} mã</strong>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- STANDARD TABLE FORMAT -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 9pt;">
+        <thead>
+          <tr style="background-color: #1e3a8a; color: #ffffff;">
+            <th style="border: 1px solid #0f172a; padding: 7px 3px; width: 30px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">STT</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 4px; width: 85px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Mã Kho / QR</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 8px; text-align: left; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Tên Trang Thiết Bị / Vật Tư</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 4px; width: 110px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Part Number</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 4px; width: 110px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Serial (S/N)</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 6px; width: 110px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Vị Trí / Tủ</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 3px; width: 45px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">SL</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 4px; width: 85px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Hiện Trạng</th>
+            <th style="border: 1px solid #0f172a; padding: 7px 6px; width: 130px; text-align: center; font-size: 8.5pt; font-weight: bold; text-transform: uppercase;">Ghi Chú & Lịch Sử</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <!-- SIGNATURE AND APPROVAL SECTION -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 15px; page-break-inside: avoid;">
+        <tr>
+          <td style="width: 33.3%; text-align: center; vertical-align: top;">
+            <div style="font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #0f172a;">NGƯỜI LẬP BÁO CÁO</div>
+            <div style="font-size: 8.5pt; font-style: italic; color: #64748b; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
+            <div style="height: 55px;"></div>
+            <div style="font-weight: bold; font-size: 9.5pt; color: #0f172a;">${username}</div>
+          </td>
+          <td style="width: 33.3%; text-align: center; vertical-align: top;">
+            <div style="font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #0f172a;">KỸ SƯ PHỤ TRÁCH KHO</div>
+            <div style="font-size: 8.5pt; font-style: italic; color: #64748b; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
+            <div style="height: 55px;"></div>
+            <div style="font-weight: bold; font-size: 9.5pt; color: #0f172a;">........................................</div>
+          </td>
+          <td style="width: 33.3%; text-align: center; vertical-align: top;">
+            <div style="font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #0f172a;">ĐỘI TRƯỞNG ĐỘI THÔNG TIN</div>
+            <div style="font-size: 8.5pt; font-style: italic; color: #64748b; margin-top: 2px;">(Ký, đóng dấu xác nhận)</div>
+            <div style="height: 55px;"></div>
+            <div style="font-weight: bold; font-size: 9.5pt; color: #0f172a;">........................................</div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- FOOTER NOTE -->
+      <div style="margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 6px; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between;">
+        <div>Tài liệu kỹ thuật nội bộ • Đội Thông Tin CNS/ATM • Trung tâm Bảo đảm Kỹ thuật - Công ty Quản lý bay miền Nam</div>
+        <div>Hệ thống CNS v3.1 • Mã báo cáo: BC-CNS-${Date.now().toString().slice(-6)}</div>
+      </div>
+    </div>
+  `;
+
+  const safeCategory = (options.categoryFilter || 'All').replace(/[\/\s\\&]/g, '_');
+  const fileName = `BaoCao_TonKho_DoiThongTin_${safeCategory}_${dateStr.replace(/[\/\\]/g, '-')}.pdf`;
+  await renderHtmlToPdf(html, fileName, true); // Landscape A4 format
 }
 
 /**

@@ -35,6 +35,40 @@ export const initAuthListener = (
   });
 };
 
+export const signInWithGoogleAccount = async (): Promise<{ user: User; accessToken?: string } | null> => {
+  try {
+    isSigningIn = true;
+    const loginProvider = new GoogleAuthProvider();
+    loginProvider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, loginProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedAccessToken = credential.accessToken;
+    }
+    return { user: result.user, accessToken: credential?.accessToken || undefined };
+  } catch (error: any) {
+    const errorCode = error?.code || '';
+    const errorMsg = error?.message || '';
+
+    // Handle user closing popup or cancelling popup gracefully
+    if (
+      errorCode === 'auth/popup-closed-by-user' ||
+      errorCode === 'auth/cancelled-popup-request' ||
+      errorCode === 'auth/popup-blocked' ||
+      errorMsg.includes('popup-closed-by-user') ||
+      errorMsg.includes('cancelled-popup-request')
+    ) {
+      console.info('Người dùng đã đóng hoặc hủy cửa sổ đăng nhập Google.');
+      return null;
+    }
+
+    console.error('Lỗi đăng nhập tài khoản Google:', error);
+    throw error;
+  } finally {
+    isSigningIn = false;
+  }
+};
+
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;

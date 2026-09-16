@@ -58,7 +58,10 @@ export interface UserAccount {
   username: string;
   fullName: string;
   role: Role;
-  password: string;
+  password?: string;
+  email?: string;
+  photoURL?: string;
+  provider?: 'local' | 'google';
   createdAt: string;
   status: 'active' | 'locked';
   notes?: string;

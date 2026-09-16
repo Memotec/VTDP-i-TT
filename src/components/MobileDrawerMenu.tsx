@@ -27,6 +27,8 @@ interface MobileDrawerMenuProps {
   role: Role | null;
   currentUsername: string | null;
   userFullName?: string;
+  userEmail?: string;
+  userPhotoUrl?: string;
   inventoryCount: number;
   dispatchedCount: number;
   auditLogsCount: number;
@@ -50,6 +52,8 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
   role,
   currentUsername,
   userFullName,
+  userEmail,
+  userPhotoUrl,
   inventoryCount,
   dispatchedCount,
   auditLogsCount,
@@ -98,11 +102,20 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
         {/* Sheet Header */}
         <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/25">
-              {userInitials}
-            </div>
+            {userPhotoUrl ? (
+              <img
+                src={userPhotoUrl}
+                alt={userFullName || currentUsername || 'Avatar'}
+                className="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-md"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/25">
+                {userInitials}
+              </div>
+            )}
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white text-sm">
+              <h3 className="font-black text-slate-900 dark:text-white text-sm truncate max-w-[180px]">
                 {userFullName || currentUsername || 'Người dùng'}
               </h3>
               <div className="flex items-center gap-2 mt-0.5">
@@ -113,7 +126,9 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
                 }`}>
                   {role === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}
                 </span>
-                <span className="text-[11px] font-mono text-slate-400">@{currentUsername}</span>
+                <span className="text-[11px] font-mono text-slate-400 truncate max-w-[120px]">
+                  {userEmail ? userEmail : `@${currentUsername}`}
+                </span>
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import {
   Layers, Building2, User, Eye, Download, Loader2
 } from 'lucide-react';
 import { DispatchedRecord, Role } from '../types.ts';
+import { exportDispatchedRegistryToPDF } from '../utils/pdfExporter.ts';
 
 interface DeployedRegistryTableProps {
   records: DispatchedRecord[];
@@ -74,7 +75,6 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
     try {
       setIsExportingRegistryPdf(true);
       showToast('Đang tạo tệp PDF Sổ Tổng Hợp Theo Dõi Thiết Bị...', 'info');
-      const { exportDispatchedRegistryToPDF } = await import('../utils/pdfExporter.ts');
       await exportDispatchedRegistryToPDF(filteredRecords);
       showToast(`Đã xuất tệp PDF Sổ Theo Dõi (${filteredRecords.length} hồ sơ) thành công!`, 'success');
     } catch (err) {

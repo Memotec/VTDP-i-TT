@@ -2002,24 +2002,7 @@ export default function App() {
   const handleFallbackToLocal = (reason: string, isSilent: boolean = false, isStartup: boolean = false) => {
     // 1. Retrieve data safely from LocalStorage / LocalDatabase
     const localInv = LocalDatabase.getInventory();
-    if (localInv && localInv.length > 0) {
-      setInventory(localInv);
-    } else {
-      const rawLocal = localStorage.getItem('cns_inventory_v30_stable');
-      if (rawLocal) {
-        try {
-          const parsed = JSON.parse(rawLocal);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setInventory(parsed);
-          }
-        } catch {
-          setInventory(INITIAL_INVENTORY);
-        }
-      } else {
-        setInventory(INITIAL_INVENTORY);
-        LocalDatabase.saveInventory(INITIAL_INVENTORY);
-      }
-    }
+    setInventory(localInv);
 
     const localDispatched = LocalDatabase.getDispatchedRecords();
     if (localDispatched && localDispatched.length > 0) {

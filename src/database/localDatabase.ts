@@ -25,12 +25,12 @@ export class LocalDatabase {
   static getInventory(): InventoryItem[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY);
-      if (!raw) return INITIAL_INVENTORY;
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_INVENTORY;
+      return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
       console.error('LocalDatabase.getInventory error:', err);
-      return INITIAL_INVENTORY;
+      return [];
     }
   }
 
@@ -145,12 +145,12 @@ export class LocalDatabase {
   static getDispatchedRecords(): DispatchedRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.DISPATCHED);
-      if (!raw) return INITIAL_DISPATCHED_RECORDS;
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_DISPATCHED_RECORDS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
       console.error('LocalDatabase.getDispatchedRecords error:', err);
-      return INITIAL_DISPATCHED_RECORDS;
+      return [];
     }
   }
 
@@ -206,11 +206,11 @@ export class LocalDatabase {
   static getAuditLogs(): SystemAuditLogEntry[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      if (!raw) return INITIAL_SYSTEM_AUDIT_LOGS;
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_SYSTEM_AUDIT_LOGS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return INITIAL_SYSTEM_AUDIT_LOGS;
+      return [];
     }
   }
 

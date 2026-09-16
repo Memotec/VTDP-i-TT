@@ -60,13 +60,13 @@ export const MobileAppHeader: React.FC<MobileAppHeaderProps> = ({
   const getTabTitle = () => {
     switch (activeWorkspaceTab) {
       case 'INVENTORY':
-        return { name: 'Kho Vật Tư', count: inventoryCount, icon: Database };
+        return { name: 'Kho Vật Tư', count: inventoryCount, unit: 'vật tư', icon: Database };
       case 'DISPATCHED':
-        return { name: 'Sổ Bàn Giao', count: dispatchedCount, icon: Layers };
+        return { name: 'Sổ Bàn Giao', count: dispatchedCount, unit: 'hồ sơ', icon: Layers };
       case 'AUDIT_LOG':
-        return { name: 'Nhật Ký Hệ Thống', count: auditLogsCount, icon: FileText };
+        return { name: 'Nhật Ký Hệ Thống', count: auditLogsCount, unit: 'bản ghi', icon: FileText };
       default:
-        return { name: 'Kho Dự Phòng', count: inventoryCount, icon: Database };
+        return { name: 'Kho Dự Phòng', count: inventoryCount, unit: 'vật tư', icon: Database };
     }
   };
 
@@ -94,7 +94,7 @@ export const MobileAppHeader: React.FC<MobileAppHeaderProps> = ({
               </span>
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/60 shrink-0">
                 <TabIcon className="w-2.5 h-2.5" />
-                {tabInfo.name} ({tabInfo.count})
+                Tổng: {tabInfo.count} / {tabInfo.unit}
               </span>
             </div>
             <p className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium truncate">

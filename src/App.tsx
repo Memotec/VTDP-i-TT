@@ -3793,7 +3793,7 @@ export default function App() {
                       {activeWorkspaceTab === 'INVENTORY' ? 'Kho Dự Phòng Tại Chỗ' : activeWorkspaceTab === 'DISPATCHED' ? 'Sổ Bàn Giao & Điều Chuyển' : 'Nhật Ký Hệ Thống'}
                     </span>
                     <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-[#2563EB] dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-900 hidden sm:inline-flex items-center">
-                      {activeWorkspaceTab === 'INVENTORY' ? `${inventory.length} vật tư` : activeWorkspaceTab === 'DISPATCHED' ? `${dispatchedRecords.length} hồ sơ` : `${auditLogs.length} bản ghi`}
+                      {activeWorkspaceTab === 'INVENTORY' ? `Tổng: ${inventory.length} / vật tư` : activeWorkspaceTab === 'DISPATCHED' ? `Tổng: ${dispatchedRecords.length} / hồ sơ` : `Tổng: ${auditLogs.length} / bản ghi`}
                     </span>
                   </h1>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">

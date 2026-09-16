@@ -123,10 +123,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                 DANH MỤC THIẾT BỊ & VẬT TƯ
               </h3>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 dark:bg-blue-950/80 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/60">
-                {filteredInventory.length} mã
+                Tổng: {filteredInventory.length} / mã vật tư
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                {totalQty} hiện vật
+                Tổng: {totalQty} / hiện vật
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">

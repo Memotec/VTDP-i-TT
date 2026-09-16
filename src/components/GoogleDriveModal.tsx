@@ -93,7 +93,14 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
         return;
       }
       console.error('Đăng nhập thất bại:', err);
-      onAddToast(`Đăng nhập Google thất bại: ${err.message || 'Vui lòng thử lại'}`, 'error');
+      const msg = err?.message || '';
+      if (msg.includes('POPUP_BLOCKED')) {
+        onAddToast('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Vui lòng cho phép Pop-up trên trình duyệt hoặc mở ứng dụng ở Tab mới!', 'error');
+      } else if (msg.includes('UNAUTHORIZED_DOMAIN')) {
+        onAddToast('Tên miền ứng dụng chưa được ủy quyền trong Firebase Auth Console. Vui lòng kiểm tra cấu hình domain.', 'error');
+      } else {
+        onAddToast(`Đăng nhập Google thất bại: ${msg || 'Vui lòng thử lại'}`, 'error');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -529,6 +536,18 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {file.webViewLink && (
+                          <a
+                            href={file.webViewLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all"
+                            title="Xem tệp trực tiếp trên Google Drive"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+
                         {file.name.endsWith('.json') && (
                           <button
                             type="button"

@@ -121,6 +121,9 @@ export async function listDriveBackups(accessToken: string): Promise<DriveFileIt
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
     const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    if (res.status === 403 || msg.includes('insufficient authentication scopes') || msg.includes('insufficientPermissions')) {
+      throw new Error('INSUFFICIENT_SCOPES: Chưa có quyền đọc Google Drive. Vui lòng nhấn Đăng nhập lại để cấp quyền.');
+    }
     throw new Error(`Lỗi tải danh sách tệp Google Drive (${msg})`);
   }
 
@@ -166,6 +169,9 @@ export async function uploadToDrive(
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
     const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    if (res.status === 403 || msg.includes('insufficient authentication scopes') || msg.includes('insufficientPermissions')) {
+      throw new Error('INSUFFICIENT_SCOPES: Token hiện tại chưa có quyền ghi Google Drive. Vui lòng nhấn Đăng nhập lại trong menu "Sao Lưu Google Drive" để cấp quyền.');
+    }
     throw new Error(`Lỗi tải tệp lên Google Drive (${msg})`);
   }
 

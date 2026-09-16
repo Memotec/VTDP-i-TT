@@ -1067,8 +1067,13 @@ export default function App() {
         addToast("Đã tự động sao lưu dữ liệu lên thư mục 'QLVT_Backup' trên Google Drive!", 'success');
       }
       addSystemAuditLog('AUTO_BACKUP', 'Sao Lưu Google Drive', "Tự động sao lưu ngầm dữ liệu kho lên Google Drive 'QLVT_Backup'");
-    } catch (err) {
-      console.error("Lỗi tự động sao lưu Google Drive 'QLVT_Backup':", err);
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('insufficient authentication scopes') || errMsg.includes('INSUFFICIENT_SCOPES') || errMsg.includes('403') || errMsg.includes('insufficientPermissions')) {
+        console.warn("Tự động sao lưu Google Drive tạm hoãn: Token hiện tại chưa bao gồm quyền truy cập Google Drive. Cần ủy quyền thông qua cửa sổ Sao Lưu Google Drive.");
+      } else {
+        console.error("Lỗi tự động sao lưu Google Drive 'QLVT_Backup':", err);
+      }
     }
   }, [addToast, addSystemAuditLog]);
 
@@ -1819,7 +1824,7 @@ export default function App() {
 
       addToast('Đang khởi tạo tài liệu Google Docs...', 'info');
       const isFilteredCat = selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'Tất cả loại';
-      const res = await exportInventoryReportToGoogleDoc(token, filteredInventory, {
+      const docParams = {
         currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
         categoryFilter: selectedCategory,
         searchQuery: searchQuery,
@@ -1827,7 +1832,25 @@ export default function App() {
           ? `BÁO CÁO TỒN KHO & HIỆN TRẠNG THIẾT BỊ (${selectedCategory.toUpperCase()})`
           : 'BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG TẠI CHỖ',
         reportDate: new Date().toLocaleDateString('vi-VN')
-      });
+      };
+
+      let res;
+      try {
+        res = await exportInventoryReportToGoogleDoc(token, filteredInventory, docParams);
+      } catch (docErr: any) {
+        const errMsg = docErr?.message || '';
+        if (errMsg.includes('insufficient') || errMsg.includes('403') || errMsg.includes('INSUFFICIENT_SCOPES')) {
+          addToast('Cần cấp quyền truy cập Google Docs & Drive. Đang mở cửa sổ ủy quyền...', 'info');
+          const authRes = await googleSignIn();
+          if (authRes?.accessToken) {
+            res = await exportInventoryReportToGoogleDoc(authRes.accessToken, filteredInventory, docParams);
+          } else {
+            throw docErr;
+          }
+        } else {
+          throw docErr;
+        }
+      }
       addToast(`Đã xuất thành công Google Doc: "${res.title}"!`, 'success');
       window.open(res.webViewLink, '_blank');
       addSystemAuditLog(

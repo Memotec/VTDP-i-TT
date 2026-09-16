@@ -39,13 +39,11 @@ export const signInWithGoogleAccount = async (): Promise<{ user: User; accessTok
   try {
     isSigningIn = true;
     const loginProvider = new GoogleAuthProvider();
-    loginProvider.addScope('https://www.googleapis.com/auth/documents');
-    loginProvider.addScope('https://www.googleapis.com/auth/documents.readonly');
-    loginProvider.addScope('https://www.googleapis.com/auth/drive');
-    loginProvider.addScope('https://www.googleapis.com/auth/drive.file');
-    loginProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
-    loginProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    // Use basic authentication scopes first for highest compatibility
+    loginProvider.addScope('email');
+    loginProvider.addScope('profile');
     loginProvider.setCustomParameters({ prompt: 'select_account' });
+
     const result = await signInWithPopup(auth, loginProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
@@ -56,16 +54,29 @@ export const signInWithGoogleAccount = async (): Promise<{ user: User; accessTok
     const errorCode = error?.code || '';
     const errorMsg = error?.message || '';
 
-    // Handle user closing popup or cancelling popup gracefully
     if (
       errorCode === 'auth/popup-closed-by-user' ||
       errorCode === 'auth/cancelled-popup-request' ||
-      errorCode === 'auth/popup-blocked' ||
       errorMsg.includes('popup-closed-by-user') ||
       errorMsg.includes('cancelled-popup-request')
     ) {
-      console.info('Người dùng đã đóng hoặc hủy cửa sổ đăng nhập Google.');
+      console.info('Người dùng đã chủ động đóng cửa sổ đăng nhập Google.');
       return null;
+    }
+
+    if (errorCode === 'auth/popup-blocked' || errorMsg.includes('popup-blocked')) {
+      console.warn('Google Auth Popup bị chặn bởi trình duyệt/iframe.');
+      throw new Error('POPUP_BLOCKED: Cửa sổ đăng nhập Google Pop-up bị trình duyệt hoặc khung xem trước (iframe) chặn.');
+    }
+
+    if (errorCode === 'auth/unauthorized-domain' || errorMsg.includes('unauthorized-domain')) {
+      console.warn('Tên miền ứng dụng chưa nằm trong Authorized Domains của Firebase Auth.');
+      throw new Error('UNAUTHORIZED_DOMAIN: Tên miền ứng dụng chưa được cấu hình ủy quyền (Authorized Domain) trong Firebase Console.');
+    }
+
+    if (errorCode === 'auth/operation-not-allowed' || errorMsg.includes('operation-not-allowed')) {
+      console.warn('Phương thức Google Sign-In chưa được bật trong Firebase Auth.');
+      throw new Error('OPERATION_NOT_ALLOWED: Phương thức đăng nhập Google chưa bật trong cấu hình Firebase.');
     }
 
     console.error('Lỗi đăng nhập tài khoản Google:', error);

@@ -34,7 +34,7 @@ const DRIVE_FOLDER_NAME = 'QLVT_Backup';
  */
 export async function getOrCreateAppFolder(accessToken: string): Promise<string> {
   const configuredId = getStoredDriveFolderId();
-  if (configuredId) {
+  if (configuredId && configuredId !== 'root') {
     // Check if the configured folder exists & is accessible
     try {
       const checkRes = await fetch(`https://www.googleapis.com/drive/v3/files/${configuredId}?fields=id,name,trashed`, {
@@ -52,41 +52,58 @@ export async function getOrCreateAppFolder(accessToken: string): Promise<string>
   }
 
   // Fallback: Search for existing folder named QLVT_Backup
-  const query = encodeURIComponent(`name = '${DRIVE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
-  
-  const searchRes = await fetch(searchUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  });
+  try {
+    const query = encodeURIComponent(`name = '${DRIVE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
+    
+    const searchRes = await fetch(searchUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
 
-  if (!searchRes.ok) {
-    throw new Error(`Không thể tìm thư mục Google Drive (${searchRes.statusText})`);
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      if (searchData.files && searchData.files.length > 0) {
+        const foundFolderId = searchData.files[0].id;
+        localStorage.setItem('cns_drive_folder_id', foundFolderId);
+        return foundFolderId;
+      }
+    } else {
+      console.warn(`Search folder ${DRIVE_FOLDER_NAME} returned status ${searchRes.status}`);
+    }
+  } catch (searchError) {
+    console.warn('Search folder failed with exception:', searchError);
   }
 
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id;
+  // Try creating folder if not found or search failed
+  try {
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: DRIVE_FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder'
+      })
+    });
+
+    if (createRes.ok) {
+      const folderData = await createRes.json();
+      if (folderData?.id) {
+        localStorage.setItem('cns_drive_folder_id', folderData.id);
+        return folderData.id;
+      }
+    } else {
+      const errData = await createRes.json().catch(() => ({}));
+      console.warn(`Create folder ${DRIVE_FOLDER_NAME} failed (${errData?.error?.message || createRes.status})`);
+    }
+  } catch (createError) {
+    console.warn('Create folder failed with exception:', createError);
   }
 
-  // Create folder if not found
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: DRIVE_FOLDER_NAME,
-      mimeType: 'application/vnd.google-apps.folder'
-    })
-  });
-
-  if (!createRes.ok) {
-    throw new Error(`Khởi tạo thư mục ${DRIVE_FOLDER_NAME} thất bại`);
-  }
-
-  const folderData = await createRes.json();
-  return folderData.id;
+  // Fallback to Google Drive root if folder search/creation is restricted
+  return 'root';
 }
 
 /**
@@ -102,7 +119,9 @@ export async function listDriveBackups(accessToken: string): Promise<DriveFileIt
   });
 
   if (!res.ok) {
-    throw new Error(`Lỗi tải danh sách tệp Google Drive (${res.statusText})`);
+    const errData = await res.json().catch(() => ({}));
+    const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    throw new Error(`Lỗi tải danh sách tệp Google Drive (${msg})`);
   }
 
   const data = await res.json();
@@ -145,8 +164,9 @@ export async function uploadToDrive(
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Lỗi tải tệp lên Google Drive: ${res.statusText} (${errText})`);
+    const errData = await res.json().catch(() => ({}));
+    const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    throw new Error(`Lỗi tải tệp lên Google Drive (${msg})`);
   }
 
   return await res.json();
@@ -163,7 +183,9 @@ export async function downloadFromDrive(accessToken: string, fileId: string): Pr
   });
 
   if (!res.ok) {
-    throw new Error(`Lỗi tải tệp từ Google Drive (${res.statusText})`);
+    const errData = await res.json().catch(() => ({}));
+    const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    throw new Error(`Lỗi tải tệp từ Google Drive (${msg})`);
   }
 
   return await res.text();
@@ -181,7 +203,9 @@ export async function deleteFromDrive(accessToken: string, fileId: string): Prom
   });
 
   if (!res.ok && res.status !== 204) {
-    throw new Error(`Lỗi xóa tệp Google Drive (${res.statusText})`);
+    const errData = await res.json().catch(() => ({}));
+    const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    throw new Error(`Lỗi xóa tệp Google Drive (${msg})`);
   }
 
   return true;

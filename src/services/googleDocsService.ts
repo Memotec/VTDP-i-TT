@@ -27,25 +27,44 @@ export async function createBlankGoogleDoc(
   title: string,
   initialText = ''
 ): Promise<{ documentId: string; webViewLink: string; title: string }> {
-  const folderId = await getOrCreateAppFolder(accessToken);
+  let folderId = await getOrCreateAppFolder(accessToken).catch(() => 'root');
+  if (!folderId) folderId = 'root';
+
+  const bodyData: any = {
+    name: title,
+    mimeType: 'application/vnd.google-apps.document'
+  };
+  if (folderId && folderId !== 'root') {
+    bodyData.parents = [folderId];
+  }
 
   // 1. Create file in Google Drive as a Google Doc
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+  let createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      name: title,
-      mimeType: 'application/vnd.google-apps.document',
-      parents: folderId ? [folderId] : []
-    })
+    body: JSON.stringify(bodyData)
   });
+
+  if (!createRes.ok && bodyData.parents) {
+    // Retry without explicit parents if folder permission issue
+    delete bodyData.parents;
+    createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyData)
+    });
+  }
 
   if (!createRes.ok) {
     const errData = await createRes.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || `Lỗi tạo Google Doc: ${createRes.statusText}`);
+    const msg = errData?.error?.message || (createRes.statusText ? createRes.statusText : `HTTP ${createRes.status}`);
+    throw new Error(`Lỗi tạo Google Doc (${msg})`);
   }
 
   const fileData = await createRes.json();
@@ -84,8 +103,11 @@ export async function createBlankGoogleDoc(
  * Lists all Google Docs created or stored in the Google Drive app folder
  */
 export async function listAppGoogleDocs(accessToken: string): Promise<GoogleDocFile[]> {
-  const folderId = await getOrCreateAppFolder(accessToken);
-  const query = encodeURIComponent(`'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false`);
+  const folderId = await getOrCreateAppFolder(accessToken).catch(() => 'root');
+  const query = folderId && folderId !== 'root'
+    ? encodeURIComponent(`'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false`)
+    : encodeURIComponent(`mimeType = 'application/vnd.google-apps.document' and trashed = false`);
+  
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,mimeType,createdTime,modifiedTime,webViewLink,iconLink)&orderBy=modifiedTime desc`;
 
   const res = await fetch(url, {
@@ -93,7 +115,9 @@ export async function listAppGoogleDocs(accessToken: string): Promise<GoogleDocF
   });
 
   if (!res.ok) {
-    throw new Error(`Không thể lấy danh sách Google Docs (${res.statusText})`);
+    const errData = await res.json().catch(() => ({}));
+    const msg = errData?.error?.message || (res.statusText ? res.statusText : `HTTP ${res.status}`);
+    throw new Error(`Không thể lấy danh sách Google Docs (${msg})`);
   }
 
   const data = await res.json();

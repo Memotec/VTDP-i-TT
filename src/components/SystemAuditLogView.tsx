@@ -28,7 +28,11 @@ import {
   Clock,
   Laptop,
   List,
-  Table
+  Table,
+  ChevronDown,
+  FileCode,
+  FileText,
+  FileDown
 } from 'lucide-react';
 import { SystemAuditLogEntry, AuditActionType, Role } from '../types.ts';
 
@@ -57,6 +61,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
   const [timeFilter, setTimeFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'LIST' | 'TABLE' | 'TIMELINE'>('LIST');
   const [selectedLogDetail, setSelectedLogDetail] = useState<SystemAuditLogEntry | null>(null);
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
 
   // Action badge and icon helper
   const getActionBadge = (type: AuditActionType) => {
@@ -242,6 +247,115 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
     }
   };
 
+  // Download Logs in multi-formats (JSON, CSV, MD, TXT)
+  const handleDownloadAuditLogsFormat = (format: 'json' | 'csv' | 'md' | 'txt') => {
+    if (filteredLogs.length === 0) {
+      onAddToast('Không có dữ liệu nhật ký để tải về!', 'info');
+      return;
+    }
+
+    const timestampStr = new Date().toISOString().slice(0, 10);
+    let blob: Blob;
+    let filename = `System_Audit_Logs_CNS_${timestampStr}`;
+
+    if (format === 'json') {
+      filename += '.json';
+      const jsonContent = JSON.stringify(
+        {
+          appName: 'Hệ Thống Quản Lý Kho Vật Tư CNS/ATM',
+          exportedAt: new Date().toISOString(),
+          exportedBy: currentUsername || 'system',
+          totalLogsCount: filteredLogs.length,
+          logs: filteredLogs
+        },
+        null,
+        2
+      );
+      blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    } else if (format === 'csv') {
+      filename += '.csv';
+      const headers = ['STT', 'ID Log', 'Mốc Thời Gian', 'Hành Động', 'Tiêu Đề', 'Người Thực Hiện', 'Vai Trò', 'Thiết Bị / Đối Tượng', 'S/N', 'Phân Loại', 'Chi Tiết', 'Dữ Liệu Cũ', 'Dữ Liệu Mới', 'IP Address'];
+      const rows = filteredLogs.map((log, idx) => [
+        idx + 1,
+        `"${log.id}"`,
+        `"${log.timestamp}"`,
+        `"${getActionBadge(log.actionType).label}"`,
+        `"${(log.actionTitle || '').replace(/"/g, '""')}"`,
+        `"${(log.performedByName || log.performedBy || '').replace(/"/g, '""')}"`,
+        `"${log.userRole === 'admin' ? 'Quản trị viên' : 'Kiểm kê viên'}"`,
+        `"${(log.targetName || 'N/A').replace(/"/g, '""')}"`,
+        `"${(log.targetSN || 'N/A').replace(/"/g, '""')}"`,
+        `"${(log.targetCategory || 'N/A').replace(/"/g, '""')}"`,
+        `"${(log.details || '').replace(/"/g, '""')}"`,
+        `"${(log.prevData || '').replace(/"/g, '""')}"`,
+        `"${(log.newData || '').replace(/"/g, '""')}"`,
+        `"${log.ipAddress || ''}"`
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    } else if (format === 'md') {
+      filename += '.md';
+      let mdText = `# 🛡️ HỆ THỐNG NHẬT KÝ LƯU VẾT CNS/ATM\n\n`;
+      mdText += `- **Thời gian xuất file:** ${new Date().toLocaleString('vi-VN')}\n`;
+      mdText += `- **Cán bộ thực hiện:** @${currentUsername || 'System'}\n`;
+      mdText += `- **Tổng số bản ghi:** ${filteredLogs.length} sự kiện\n\n`;
+      mdText += `--- \n\n`;
+      mdText += `### 📊 Chi Tiết Sự Kiện Nhật Ký\n\n`;
+      mdText += `| STT | Mốc Thời Gian | Hành Động | Tiêu Đề | Người Thực Hiện | Đối Tượng (S/N) | Chi Tiết |\n`;
+      mdText += `| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n`;
+
+      filteredLogs.forEach((log, idx) => {
+        const badge = getActionBadge(log.actionType);
+        const userStr = `${log.performedByName || log.performedBy} (@${log.performedBy})`;
+        const targetStr = log.targetName ? `${log.targetName} ${log.targetSN ? `\`${log.targetSN}\`` : ''}` : '-';
+        const detailsClean = (log.details || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+        mdText += `| ${idx + 1} | \`${log.timestamp}\` | **${badge.label}** | ${log.actionTitle} | ${userStr} | ${targetStr} | ${detailsClean} |\n`;
+      });
+
+      blob = new Blob([mdText], { type: 'text/markdown;charset=utf-8;' });
+    } else {
+      // txt format
+      filename += '.txt';
+      let txtText = `================================================================================\n`;
+      txtText += `HỆ THỐNG QUẢN LÝ KHO VẬT TƯ CNS/ATM - NHẬT KÝ HỆ THỐNG (AUDIT LOG)\n`;
+      txtText += `Thời gian trích xuất: ${new Date().toLocaleString('vi-VN')}\n`;
+      txtText += `Cán bộ trích xuất  : @${currentUsername || 'System'}\n`;
+      txtText += `Tổng số bản ghi     : ${filteredLogs.length} bản ghi\n`;
+      txtText += `================================================================================\n\n`;
+
+      filteredLogs.forEach((log, idx) => {
+        const badge = getActionBadge(log.actionType);
+        txtText += `[#${idx + 1}] MỐC THỜI GIAN : ${log.timestamp}\n`;
+        txtText += `     MÃ LOG        : ${log.id}\n`;
+        txtText += `     LOẠI HÀNH ĐỘNG: ${badge.label} (${log.actionType})\n`;
+        txtText += `     TIÊU ĐỀ       : ${log.actionTitle}\n`;
+        txtText += `     NGƯỜI THỰC HIỆN: ${log.performedByName || log.performedBy} (@${log.performedBy}) [${log.userRole === 'admin' ? 'QUẢN TRỊ VIÊN' : 'KIỂM KÊ VIÊN'}]\n`;
+        if (log.targetName) {
+          txtText += `     ĐỐI TƯỢNG     : ${log.targetName} ${log.targetSN ? `(S/N: ${log.targetSN})` : ''}\n`;
+        }
+        txtText += `     CHI TIẾT      : ${log.details}\n`;
+        if (log.prevData || log.newData) {
+          txtText += `     BIẾN ĐỘNG     : ${log.prevData ? `Cũ: ${log.prevData} | ` : ''}${log.newData ? `Mới: ${log.newData}` : ''}\n`;
+        }
+        txtText += `--------------------------------------------------------------------------------\n`;
+      });
+
+      blob = new Blob([txtText], { type: 'text/plain;charset=utf-8;' });
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    onAddToast(`Đã tải xuống tập tin ${filename} thành công!`, 'success');
+    setIsDownloadMenuOpen(false);
+  };
+
   // Print Audit Report
   const handlePrintAuditReport = () => {
     const win = window.open('', '_blank');
@@ -375,6 +489,90 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2.5 flex-wrap w-full lg:w-auto">
+            {/* Download Logs Dropdown Button */}
+            <div className="relative flex-1 lg:flex-none">
+              <button
+                type="button"
+                onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                title="Tải xuống toàn bộ nhật ký hệ thống để lưu trữ (JSON, CSV, MD, TXT)"
+              >
+                <FileDown className="w-4 h-4" />
+                <span>Tải Nhật Ký</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isDownloadMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isDownloadMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsDownloadMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      Chọn định dạng lưu trữ
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAuditLogsFormat('json')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
+                        <FileCode className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-extrabold">Tệp JSON (.json)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Đầy đủ cấu trúc dữ liệu / Đóng gói</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAuditLogsFormat('csv')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
+                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-extrabold">Tệp CSV (.csv)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Hỗ trợ Unicode tiếng Việt cho Excel</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAuditLogsFormat('md')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400">
+                        <FileText className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-extrabold">Tệp Markdown (.md)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Bảng biểu định dạng Markdown báo cáo</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAuditLogsFormat('txt')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        <FileText className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-extrabold">Tệp Văn Bản (.txt)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Nhật ký thuần text để lưu trữ hệ thống</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={handleExportExcel}

@@ -4,7 +4,7 @@ import {
   User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Crown, AlertTriangle,
-  Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud
+  Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud, ArrowUp
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
@@ -219,6 +219,33 @@ export default function App() {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const { isInstallable: pwaInstallable, isInstalled: pwaInstalled, installPwa } = usePWAInstall();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const inventorySectionRef = useRef<HTMLDivElement>(null);
+  const [showScrollTopBtn, setShowScrollTopBtn] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 280) {
+        setShowScrollTopBtn(true);
+      } else {
+        setShowScrollTopBtn(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const scrollToInventorySection = useCallback(() => {
+    if (inventorySectionRef.current) {
+      const yOffset = -70;
+      const element = inventorySectionRef.current;
+      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+  }, []);
 
   // System Audit Log state
   const [auditLogs, setAuditLogs] = useState<SystemAuditLogEntry[]>(() => LocalDatabase.getAuditLogs());
@@ -4260,7 +4287,10 @@ export default function App() {
               {categories.map(cat => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    scrollToInventorySection();
+                  }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     selectedCategory === cat
                       ? 'bg-[#2563EB] text-white shadow-xs font-black'
@@ -4275,7 +4305,10 @@ export default function App() {
             {/* Status Audit Filter */}
             <div className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-2 shadow-xs flex items-center gap-1 shrink-0 overflow-x-auto custom-scrollbar">
               <button
-                onClick={() => setStatusFilter('ALL')}
+                onClick={() => {
+                  setStatusFilter('ALL');
+                  scrollToInventorySection();
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'ALL'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black shadow-xs'
@@ -4285,7 +4318,10 @@ export default function App() {
                 Tất cả ({stats.totalItems})
               </button>
               <button
-                onClick={() => setStatusFilter('OK')}
+                onClick={() => {
+                  setStatusFilter('OK');
+                  scrollToInventorySection();
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'OK'
                     ? 'bg-emerald-600 text-white font-black shadow-xs'
@@ -4295,7 +4331,10 @@ export default function App() {
                 Đủ / Tốt ({stats.okCount})
               </button>
               <button
-                onClick={() => setStatusFilter('MISSING')}
+                onClick={() => {
+                  setStatusFilter('MISSING');
+                  scrollToInventorySection();
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'MISSING'
                     ? 'bg-rose-600 text-white font-black shadow-xs'
@@ -4305,7 +4344,10 @@ export default function App() {
                 Thiếu / Hỏng ({stats.missingCount})
               </button>
               <button
-                onClick={() => setStatusFilter('UNCHECKED')}
+                onClick={() => {
+                  setStatusFilter('UNCHECKED');
+                  scrollToInventorySection();
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'UNCHECKED'
                     ? 'bg-blue-600 text-white font-black shadow-xs'
@@ -4315,7 +4357,10 @@ export default function App() {
                 Chưa kiểm ({stats.totalItems - stats.checkedCount})
               </button>
               <button
-                onClick={() => setStatusFilter('LOW_STOCK')}
+                onClick={() => {
+                  setStatusFilter('LOW_STOCK');
+                  scrollToInventorySection();
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   statusFilter === 'LOW_STOCK'
                     ? 'bg-amber-500 text-white font-black shadow-xs'
@@ -4331,7 +4376,7 @@ export default function App() {
           </div>
 
           {/* Main Inventory Table & Actions */}
-          <div className="mt-6">
+          <div className="mt-6 scroll-smooth" ref={inventorySectionRef}>
             {/* Cloud-First Loading Banner */}
             {isCloudFirstLoading && (
               <div className="mb-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs animate-pulse">
@@ -4898,6 +4943,20 @@ export default function App() {
             }}
           />
         </Suspense>
+      )}
+
+      {/* Nút Quay Về Đầu Trang Nổi (Floating Action Button - FAB) */}
+      {showScrollTopBtn && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="fixed bottom-20 md:bottom-8 right-5 z-40 p-3 bg-[#2563EB] hover:bg-blue-700 text-white rounded-full shadow-2xl shadow-blue-600/40 border border-blue-400/40 flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-110 active:scale-95 group animate-in fade-in zoom-in duration-200"
+          title="Quay về đầu trang"
+          aria-label="Quay về đầu trang"
+        >
+          <ArrowUp className="w-5 h-5 transition-transform group-hover:-translate-y-0.5" />
+          <span className="hidden sm:inline-block text-xs font-black pr-1">Đầu Trang</span>
+        </button>
       )}
     </div>
   );

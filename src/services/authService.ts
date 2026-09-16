@@ -39,6 +39,12 @@ export const signInWithGoogleAccount = async (): Promise<{ user: User; accessTok
   try {
     isSigningIn = true;
     const loginProvider = new GoogleAuthProvider();
+    loginProvider.addScope('https://www.googleapis.com/auth/documents');
+    loginProvider.addScope('https://www.googleapis.com/auth/documents.readonly');
+    loginProvider.addScope('https://www.googleapis.com/auth/drive');
+    loginProvider.addScope('https://www.googleapis.com/auth/drive.file');
+    loginProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
+    loginProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
     loginProvider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, loginProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);

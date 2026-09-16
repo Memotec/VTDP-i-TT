@@ -110,7 +110,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   }, [filteredInventory]);
 
   return (
-    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-[#E2E8F0] dark:border-slate-800 overflow-hidden shadow-xs flex flex-col min-h-[420px] w-full transition-all">
+    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-[#E2E8F0] dark:border-slate-800 overflow-hidden shadow-xs flex flex-col min-h-[420px] w-full transition-all scroll-smooth" id="inventory-table-container">
       {/* Table Header & Action Toolbar */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center px-5 py-4 border-b border-[#E2E8F0] dark:border-slate-800 gap-3.5 bg-slate-50/50 dark:bg-slate-900/30">
         <div className="flex items-center gap-3 flex-wrap">
@@ -554,7 +554,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
         </div>
       ) : (
         /* DẠNG BẢNG (TABLE VIEW) */
-        <div className="table-container overflow-x-auto flex-1 custom-scrollbar">
+        <div className="table-container overflow-x-auto flex-1 custom-scrollbar scroll-smooth">
           {/* Mobile Swipe Hint */}
           <div className="md:hidden bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[11px] font-bold px-4 py-2 border-b border-blue-100 dark:border-blue-900/40 flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 truncate">

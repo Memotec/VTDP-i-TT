@@ -77,7 +77,18 @@ const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
     password: 'admin',
     createdAt: '2026-01-01',
     status: 'active',
-    notes: 'Quản trị Hệ Thống)'
+    notes: 'Quản trị Hệ Thống'
+  },
+  {
+    id: 'u-tailieutbtt',
+    username: 'tailieutbtt',
+    fullName: 'Super Admin (TailieuTBTT)',
+    email: 'tailieutbtt@gmail.com',
+    role: 'admin',
+    password: 'admin',
+    createdAt: '2026-01-01',
+    status: 'active',
+    notes: 'Tài khoản Quản trị viên chính Google/Gmail'
   },
   {
     id: 'u-guest',
@@ -115,21 +126,49 @@ export default function App() {
 
   // Dynamic user accounts list
   const [users, setUsers] = useState<UserAccount[]>(() => {
+    let initialList = [...DEFAULT_USER_ACCOUNTS];
     const saved = localStorage.getItem('cns_user_accounts_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialList = parsed;
+        }
       } catch { /* fallback */ }
     }
-    const initial = [...DEFAULT_USER_ACCOUNTS];
+
     const storedAdminPass = localStorage.getItem('cns_admin_password');
     const storedAdminName = localStorage.getItem('cns_admin_name');
     const storedGuestPass = localStorage.getItem('cns_guest_password');
-    if (storedAdminPass) initial[0].password = storedAdminPass;
-    if (storedAdminName) initial[0].fullName = storedAdminName;
-    if (storedGuestPass) initial[1].password = storedGuestPass;
-    return initial;
+    if (storedAdminPass && initialList[0]) initialList[0].password = storedAdminPass;
+    if (storedAdminName && initialList[0]) initialList[0].fullName = storedAdminName;
+    if (storedGuestPass && initialList[2]) initialList[2].password = storedGuestPass;
+
+    // Guarantee tailieutbtt@gmail.com account is always present and HAS 'admin' role
+    const tailieuIdx = initialList.findIndex(
+      u => (u.email && u.email.toLowerCase() === 'tailieutbtt@gmail.com') || u.username.toLowerCase() === 'tailieutbtt'
+    );
+    if (tailieuIdx >= 0) {
+      initialList[tailieuIdx] = {
+        ...initialList[tailieuIdx],
+        role: 'admin',
+        email: 'tailieutbtt@gmail.com'
+      };
+    } else {
+      initialList.push({
+        id: 'u-tailieutbtt',
+        username: 'tailieutbtt',
+        fullName: 'Super Admin (TailieuTBTT)',
+        email: 'tailieutbtt@gmail.com',
+        role: 'admin',
+        password: 'admin',
+        createdAt: '2026-01-01',
+        status: 'active',
+        notes: 'Tài khoản Quản trị viên chính Google/Gmail'
+      });
+    }
+
+    return initialList;
   });
 
   // Login form state
@@ -1236,6 +1275,9 @@ export default function App() {
       const displayName = gUser.displayName || email || 'Người dùng Google';
       const photoURL = gUser.photoURL || undefined;
 
+      // Check if this email is designated as Super Admin
+      const isSuperAdminEmail = email === 'tailieutbtt@gmail.com' || email.startsWith('tailieutbtt@');
+
       // Match existing user by email, or username matching email prefix or email
       let matchedUser = users.find(
         account => (account.email && account.email.toLowerCase() === email) ||
@@ -1251,11 +1293,14 @@ export default function App() {
           return;
         }
 
-        // Update email / photoURL on matched account if needed
+        const effectiveRole: Role = isSuperAdminEmail ? 'admin' : matchedUser.role;
+
+        // Update email / photoURL / role on matched account if needed
         const updatedUsers = users.map(u => {
           if (u.id === matchedUser!.id) {
             return {
               ...u,
+              role: effectiveRole,
               email: email || u.email,
               photoURL: photoURL || u.photoURL,
               provider: 'google' as const
@@ -1265,9 +1310,9 @@ export default function App() {
         });
         handleUpdateUsers(updatedUsers);
 
-        setRole(matchedUser.role);
+        setRole(effectiveRole);
         setCurrentUsername(matchedUser.username);
-        localStorage.setItem('cns_session_active', matchedUser.role);
+        localStorage.setItem('cns_session_active', effectiveRole);
         localStorage.setItem('cns_current_username', matchedUser.username);
 
         addToast(`Xin chào ${displayName}! Đăng nhập thành công qua tài khoản Gmail.`, 'success');
@@ -1276,39 +1321,40 @@ export default function App() {
         addSystemAuditLog(
           'AUTH_LOGIN',
           'Đăng nhập Google/Gmail',
-          `Tài khoản Gmail ${email} (${displayName}) đăng nhập thành công với vai trò ${matchedUser.role === 'admin' ? 'Super Admin' : 'Kiểm Kê Viên'}.`
+          `Tài khoản Gmail ${email} (${displayName}) đăng nhập thành công với vai trò ${effectiveRole === 'admin' ? 'Super Admin' : 'Kiểm Kê Viên'}.`
         );
       } else {
         // Automatically create a new account for this Google user
         const newUsername = email ? email.split('@')[0] : `user_${Date.now()}`;
+        const effectiveRole: Role = isSuperAdminEmail ? 'admin' : 'guest';
         const newUser: UserAccount = {
           id: `u-google-${Date.now()}`,
           username: newUsername,
           fullName: displayName,
           email: email || undefined,
           photoURL: photoURL || undefined,
-          role: 'guest',
+          role: effectiveRole,
           status: 'active',
           provider: 'google',
           createdAt: new Date().toLocaleDateString('vi-VN'),
-          notes: 'Tự động tạo từ Đăng nhập bằng Google / Gmail'
+          notes: isSuperAdminEmail ? 'Tài khoản Quản trị viên Super Admin' : 'Tự động tạo từ Đăng nhập bằng Google / Gmail'
         };
 
         const updatedUsers = [...users, newUser];
         handleUpdateUsers(updatedUsers);
 
-        setRole('guest');
+        setRole(effectiveRole);
         setCurrentUsername(newUser.username);
-        localStorage.setItem('cns_session_active', 'guest');
+        localStorage.setItem('cns_session_active', effectiveRole);
         localStorage.setItem('cns_current_username', newUser.username);
 
-        addToast(`Đăng nhập thành công với Gmail (${email})!`, 'success');
+        addToast(`Đăng nhập thành công với Gmail (${email}) - Vai trò: ${effectiveRole === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}!`, 'success');
         playScanBeep(1000, 0.15);
 
         addSystemAuditLog(
           'AUTH_LOGIN',
           'Đăng nhập Google lần đầu',
-          `Tạo mới tài khoản Kiểm kê viên cho Gmail: ${email} (${displayName}).`
+          `Tạo mới tài khoản ${effectiveRole === 'admin' ? 'Super Admin' : 'Kiểm kê viên'} cho Gmail: ${email} (${displayName}).`
         );
       }
     } catch (err: any) {
@@ -3853,6 +3899,60 @@ export default function App() {
                 >
                   {darkMode ? <Sun className="w-4.5 h-4.5 text-amber-400" /> : <Moon className="w-4.5 h-4.5 text-slate-600" />}
                 </button>
+
+                {/* User Account & Function Control in Top Right Header */}
+                {(() => {
+                  const currentUserObj = users.find(u => u.username.toLowerCase() === (currentUsername || '').toLowerCase());
+                  const displayName = currentUserObj?.fullName || currentUsername || 'Người dùng';
+                  const userPhotoUrl = currentUserObj?.photoURL;
+
+                  return (
+                    <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-[#E2E8F0] dark:border-slate-800 px-2.5 py-1.5 rounded-xl shadow-xs">
+                        {userPhotoUrl ? (
+                          <img
+                            src={userPhotoUrl}
+                            alt={displayName}
+                            className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            {role === 'admin' ? <Crown className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+                          </div>
+                        )}
+                        <div className="min-w-0 text-left hidden lg:block">
+                          <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[130px]">
+                            {displayName}
+                          </p>
+                          <p className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider truncate">
+                            {role === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}
+                          </p>
+                        </div>
+
+                        {role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAdminAccountModalOpen(true)}
+                            className="p-1 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer"
+                            title="Quản trị tài khoản & Phân quyền"
+                          >
+                            <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="p-1 text-[#DC2626] hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-colors cursor-pointer"
+                          title="Đăng xuất khỏi hệ thống"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </header>
 

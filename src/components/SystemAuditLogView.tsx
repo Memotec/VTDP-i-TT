@@ -26,7 +26,9 @@ import {
   ChevronRight,
   Info,
   Clock,
-  Laptop
+  Laptop,
+  List,
+  Table
 } from 'lucide-react';
 import { SystemAuditLogEntry, AuditActionType, Role } from '../types.ts';
 
@@ -53,6 +55,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
   const [actionFilter, setActionFilter] = useState<string>('ALL');
   const [userFilter, setUserFilter] = useState<string>('ALL');
   const [timeFilter, setTimeFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'LIST' | 'TABLE' | 'TIMELINE'>('LIST');
   const [selectedLogDetail, setSelectedLogDetail] = useState<SystemAuditLogEntry | null>(null);
 
   // Action badge and icon helper
@@ -535,8 +538,8 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
           </div>
         </div>
 
-        {/* Active Filter Chips */}
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
+        {/* Active Filter Chips & View Mode Switcher */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1">
           <div className="flex items-center gap-2">
             <span>Hiển thị <strong>{filteredLogs.length}</strong> / {logs.length} bản ghi nhật ký</span>
             {(searchTerm || actionFilter !== 'ALL' || userFilter !== 'ALL') && (
@@ -553,6 +556,48 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
               </button>
             )}
           </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setViewMode('LIST')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                viewMode === 'LIST'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Danh Sách (List)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('TABLE')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                viewMode === 'TABLE'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>Bảng Chi Tiết</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('TIMELINE')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                viewMode === 'TIMELINE'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Dòng Thời Gian</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -568,7 +613,123 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
               Không có sự kiện nào khớp với tiêu chí tìm kiếm hoặc bộ lọc hành động đã chọn.
             </p>
           </div>
+        ) : viewMode === 'LIST' ? (
+          /* LIST VIEW FORMAT (Clean System Logs List) */
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/80 p-2 sm:p-4">
+            {filteredLogs.map((log, index) => {
+              const badge = getActionBadge(log.actionType);
+              const IconComp = badge.icon;
+
+              return (
+                <div
+                  key={log.id}
+                  onClick={() => setSelectedLogDetail(log)}
+                  className="p-3.5 sm:p-4 rounded-2xl hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5 cursor-pointer group border border-transparent hover:border-slate-200/60 dark:hover:border-slate-800/80"
+                >
+                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                    {/* Index & Action Icon */}
+                    <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                      <span className="text-[11px] font-mono font-bold text-slate-400 w-6 text-right">
+                        #{index + 1}
+                      </span>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${badge.bg} shadow-xs`}>
+                        <IconComp className={`w-4.5 h-4.5 ${badge.iconColor}`} />
+                      </div>
+                    </div>
+
+                    {/* Content Block */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border uppercase tracking-wider ${badge.bg}`}>
+                          {badge.label}
+                        </span>
+
+                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {log.timestamp}
+                        </span>
+
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                          log.userRole === 'admin'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          <User className="w-2.5 h-2.5" />
+                          {log.performedByName || `@${log.performedBy}`}
+                        </span>
+                      </div>
+
+                      <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white mt-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {log.actionTitle}
+                        {log.targetName && (
+                          <span className="text-xs font-normal text-slate-500 dark:text-slate-400 ml-2">
+                            ({log.targetName} {log.targetSN ? `• S/N: ${log.targetSN}` : ''})
+                          </span>
+                        )}
+                      </h4>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed line-clamp-2">
+                        {log.details}
+                      </p>
+
+                      {(log.prevData || log.newData) && (
+                        <div className="flex items-center gap-2 mt-1.5 text-[10.5px] font-mono bg-slate-50 dark:bg-slate-850 p-1.5 px-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/80 inline-flex max-w-full overflow-x-auto">
+                          {log.prevData && <span className="line-through text-slate-400">{log.prevData}</span>}
+                          {log.prevData && log.newData && <span className="text-slate-400">→</span>}
+                          {log.newData && <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.newData}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Detail Trigger Button */}
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLogDetail(log);
+                      }}
+                      className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl border border-indigo-200/60 dark:border-indigo-800 group-hover:bg-indigo-600 group-hover:text-white transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                    >
+                      <span>Xem chi tiết</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : viewMode === 'TIMELINE' ? (
+          /* TIMELINE VIEW FORMAT */
+          <div className="p-6 space-y-6 relative before:absolute before:top-8 before:bottom-8 before:left-9 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
+            {filteredLogs.map((log) => {
+              const badge = getActionBadge(log.actionType);
+              const IconComp = badge.icon;
+              return (
+                <div key={log.id} onClick={() => setSelectedLogDetail(log)} className="relative pl-10 group cursor-pointer">
+                  <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-2 flex items-center justify-center bg-white dark:bg-slate-900 ${badge.bg}`}>
+                    <IconComp className={`w-3.5 h-3.5 ${badge.iconColor}`} />
+                  </div>
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-black text-slate-900 dark:text-white">{log.actionTitle}</span>
+                      <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {log.timestamp}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{log.details}</p>
+                    <div className="text-[10px] text-slate-400 mt-2 font-mono">
+                      Người thực hiện: @{log.performedBy} ({log.userRole === 'admin' ? 'Admin' : 'Kiểm kê'})
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* TABLE VIEW FORMAT */
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>

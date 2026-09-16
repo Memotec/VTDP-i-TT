@@ -5,7 +5,7 @@
  */
 
 import { InventoryItem, DispatchedRecord, UsageSlip, SystemAuditLogEntry, SyncQueueItem, ConflictItem, SyncItemStatus } from '../types.ts';
-import { INITIAL_INVENTORY, INITIAL_DISPATCHED_RECORDS, INITIAL_SYSTEM_AUDIT_LOGS, CATEGORIES } from '../initialData.ts';
+import { CATEGORIES, isInitialMockItem } from '../initialData.ts';
 
 export const STORAGE_KEYS = {
   INVENTORY: 'cns_inventory_v33_file_data',
@@ -27,7 +27,13 @@ export class LocalDatabase {
       const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      // Do not display mock initialData items; purge from local storage if detected
+      const filtered = parsed.filter(item => !isInitialMockItem(item));
+      if (filtered.length !== parsed.length) {
+        this.saveInventory(filtered);
+      }
+      return filtered;
     } catch (err) {
       console.error('LocalDatabase.getInventory error:', err);
       return [];
@@ -147,7 +153,12 @@ export class LocalDatabase {
       const raw = localStorage.getItem(STORAGE_KEYS.DISPATCHED);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      const filtered = parsed.filter(rec => rec.id !== 'disp-01');
+      if (filtered.length !== parsed.length) {
+        this.saveDispatchedRecords(filtered);
+      }
+      return filtered;
     } catch (err) {
       console.error('LocalDatabase.getDispatchedRecords error:', err);
       return [];
@@ -208,7 +219,12 @@ export class LocalDatabase {
       const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      const filtered = parsed.filter(log => log.id !== 'log-101' && log.id !== 'log-102');
+      if (filtered.length !== parsed.length) {
+        this.saveAuditLogs(filtered);
+      }
+      return filtered;
     } catch {
       return [];
     }

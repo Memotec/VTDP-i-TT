@@ -23,11 +23,13 @@ import {
   XCircle,
   Copy,
   Info,
-  History
+  History,
+  FileDown
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, Role } from '../types.ts';
 import { getEquipmentLookupUrl } from '../utils/qrParser.ts';
+import { exportItemProfileToPDF } from '../utils/pdfExporter.ts';
 
 interface ItemDetailDrawerProps {
   item: InventoryItem | null;
@@ -54,11 +56,25 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'history'>('info');
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
 
   if (!item) return null;
 
   const lookupUrl = getEquipmentLookupUrl(item);
   const scanCode = item.warehouse || item.sn || item.id || '';
+
+  const handleExportItemPdf = async () => {
+    if (!item) return;
+    try {
+      setIsExportingPdf(true);
+      await exportItemProfileToPDF(item);
+    } catch (err) {
+      console.error('Lỗi khi xuất PDF:', err);
+      alert('Không thể xuất file PDF thiết bị. Vui lòng thử lại.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleCopy = (text: string, fieldName: string) => {
     if (!text) return;
@@ -491,6 +507,18 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 <span className="sm:hidden">In QR</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportItemPdf}
+              disabled={isExportingPdf}
+              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Xuất phiếu lý lịch thiết bị thành file PDF"
+            >
+              <FileDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">Xuất File PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">

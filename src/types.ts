@@ -18,9 +18,11 @@ export interface InventoryItem {
   warehouse?: string;
   loc?: string;
   qty: number;
+  unit?: string;
   auditStatus: 'OK' | 'MISSING' | null;
   auditDate?: string | null;
   auditNote?: string;
+  notes?: string;
   category: string;
   imageUrl?: string;
   imagePrompt?: string;

@@ -16,11 +16,13 @@ import {
   Search,
   ExternalLink,
   CameraOff,
-  Smartphone
+  Smartphone,
+  FileDown
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { InventoryItem } from '../types.ts';
 import { playScanBeep } from '../utils/audio.ts';
+import { exportItemProfileToPDF } from '../utils/pdfExporter.ts';
 
 export interface ScanFeedbackResult {
   success: boolean;
@@ -923,6 +925,20 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                   >
                     <span>Xem chi tiết thiết bị</span>
                     <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {scanMessage.item && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportItemProfileToPDF(scanMessage.item!);
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                    title="Xuất phiếu lý lịch thiết bị dạng PDF chuẩn"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>Xuất File PDF</span>
                   </button>
                 )}
 

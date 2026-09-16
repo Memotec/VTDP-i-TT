@@ -1,7 +1,11 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, UsageSlip, DispatchedRecord } from '../types.ts';
 import { HandoverRow } from '../components/HandoverModal.tsx';
+import { getEquipmentLookupUrl } from './qrParser.ts';
 
 /**
  * Utility to generate high-quality PDF files for Vietnamese official forms:
@@ -1031,3 +1035,264 @@ export function safePrintHtml(htmlContent: string): boolean {
   }
   return false;
 }
+
+/**
+ * Generates the clean HTML string for the Equipment Identity Profile Sheet (Phiếu Lý Lịch Thiết Bị).
+ * Used both for generating PDF files and for displaying a pristine document view in the web UI.
+ */
+export function renderItemProfileHtml(
+  item: InventoryItem,
+  options?: {
+    currentUsername?: string;
+    qrDataUrl?: string;
+  }
+): string {
+  const now = new Date();
+  const printDay = String(now.getDate()).padStart(2, '0');
+  const printMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const printYear = String(now.getFullYear());
+
+  const lookupUrl = getEquipmentLookupUrl(item);
+  const scanCode = item.warehouse || item.sn || item.id || 'CNS-EQUIP';
+
+  let qrElementHtml = '';
+  if (options?.qrDataUrl) {
+    qrElementHtml = `<img src="${options.qrDataUrl}" style="width: 130px; height: 130px; display: block; margin: 0 auto;" alt="Mã QR" />`;
+  } else {
+    try {
+      qrElementHtml = renderToStaticMarkup(
+        React.createElement(QRCodeSVG, {
+          value: lookupUrl || scanCode,
+          size: 130,
+          level: 'M',
+          includeMargin: true
+        })
+      );
+    } catch {
+      qrElementHtml = `<div style="font-family: monospace; font-size: 11pt; padding: 20px; border: 1px dashed #999;">[Mã QR: ${scanCode}]</div>`;
+    }
+  }
+
+  const statusText = item.qty === 0
+    ? 'HẾT HÀNG (0 BỘ) - CẦN BỔ SUNG KHẨN CẤP'
+    : item.qty === 1
+    ? 'SẮP HẾT DỰ PHÒNG (CÒN 1 BỘ) - SẴN SÀNG THAY THẾ'
+    : `SẴN SÀNG DỰ PHÒNG (${item.qty} BỘ/CÁI)`;
+
+  const statusColor = item.qty === 0 ? '#b91c1c' : item.qty === 1 ? '#b45309' : '#15803d';
+
+  return `
+    <div style="padding: 16mm 16mm 16mm 18mm; box-sizing: border-box; background: #ffffff; width: 210mm; font-family: 'Times New Roman', Times, serif; color: #000000; line-height: 1.45;">
+      <!-- Header: Co quan & Quoc hieu -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+        <tr>
+          <td style="width: 48%; text-align: center; vertical-align: top;">
+            <div style="font-size: 9.5pt; text-transform: uppercase;">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;"><u>ĐỘI THÔNG TIN CNS/ATM</u></div>
+            <div style="font-size: 10pt; font-style: italic; margin-top: 6px;">Số hồ sơ: <strong>LLTB-${scanCode}</strong></div>
+          </td>
+          <td style="width: 52%; text-align: center; vertical-align: top;">
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+            <div style="font-size: 11pt; font-weight: bold; margin-top: 1px;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+            <div style="font-size: 10.5pt; font-style: italic; margin-top: 6px;">TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}</div>
+            <div style="font-size: 9pt; color: #1e3a8a; font-weight: bold; margin-top: 5px; border: 1px solid #93c5fd; background: #eff6ff; padding: 2px 8px; border-radius: 4px; display: inline-block;">
+              HỒ SƠ ĐIỆN TỬ TRA CỨU QUA MÃ QR
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Title -->
+      <div style="text-align: center; margin: 16px 0 14px 0; border-top: 1.5px solid #1e293b; border-bottom: 1.5px solid #1e293b; padding: 10px 0;">
+        <h1 style="font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; color: #0f172a;">
+          PHIẾU LÝ LỊCH & THÔNG TIN KỸ THUẬT THIẾT BỊ VẬT TƯ
+        </h1>
+        <div style="font-size: 10pt; font-style: italic; margin-top: 3px; color: #334155;">
+          (Trích xuất tự động qua quét mã QR định danh kho thiết bị dự phòng Đội Thông Tin)
+        </div>
+      </div>
+
+      <!-- Section I: Identification with QR Table -->
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 12px; margin-bottom: 6px; color: #0f172a;">
+        I. THÔNG TIN ĐỊNH DANH & THÔNG SỐ CỐT LÕI:
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
+        <tr>
+          <td style="width: 70%; vertical-align: top; padding-right: 12px;">
+            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000;">
+              <tr style="background: #f1f5f9;">
+                <td style="border: 1px solid #000; padding: 6px 10px; font-weight: bold; width: 34%; font-size: 10.5pt;">Tên trang thiết bị:</td>
+                <td style="border: 1px solid #000; padding: 6px 10px; font-weight: bold; color: #0f172a; font-size: 11pt;">${item.name}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Mã kho quản lý:</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-family: monospace; font-size: 11pt; font-weight: bold; color: #1d4ed8;">${item.warehouse || 'Chưa cấp mã kho'}</td>
+              </tr>
+              <tr style="background: #fafafa;">
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Phân loại hệ thống:</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-size: 10.5pt; font-weight: bold;">${item.category || 'Vật tư CNS/ATM'}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Số Serial (S/N):</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-family: monospace; font-size: 10.5pt; font-weight: bold;">${item.sn || 'N/A'}</td>
+              </tr>
+              <tr style="background: #fafafa;">
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Part Number (P/N):</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-family: monospace; font-size: 10.5pt;">${item.pn || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Vị trí lưu kho:</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-size: 10.5pt; font-weight: bold; color: #b45309;">${item.loc || 'Kho Dự Phòng'}</td>
+              </tr>
+              <tr style="background: #fafafa;">
+                <td style="border: 1px solid #000; padding: 5px 10px; font-weight: bold; font-size: 10pt;">Số lượng tồn hiện tại:</td>
+                <td style="border: 1px solid #000; padding: 5px 10px; font-size: 10.5pt; font-weight: bold; color: ${statusColor};">
+                  ${item.qty} ${item.unit || 'Bộ / Cái'}
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td style="width: 30%; vertical-align: top; text-align: center; border: 1.5px solid #000; padding: 8px; background: #fafafa;">
+            <div style="font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #1e3a8a; margin-bottom: 5px;">
+              MÃ QR TRA CỨU ĐIỆN TỬ
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; padding: 4px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; margin: 0 auto; width: 138px; height: 138px;">
+              ${qrElementHtml}
+            </div>
+            <div style="font-family: monospace; font-size: 9.5pt; font-weight: bold; color: #0f172a; margin-top: 5px;">
+              ${scanCode}
+            </div>
+            <div style="font-size: 7.5pt; color: #64748b; font-style: italic; margin-top: 3px; line-height: 1.3;">
+              Quét bằng Camera điện thoại hoặc Zalo để mở hồ sơ trực tuyến
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Section II: Technical State & Audit -->
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 10px; margin-bottom: 6px; color: #0f172a;">
+        II. HIỆN TRẠNG KỸ THUẬT & ĐỐI SOÁT KIỂM KÊ:
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-bottom: 12px;">
+        <tr>
+          <td style="border: 1px solid #000; padding: 6px 10px; width: 28%; font-weight: bold; font-size: 10pt; background: #f8fafc;">
+            Tình trạng sẵn sàng:
+          </td>
+          <td style="border: 1px solid #000; padding: 6px 10px; font-size: 10.5pt; font-weight: bold; color: ${statusColor};">
+            ${statusText}
+          </td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; padding: 6px 10px; font-weight: bold; font-size: 10pt; background: #f8fafc;">
+            Trạng thái kiểm kê:
+          </td>
+          <td style="border: 1px solid #000; padding: 6px 10px; font-size: 10.5pt;">
+            ${item.auditStatus === 'OK' 
+              ? '<strong style="color: #15803d;">✓ ĐÃ KIỂM KÊ ĐỐI SOÁT THỰC TẾ TRÙNG KHỚP</strong>' 
+              : 'Đang lưu kho dự phòng tiêu chuẩn'
+            }
+            ${item.auditDate ? ` — Ngày đối soát: <strong>${item.auditDate}</strong>` : ''}
+          </td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; padding: 6px 10px; font-weight: bold; font-size: 10pt; background: #f8fafc;">
+            Ghi chú & Ứng dụng:
+          </td>
+          <td style="border: 1px solid #000; padding: 6px 10px; font-size: 10.5pt; line-height: 1.5;">
+            ${item.notes || item.auditNote || 'Thiết bị vật tư dự phòng phục vụ bảo đảm kỹ thuật hệ thống CNS/ATM - Quản lý bay miền Nam.'}
+          </td>
+        </tr>
+      </table>
+
+      <!-- Section III: Aviation Storage Norms -->
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 10px; margin-bottom: 6px; color: #0f172a;">
+        III. QUY CHUẨN LƯU KHO & AN TOÀN HÀNG KHÔNG:
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-bottom: 14px;">
+        <tr>
+          <td style="border: 1px solid #000; padding: 7px 10px; font-size: 10pt; line-height: 1.45; background: #fafafa;">
+            • <strong>Điều kiện môi trường:</strong> Nhiệt độ phòng kho kỹ thuật 20°C - 25°C, độ ẩm tương đối ≤ 65% RH, phòng có hệ thống điều hòa và hút ẩm chạy 24/7.<br/>
+            • <strong>Chống tĩnh điện (ESD):</strong> Thiết bị điện tử nhạy cảm, chỉ thao tác bốc dỡ khi sử dụng dụng cụ chống tĩnh điện hoặc vòng tay tiếp đất.<br/>
+            • <strong>Thủ tục luân chuyển:</strong> Mọi thao tác xuất dùng, mượn hoặc điều động bắt buộc phải lập Phiếu báo sử dụng hoặc Biên bản bàn giao được phê duyệt.
+          </td>
+        </tr>
+      </table>
+
+      <!-- Section IV: Signatures & Certification -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 14px;">
+        <tr>
+          <td style="width: 35%; text-align: center; vertical-align: top;">
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">NGƯỜI TRA CỨU / TIẾP NHẬN</div>
+            <div style="font-size: 9pt; font-style: italic;">(Ký và ghi rõ họ tên)</div>
+            <div style="height: 52px;"></div>
+            <div style="font-size: 9.5pt; color: #64748b;">(Xác nhận thông tin thiết bị)</div>
+          </td>
+          <td style="width: 35%; text-align: center; vertical-align: top;">
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">KỸ SƯ PHỤ TRÁCH KHO</div>
+            <div style="font-size: 9pt; font-style: italic;">(Ký và ghi rõ họ tên)</div>
+            <div style="height: 52px;"></div>
+            <div style="font-size: 10pt; font-weight: bold;">${options?.currentUsername || 'Kỹ sư Quản lý Kho CNS'}</div>
+          </td>
+          <td style="width: 30%; text-align: center; vertical-align: top;">
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">XÁC THỰC KỸ THUẬT SỐ</div>
+            <div style="font-size: 8.5pt; font-style: italic; color: #166534; margin-top: 1px;">
+              HỆ THỐNG CNS INVENTORY
+            </div>
+            <div style="margin-top: 8px; border: 2px solid #16a34a; border-radius: 8px; padding: 6px 10px; background: #f0fdf4; display: inline-block;">
+              <div style="font-size: 8pt; font-weight: bold; color: #15803d; text-transform: uppercase;">
+                ✓ ĐÃ XÁC THỰC CHÍNH HÃNG
+              </div>
+              <div style="font-size: 7.5pt; font-family: monospace; color: #166534; margin-top: 2px;">
+                CNS-VERIFIED-${scanCode.toUpperCase().replace(/[^A-Z0-9_-]/g, '')}
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Footer Note -->
+      <div style="margin-top: 18px; border-top: 1px dashed #94a3b8; padding-top: 6px; font-size: 8.5pt; color: #64748b; text-align: center; font-style: italic;">
+        Tài liệu điện tử trích xuất từ Hệ thống Quản lý Trang thiết bị Dự phòng Đội Thông Tin CNS/ATM • Thời gian: ${now.toLocaleTimeString('vi-VN')} ${now.toLocaleDateString('vi-VN')}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 6. Xuất PHIẾU LÝ LỊCH & THÔNG TIN KỸ THUẬT THIẾT BỊ VẬT TƯ (Single Item PDF)
+ * Dành cho người dùng khi quét mã QR bằng điện thoại di động hoặc tra cứu trong kho.
+ */
+export async function exportItemProfileToPDF(
+  item: InventoryItem,
+  options?: {
+    currentUsername?: string;
+    qrDataUrl?: string;
+    openInNewTab?: boolean;
+  }
+): Promise<void> {
+  const htmlContent = renderItemProfileHtml(item, options);
+  const scanCode = (item.warehouse || item.sn || item.id || 'ThietBi').replace(/[/\\?%*:|"<>]/g, '_');
+  const fileName = `Phieu_ThietBi_${scanCode}.pdf`;
+
+  return renderHtmlToPdf(htmlContent, fileName, false);
+}
+
+/**
+ * In trực tiếp Phiếu Lý Lịch Thiết Bị Vật Tư qua hộp thoại Print của trình duyệt
+ */
+export function printItemProfilePDF(
+  item: InventoryItem,
+  options?: {
+    currentUsername?: string;
+    qrDataUrl?: string;
+  }
+): boolean {
+  const htmlContent = renderItemProfileHtml(item, options);
+  return safePrintHtml(htmlContent);
+}
+

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
-import { INITIAL_INVENTORY, CATEGORIES, INITIAL_DISPATCHED_RECORDS } from './initialData.ts';
+import { CATEGORIES, isInitialMockItem } from './initialData.ts';
 import { playScanBeep } from './utils/audio.ts';
 import { PrintTemplates } from './components/PrintTemplates.tsx';
 import type { PrintMode } from './components/PrintPreviewModal.tsx';
@@ -113,8 +113,8 @@ const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
 ];
 
 export default function App() {
-  // Inventory state - initialized directly from LocalDatabase to prevent empty state flash
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => LocalDatabase.getInventory());
+  // Inventory state - initialized directly from LocalDatabase (excluding any mock initialData)
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => LocalDatabase.getInventory().filter(item => !isInitialMockItem(item)));
   const [role, setRole] = useState<Role>(() => {
     const saved = localStorage.getItem('cns_session_active');
     if (saved === 'admin' || saved === 'guest') return saved as Role;
@@ -675,8 +675,10 @@ export default function App() {
     const unsubInv = subscribeToInventory(
       (firestoreItems) => {
         if (!firestoreItems) return;
-        // Filter out items that have been explicitly deleted locally
-        const validItems = firestoreItems.filter(item => !LocalDatabase.isItemDeleted(item.id, item.sn));
+        // Filter out items that have been explicitly deleted locally or are legacy mock initialData
+        const validItems = firestoreItems
+          .filter(item => !LocalDatabase.isItemDeleted(item.id, item.sn))
+          .filter(item => !isInitialMockItem(item));
         if (validItems.length === 0) return;
 
         setInventory(prev => {
@@ -1134,14 +1136,14 @@ export default function App() {
   const handleResetToDefault = () => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Khôi Phục Dữ Liệu Mẫu CNS',
-      message: 'Bạn có chắc chắn muốn đặt lại cơ sở dữ liệu về danh sách thiết bị CNS tiêu chuẩn ban đầu?',
+      title: 'Làm Mới Bộ Nhớ Thiết Bị',
+      message: 'Bạn có chắc chắn muốn làm trống bộ nhớ kho để bắt đầu quản lý kho mới hoặc đồng bộ lại từ máy chủ?',
       onConfirm: () => {
-        setInventory(INITIAL_INVENTORY);
-        LocalDatabase.saveInventory(INITIAL_INVENTORY);
+        setInventory([]);
+        LocalDatabase.saveInventory([]);
         const nowStr = new Date().toLocaleTimeString('vi-VN');
         setStorageConfig(prev => ({ ...prev, lastSavedTime: nowStr }));
-        addToast('Đã khôi phục thành công danh sách thiết bị mẫu CNS ban đầu!', 'success');
+        addToast('Đã làm mới bộ nhớ thiết bị thành công!', 'success');
         playScanBeep(1000, 0.15);
         setConfirmDialog(null);
       }
@@ -2075,8 +2077,8 @@ export default function App() {
       try {
         const res = await CloudService.pullFromCloud(activeUrl);
         if (res.success && (res.items || res.dispatched)) {
-          cloudItems = res.items || [];
-          cloudDispatched = res.dispatched || [];
+          cloudItems = (res.items || []).filter(item => !isInitialMockItem(item));
+          cloudDispatched = (res.dispatched || []).filter(d => d.id !== 'disp-01');
           cloudSuccess = true;
         } else {
           failureReason = res.error || 'Google Apps Script không phản hồi dữ liệu hợp lệ';
@@ -2091,8 +2093,8 @@ export default function App() {
     // Priority 1b: Secondary cloud tier - Firebase Firestore if Apps Script failed or empty
     if (!cloudSuccess || (cloudItems.length === 0 && cloudDispatched.length === 0)) {
       try {
-        const firestoreItems = await getInventoryFromFirestore();
-        const firestoreDispatched = await getDispatchedRecordsFromFirestore();
+        const firestoreItems = (await getInventoryFromFirestore()).filter(item => !isInitialMockItem(item));
+        const firestoreDispatched = (await getDispatchedRecordsFromFirestore()).filter(d => d.id !== 'disp-01');
         if (firestoreItems.length > 0 || firestoreDispatched.length > 0) {
           cloudItems = firestoreItems.length > 0 ? firestoreItems : cloudItems;
           cloudDispatched = firestoreDispatched.length > 0 ? firestoreDispatched : cloudDispatched;

@@ -157,7 +157,7 @@ async function startServer() {
       params.append("clientVersion", "3.6-enterprise");
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
       const gasRes = await fetch(cleanUrl, {
         method: "POST",
@@ -225,7 +225,7 @@ async function startServer() {
       if (err.name === "AbortError") {
         return res.status(200).json({
           success: false,
-          error: "Hết thời gian chờ (Timeout 25s) khi gửi dữ liệu lên Google Apps Script.",
+          error: "Hết thời gian chờ (Timeout 45s) khi gửi dữ liệu lên Google Apps Script.",
         });
       }
       return res.status(200).json({
@@ -244,11 +244,14 @@ async function startServer() {
       const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}t=${Date.now()}&source=cloud_proxy`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
       const gasRes = await fetch(fetchUrl, {
         method: "GET",
         signal: controller.signal,
+        headers: {
+          "User-Agent": "Aviation-CNS-CloudProxy/1.0",
+        },
       });
       clearTimeout(timeoutId);
 

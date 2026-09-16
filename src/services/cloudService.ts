@@ -170,7 +170,7 @@ export class CloudService {
     // Step 2: Direct browser fetch fallback
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safe timeout
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s safe timeout
 
       const params = new URLSearchParams();
       params.append('action', 'AUTO_SYNC_BATCH');
@@ -225,7 +225,7 @@ export class CloudService {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return {
           success: false,
-          error: 'Hết thời gian chờ (Timeout sau 20s). Vui lòng kiểm tra kết nối mạng hoặc quyền truy cập Web App.'
+          error: 'Hết thời gian chờ kết nối (Timeout 45s). Google Apps Script phản hồi chậm hoặc đang bận, vui lòng thử lại.'
         };
       }
       const errMsg = err instanceof Error ? err.message : 'Lỗi mạng khi kết nối Cloud API';
@@ -290,7 +290,7 @@ export class CloudService {
     // Step 2: Direct browser fetch fallback
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s safe timeout for Google Apps Script cold starts
 
       // Cache-busting parameter to guarantee fresh data
       const url = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}t=${Date.now()}&source=auto_sync`;
@@ -356,7 +356,7 @@ export class CloudService {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return {
           success: false,
-          error: 'Hết thời gian chờ (Timeout 18s) khi kéo dữ liệu từ Google Sheets.'
+          error: 'Hết thời gian chờ kết nối (Timeout 45s) khi kéo dữ liệu từ Google Sheets. Vui lòng thử lại hoặc kiểm tra đường dẫn Web App.'
         };
       }
       const errMsg = err instanceof Error ? err.message : 'Không thể kết nối đến máy chủ Cloud';

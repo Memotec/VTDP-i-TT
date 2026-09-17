@@ -32,6 +32,7 @@ import { exportInventoryReportToGoogleDoc } from '../services/googleDocsService.
 import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
 export type PrintMode = 'QR' | 'LABEL' | 'AUDIT_REPORT';
+export type PrintScope = 'ALL' | 'FILTERED' | 'SELECTED';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -43,6 +44,9 @@ interface PrintPreviewModalProps {
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   syncConfig?: SyncConfig;
   initialMode?: PrintMode;
+  initialScope?: PrintScope;
+  initialSelectedItems?: InventoryItem[];
+  onPreparePrint?: (mode: PrintMode, targetItems: InventoryItem[]) => void;
   onAddSystemAuditLog?: (
     actionType: AuditActionType,
     actionTitle: string,
@@ -68,17 +72,46 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   onAddToast,
   syncConfig,
   initialMode,
+  initialScope,
+  initialSelectedItems,
+  onPreparePrint,
   onAddSystemAuditLog
 }) => {
   const [printMode, setPrintMode] = useState<PrintMode>(initialMode || 'QR');
-  const [scope, setScope] = useState<'ALL' | 'FILTERED'>('ALL');
+  const [scope, setScope] = useState<PrintScope>(() => {
+    if (initialScope) return initialScope;
+    if (filteredInventory && filteredInventory.length > 0 && filteredInventory.length < inventory.length) {
+      return 'FILTERED';
+    }
+    return 'FILTERED';
+  });
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [printColumns, setPrintColumns] = useState<2 | 3 | 4>(3);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    if (initialSelectedItems && initialSelectedItems.length > 0) {
+      return new Set(initialSelectedItems.map(i => i.id));
+    }
+    return new Set();
+  });
 
   useEffect(() => {
     if (initialMode) {
       setPrintMode(initialMode);
     }
   }, [initialMode]);
+
+  useEffect(() => {
+    if (initialScope) {
+      setScope(initialScope);
+    }
+  }, [initialScope]);
+
+  useEffect(() => {
+    if (initialSelectedItems && initialSelectedItems.length > 0) {
+      setSelectedIds(new Set(initialSelectedItems.map(i => i.id)));
+    }
+  }, [initialSelectedItems]);
+
   
   // Audit Report form custom fields
   const [inspectorName, setInspectorName] = useState(currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Nguyễn Văn Khải');
@@ -108,15 +141,50 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter items based on selected scope & category
-  const baseItems = scope === 'ALL' ? inventory : filteredInventory;
-  const targetItems = categoryFilter === 'ALL' 
+  // Base items according to scope
+  const baseItems = scope === 'ALL' 
+    ? inventory 
+    : (scope === 'SELECTED' && selectedIds.size > 0
+        ? (filteredInventory.length > 0 ? filteredInventory : inventory).filter(i => selectedIds.has(i.id))
+        : filteredInventory);
+
+  const targetCategoryItems = categoryFilter === 'ALL' 
     ? baseItems 
     : baseItems.filter(item => item.category === categoryFilter);
 
+  // If user has specific checkboxes selected and not in 'ALL' or 'FILTERED' mode with 0 checks
+  const targetItems = selectedIds.size > 0 && scope === 'SELECTED'
+    ? targetCategoryItems.filter(item => selectedIds.has(item.id))
+    : (selectedIds.size > 0 && selectedIds.size < targetCategoryItems.length
+        ? targetCategoryItems.filter(item => selectedIds.has(item.id))
+        : targetCategoryItems);
+
   const categories = Array.from(new Set(inventory.map(item => item.category).filter(Boolean)));
 
+  const handleToggleSelectItem = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleSelectAllInScope = () => {
+    const next = new Set<string>();
+    targetCategoryItems.forEach(i => next.add(i.id));
+    setSelectedIds(next);
+    onAddToast(`Đã chọn toàn bộ ${targetCategoryItems.length} thiết bị để in`, 'info');
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    onAddToast('Đã xóa danh sách tích chọn', 'info');
+  };
+
   const [isExportingGoogleDoc, setIsExportingGoogleDoc] = useState(false);
+
 
   const handleExportGoogleDoc = async () => {
     if (targetItems.length === 0) {
@@ -190,7 +258,8 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       return;
     }
 
-    onAddToast('Đang kết nối máy in và chuẩn bị tài liệu...', 'info');
+    onPreparePrint?.(printMode, targetItems);
+    onAddToast(`Đang kết nối máy in và chuẩn bị tài liệu in hàng loạt (${targetItems.length} mục)...`, 'info');
 
     // Chèn class phục vụ in cho đúng chế độ
     const rootEl = document.getElementById('print-root-container');
@@ -200,7 +269,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
     setTimeout(() => {
       window.print();
-    }, 250);
+    }, 300);
   };
 
   const handleSendReport = async () => {
@@ -422,12 +491,13 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
         </div>
 
         {/* Modal Controls Bar */}
-        <div className="px-6 py-3.5 bg-slate-100/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
+        <div className="px-6 py-3.5 bg-slate-100/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shrink-0">
           {/* Chế độ in */}
           <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
             <button
+              type="button"
               onClick={() => setPrintMode('QR')}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 printMode === 'QR'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -437,8 +507,9 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
               <span>BẢNG MÃ QR</span>
             </button>
             <button
+              type="button"
               onClick={() => setPrintMode('LABEL')}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 printMode === 'LABEL'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -448,8 +519,9 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
               <span>TEM NHÃN TB</span>
             </button>
             <button
+              type="button"
               onClick={() => setPrintMode('AUDIT_REPORT')}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 printMode === 'AUDIT_REPORT'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -460,40 +532,44 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
             </button>
           </div>
 
-          {/* Phạm vi in */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 shrink-0">Phạm vi:</span>
-            <div className="flex-1 flex items-center gap-1 p-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs">
+          {/* Phạm vi in hàng loạt */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 shrink-0">Nguồn in:</span>
+            <div className="flex items-center gap-1 p-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs">
               <button
-                onClick={() => setScope('ALL')}
-                className={`flex-1 py-2 px-2 rounded-xl font-bold transition-all cursor-pointer ${
-                  scope === 'ALL'
-                    ? 'bg-slate-800 dark:bg-slate-700 text-white'
+                type="button"
+                onClick={() => setScope('FILTERED')}
+                className={`py-1.5 px-3 rounded-xl font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                  scope === 'FILTERED'
+                    ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50'
                 }`}
+                title="In danh sách thiết bị theo bộ lọc hiện tại của bảng"
               >
-                Toàn kho ({inventory.length})
+                <Layers className="w-3.5 h-3.5" />
+                <span>Đang lọc ({filteredInventory.length})</span>
               </button>
               <button
-                onClick={() => setScope('FILTERED')}
-                className={`flex-1 py-2 px-2 rounded-xl font-bold transition-all cursor-pointer ${
-                  scope === 'FILTERED'
-                    ? 'bg-slate-800 dark:bg-slate-700 text-white'
+                type="button"
+                onClick={() => setScope('ALL')}
+                className={`py-1.5 px-3 rounded-xl font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                  scope === 'ALL'
+                    ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50'
                 }`}
+                title="In toàn bộ cơ sở dữ liệu kho vật tư"
               >
-                Đang lọc ({filteredInventory.length})
+                <span>Toàn kho ({inventory.length})</span>
               </button>
             </div>
           </div>
 
-          {/* Lọc danh mục */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 shrink-0">Danh mục:</span>
+          {/* Lọc danh mục & Mật độ cột */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="flex-1 py-2 px-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+              className="py-1.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả phân loại ({baseItems.length})</option>
               {categories.map(cat => (
@@ -502,8 +578,68 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                 </option>
               ))}
             </select>
+
+            {printMode !== 'AUDIT_REPORT' && (
+              <div className="flex items-center bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setPrintColumns(2)}
+                  className={`px-2 py-1 rounded-lg transition-colors ${printColumns === 2 ? 'bg-slate-800 text-white' : 'text-slate-600'}`}
+                  title="2 Cột (Tem lớn)"
+                >
+                  2 Cột
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintColumns(3)}
+                  className={`px-2 py-1 rounded-lg transition-colors ${printColumns === 3 ? 'bg-slate-800 text-white' : 'text-slate-600'}`}
+                  title="3 Cột (Tiêu chuẩn)"
+                >
+                  3 Cột
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintColumns(4)}
+                  className={`px-2 py-1 rounded-lg transition-colors ${printColumns === 4 ? 'bg-slate-800 text-white' : 'text-slate-600'}`}
+                  title="4 Cột (Nhỏ gọn)"
+                >
+                  4 Cột
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Batch Selection Status Bar */}
+        {printMode !== 'AUDIT_REPORT' && (
+          <div className="px-6 py-2 bg-indigo-50/70 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between flex-wrap gap-2 text-xs">
+            <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 font-bold">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+              <span>
+                In hàng loạt: <strong>{targetItems.length}</strong> / {targetCategoryItems.length} tem ({scope === 'FILTERED' ? 'Danh sách đã lọc' : 'Toàn kho'})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSelectAllInScope}
+                className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 text-[11px] transition-colors cursor-pointer"
+              >
+                Chọn tất cả ({targetCategoryItems.length})
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-rose-50 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-200 dark:border-rose-800 text-[11px] transition-colors cursor-pointer"
+                >
+                  Bỏ chọn ({selectedIds.size})
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Modal Body: Custom form parameters for Audit Report */}
         {printMode === 'AUDIT_REPORT' && (
@@ -573,7 +709,7 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                       DANH SÁCH MÃ QR TRUY XUẤT VẬT TƯ DỰ PHÒNG
                     </h1>
                     <p className="text-xs text-slate-600">
-                      Đội Thông Tin CNS/ATM • Tổng cộng: <strong>{targetItems.length}</strong> thiết bị
+                      Đội Thông Tin CNS/ATM • Tổng cộng: <strong>{targetItems.length}</strong> thiết bị in hàng loạt
                     </p>
                   </div>
                   <div className="text-right text-xs text-slate-600 font-mono">
@@ -582,11 +718,20 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div className={`grid gap-4 ${
+                  printColumns === 2 
+                    ? 'grid-cols-2' 
+                    : (printColumns === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4')
+                }`}>
                   {targetItems.map((item) => (
-                    <div key={item.id} className="border border-dashed border-slate-400 rounded-xl p-3 flex flex-col items-center text-center bg-slate-50/50">
+                    <div 
+                      key={item.id} 
+                      onClick={() => handleToggleSelectItem(item.id)}
+                      className="group relative border border-dashed border-slate-400 rounded-xl p-3 flex flex-col items-center text-center bg-slate-50/50 hover:border-indigo-500 hover:bg-indigo-50/20 transition-all cursor-pointer"
+                      title="Nhấn để chọn/bỏ chọn khỏi danh sách in"
+                    >
                       <div className="p-1 bg-white border border-slate-200 rounded-lg shadow-2xs mb-2">
-                        <QRCodeSVG value={item.warehouse || item.sn} size={105} level="M" />
+                        <QRCodeSVG value={item.warehouse || item.sn} size={printColumns === 2 ? 120 : (printColumns === 3 ? 100 : 85)} level="M" />
                       </div>
                       <div className="text-xs font-mono font-black text-indigo-700 tracking-wider">
                         {item.warehouse || item.sn}
@@ -614,9 +759,14 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                ======================================================== */}
             {printMode === 'LABEL' && (
               <div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${printColumns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
                   {targetItems.map((item) => (
-                    <div key={item.id} className="border-2 border-slate-800 rounded-xl p-3.5 flex flex-col justify-between bg-white text-black min-h-[170px]">
+                    <div 
+                      key={item.id} 
+                      onClick={() => handleToggleSelectItem(item.id)}
+                      className="group border-2 border-slate-800 rounded-xl p-3.5 flex flex-col justify-between bg-white text-black min-h-[170px] hover:border-indigo-600 transition-all cursor-pointer"
+                      title="Nhấn để chọn/bỏ chọn khỏi danh sách in"
+                    >
                       {/* Label Header */}
                       <div className="border-b border-slate-400 pb-1 mb-2">
                         <div className="text-[10px] font-black uppercase tracking-wider text-slate-800">
@@ -643,7 +793,7 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
 
                         <div className="shrink-0 flex flex-col items-center">
                           <div className="p-1 bg-white border border-slate-300 rounded-md">
-                            <QRCodeSVG value={item.warehouse || item.sn} size={72} level="M" />
+                            <QRCodeSVG value={item.warehouse || item.sn} size={printColumns === 2 ? 76 : 64} level="M" />
                           </div>
                           <span className="text-[8.5px] font-mono font-black mt-1 text-slate-800">
                             {item.warehouse || item.sn}

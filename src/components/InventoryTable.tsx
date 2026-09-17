@@ -25,6 +25,7 @@ interface InventoryTableProps {
   onExportPdf?: () => void;
   isExportingPdf?: boolean;
   onAddNewItem?: () => void;
+  onOpenPrintCenter?: (mode: 'QR' | 'LABEL' | 'AUDIT_REPORT', defaultScope?: 'ALL' | 'FILTERED', selectedItems?: InventoryItem[]) => void;
 }
 
 export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
@@ -42,9 +43,12 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   onExportCsv,
   onExportPdf,
   isExportingPdf = false,
-  onAddNewItem
+  onAddNewItem,
+  onOpenPrintCenter
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -79,6 +83,43 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
       setCopiedId(null);
     }, 1800);
   };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === filteredInventory.length && filteredInventory.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      const next = new Set<string>();
+      filteredInventory.forEach(item => next.add(item.id));
+      setSelectedIds(next);
+    }
+  };
+
+  const handleToggleSelectItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const selectedItemsList = useMemo(() => {
+    if (selectedIds.size === 0) return [];
+    return filteredInventory.filter(item => selectedIds.has(item.id));
+  }, [filteredInventory, selectedIds]);
+
+  const handleTriggerBatchPrint = (mode: 'QR' | 'LABEL' | 'AUDIT_REPORT', useSelectionOnly = false) => {
+    setIsPrintMenuOpen(false);
+    if (!onOpenPrintCenter) return;
+    if (useSelectionOnly && selectedItemsList.length > 0) {
+      onOpenPrintCenter(mode, 'FILTERED', selectedItemsList);
+    } else {
+      onOpenPrintCenter(mode, 'FILTERED', filteredInventory);
+    }
+  };
+
 
   const { totalQty, okCount, missingCount, uncheckedCount, lowStockCount, auditPercent } = useMemo(() => {
     let tQty = 0;
@@ -163,6 +204,65 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               <span>Dạng Lưới Trực Quan</span>
             </button>
           </div>
+
+          {/* Batch Print Dropdown */}
+          {onOpenPrintCenter && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsPrintMenuOpen(!isPrintMenuOpen)}
+                className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border border-indigo-200/80 dark:border-indigo-800 shadow-xs active:scale-95"
+                title="In ấn tem nhãn / mã QR hàng loạt theo danh sách đã lọc hoặc các mục đã chọn"
+              >
+                <QrCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>IN TEM HÀNG LOẠT ({selectedIds.size > 0 ? `${selectedIds.size} mục` : `${filteredInventory.length}`})</span>
+              </button>
+
+              {isPrintMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsPrintMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-scale-in space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                      Tùy chọn in hàng loạt ({selectedIds.size > 0 ? `${selectedIds.size} mục đã chọn` : `${filteredInventory.length} mục đã lọc`})
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerBatchPrint('QR', selectedIds.size > 0)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <QrCode className="w-4 h-4 text-indigo-600" />
+                      <div className="flex flex-col">
+                        <span>In Bảng Mã QR Định Danh</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Tập hợp mã QR dán quản lý thiết bị</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerBatchPrint('LABEL', selectedIds.size > 0)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Tag className="w-4 h-4 text-indigo-600" />
+                      <div className="flex flex-col">
+                        <span>In Tem Nhãn Kỹ Thuật</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Bao gồm tên thiết bị, S/N, P/N và QR</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerBatchPrint('AUDIT_REPORT', selectedIds.size > 0)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <div className="flex flex-col">
+                        <span>In Biên Bản Kiểm Kê</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Xuất biểu mẫu kiểm kê chính thức</span>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {role === 'admin' && onAddNewItem && (
             <button
@@ -257,23 +357,54 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
         </div>
       </div>
 
-      {/* View Mode Indicator Strip */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-300/80 dark:border-slate-800 px-5 py-2 flex items-center justify-between gap-3 text-xs flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-            {viewMode === 'grid' ? (
-              <>
-                <LayoutGrid className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Đang hiển thị: <strong className="text-blue-600 dark:text-blue-400 font-black">Dạng Lưới Thẻ Trực Quan</strong> ({filteredInventory.length} thiết bị có mã QR)</span>
-              </>
-            ) : (
-              <>
-                <TableIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Đang hiển thị: <strong className="text-blue-600 dark:text-blue-400 font-black">Dạng Bảng Chi Tiết</strong> ({filteredInventory.length} mục dữ liệu)</span>
-              </>
-            )}
-          </span>
+      {/* View Mode Indicator Strip & Batch Selection Bar */}
+      <div className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-300/80 dark:border-slate-800 px-5 py-2.5 flex items-center justify-between gap-3 text-xs flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={filteredInventory.length > 0 && selectedIds.size === filteredInventory.length}
+              onChange={handleToggleSelectAll}
+              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+            />
+            <span>
+              {selectedIds.size > 0 
+                ? `Đã tích chọn ${selectedIds.size}/${filteredInventory.length} thiết bị` 
+                : `Chọn tất cả (${filteredInventory.length})`}
+            </span>
+          </label>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5 animate-scale-in">
+              <button
+                type="button"
+                onClick={() => handleTriggerBatchPrint('LABEL', true)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-black text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                title="In tem nhãn cho các thiết bị đã tích chọn"
+              >
+                <Tag className="w-3 h-3" />
+                <span>In {selectedIds.size} Tem Nhãn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTriggerBatchPrint('QR', true)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-black text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                title="In mã QR cho các thiết bị đã tích chọn"
+              >
+                <QrCode className="w-3 h-3" />
+                <span>In {selectedIds.size} Mã QR</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2 py-1 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-rose-600 rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
+              >
+                Bỏ chọn
+              </button>
+            </div>
+          )}
         </div>
+
         <div className="flex items-center gap-2">
           <span className="text-slate-400 text-[11px] hidden sm:inline">Chuyển đổi giao diện:</span>
           <button
@@ -322,9 +453,16 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                     className="bg-white dark:bg-[#131B2E] rounded-2xl p-4 border border-slate-300 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-500 dark:hover:border-blue-700 transition-all flex flex-col justify-between group relative overflow-hidden"
                   >
                     <div>
-                      {/* Card Header: Category & Audit Status */}
+                      {/* Card Header: Category, Selection Checkbox & Audit Status */}
                       <div className="flex items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(item.id)}
+                            onChange={(e) => handleToggleSelectItem(item.id, e)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 cursor-pointer shrink-0"
+                            title="Tích chọn in tem / thao tác hàng loạt"
+                          />
                           <span className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-950/80 text-[#2563EB] dark:text-blue-400 flex items-center justify-center text-xs font-black shrink-0 border border-blue-200 dark:border-blue-900/60">
                             {idx + 1}
                           </span>
@@ -568,8 +706,17 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
           <table className="w-full text-sm text-left whitespace-nowrap min-w-[900px]">
               <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0 border-b-2 border-slate-300 dark:border-slate-700 text-xs uppercase font-black tracking-wider text-slate-800 dark:text-slate-200 z-10 shadow-2xs">
                 <tr>
-                  <th className="px-3.5 py-3.5 w-[5%] text-center">STT</th>
-                  <th className="px-4 py-3.5 w-[36%] text-left">Tên Trang Thiết Bị & Vật Tư</th>
+                  <th className="px-3 py-3.5 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredInventory.length > 0 && selectedIds.size === filteredInventory.length}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                      title="Chọn tất cả danh sách đang lọc"
+                    />
+                  </th>
+                  <th className="px-3 py-3.5 w-[5%] text-center">STT</th>
+                  <th className="px-4 py-3.5 w-[34%] text-left">Tên Trang Thiết Bị & Vật Tư</th>
                   <th className="px-3.5 py-3.5 w-[16%] text-left">Số Serial (S/N)</th>
                   <th className="px-3.5 py-3.5 w-[13%] text-center">Mã Kho (QR)</th>
                   <th className="px-3.5 py-3.5 w-[10%] text-center">Số Lượng</th>
@@ -580,7 +727,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80">
                 {filteredInventory.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-20 text-center">
+                    <td colSpan={8} className="px-6 py-20 text-center">
                       <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
                         <AlertCircle className="w-8 h-8" />
                       </div>
@@ -600,8 +747,19 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                         key={item.id}
                         className={`${idx % 2 === 0 ? 'bg-white dark:bg-[#131B2E]' : 'bg-slate-50 dark:bg-slate-900/30'} hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors group`}
                       >
+                        {/* Checkbox */}
+                        <td className="px-3 py-3.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(item.id)}
+                            onChange={(e) => handleToggleSelectItem(item.id, e)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                            title="Tích chọn in tem / thao tác hàng loạt"
+                          />
+                        </td>
+
                         {/* STT */}
-                        <td className="px-3.5 py-3.5 text-center font-black text-slate-600 dark:text-slate-400 text-xs">
+                        <td className="px-3 py-3.5 text-center font-black text-slate-600 dark:text-slate-400 text-xs">
                           {idx + 1}
                         </td>
 

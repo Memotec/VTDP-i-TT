@@ -229,6 +229,8 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
+  const [activePrintScope, setActivePrintScope] = useState<'ALL' | 'FILTERED' | 'SELECTED'>('FILTERED');
+  const [activePrintSelectedItems, setActivePrintSelectedItems] = useState<InventoryItem[]>([]);
   const [mobileTab, setMobileTab] = useState<MobileTab>('inventory');
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INVENTORY' | 'DISPATCHED' | 'AUDIT_LOG'>('INVENTORY');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -2442,8 +2444,18 @@ export default function App() {
     e.target.value = '';
   };
 
-  const handleOpenPrintCenter = (mode: PrintMode = 'QR') => {
+  const handleOpenPrintCenter = (
+    mode: PrintMode = 'QR',
+    defaultScope: 'ALL' | 'FILTERED' | 'SELECTED' = 'FILTERED',
+    selectedItems?: InventoryItem[]
+  ) => {
     setActivePrintMode(mode);
+    setActivePrintScope(defaultScope);
+    if (selectedItems && selectedItems.length > 0) {
+      setActivePrintSelectedItems(selectedItems);
+    } else {
+      setActivePrintSelectedItems([]);
+    }
     setPrintLayout(mode);
     setIsPrintPreviewOpen(true);
   };
@@ -4836,6 +4848,7 @@ export default function App() {
               onExportPdf={handleExportFilteredInventoryPdf}
               isExportingPdf={isExportingInventoryPdf}
               onAddNewItem={handleOpenAddNewModal}
+              onOpenPrintCenter={handleOpenPrintCenter}
             />
           </div>
             </>
@@ -5173,6 +5186,8 @@ export default function App() {
           <PrintPreviewModal
             isOpen={isPrintPreviewOpen}
             initialMode={activePrintMode}
+            initialScope={activePrintScope}
+            initialSelectedItems={activePrintSelectedItems}
             onClose={() => {
               setIsPrintPreviewOpen(false);
               setPrintLayout('NONE');

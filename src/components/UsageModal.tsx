@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem, UsageSlip, Role } from '../types.ts';
 import { exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
+import { exportUsageSlipToDocx } from '../utils/docxExporter.ts';
 import { exportUsageSlipToGoogleDoc } from '../services/googleDocsService.ts';
 import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
@@ -55,7 +56,19 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   const [previewSlip, setPreviewSlip] = useState<UsageSlip | null>(null);
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingDoc, setIsExportingDoc] = useState(false);
+
+  const handleExportDocxSlip = async (slip: UsageSlip) => {
+    try {
+      setIsExportingDocx(true);
+      await exportUsageSlipToDocx(slip);
+    } catch (err) {
+      console.error('Lỗi xuất Word Docs phiếu báo sử dụng:', err);
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
 
   const handleExportGoogleDocSlip = async (slip: UsageSlip) => {
     try {
@@ -151,6 +164,40 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     onCloseUsageForm();
   };
 
+  const handleFormSubmitWithDocx = async () => {
+    if (!selectedItemForUsage) return;
+    if (!usageUser.trim()) return;
+
+    const todayStr = new Date().toLocaleString('vi-VN');
+    const newSlip: UsageSlip = {
+      id: `slip-${Date.now()}`,
+      docNumber: usageDocNumber.trim() || `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`,
+      itemId: selectedItemForUsage.id,
+      itemName: selectedItemForUsage.name,
+      sn: selectedItemForUsage.sn,
+      pn: selectedItemForUsage.pn || '',
+      category: selectedItemForUsage.category || 'Khác',
+      warehouse: selectedItemForUsage.warehouse || '',
+      originalLoc: selectedItemForUsage.loc || '',
+      user: usageUser.trim(),
+      qtyUsed: usageQty,
+      unit: usageUnit.trim() || 'Chiếc',
+      giverDept: usageGiverDept.trim(),
+      giverName: usageGiverName.trim(),
+      giverPos: usageGiverPos.trim(),
+      receiverDept: usageReceiverDept.trim(),
+      receiverPos: usageReceiverPos.trim(),
+      purpose: usagePurpose,
+      notes: usageNotes.trim(),
+      targetLocation: usageTargetLoc.trim(),
+      date: todayStr
+    };
+
+    onSubmitUsage(newSlip, deductInventory);
+    await handleExportDocxSlip(newSlip);
+    onCloseUsageForm();
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemForUsage) return;
@@ -227,6 +274,16 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 >
                   {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">Tải PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportDocxSlip(previewSlip)}
+                  disabled={isExportingDocx}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Tải tệp Word Docs (.docx)"
+                >
+                  {isExportingDocx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">Tải Docs (.docx)</span>
                 </button>
                 <button
                   type="button"
@@ -676,6 +733,20 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={handleFormSubmitWithDocx}
+                  disabled={isExportingDocx}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-3 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 disabled:opacity-50"
+                  title="Tạo phiếu và xuất tệp Word Docs (.docx)"
+                >
+                  {isExportingDocx ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                  <span>XUẤT FILE DOCS (.DOCX)</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleFormSubmitWithPdf}
                   disabled={isExportingPdf}
                   className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-2.5 px-3 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50"
@@ -764,13 +835,13 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                   const q = usageSearchQuery.toLowerCase().trim();
                   if (!q) return true;
                   return (
-                    slip.user.toLowerCase().includes(q) ||
-                    slip.sn.toLowerCase().includes(q) ||
-                    slip.itemName.toLowerCase().includes(q) ||
-                    slip.purpose.toLowerCase().includes(q) ||
-                    (slip.targetLocation || '').toLowerCase().includes(q) ||
-                    slip.id.toLowerCase().includes(q) ||
-                    (slip.docNumber || '').toLowerCase().includes(q)
+                    String(slip.user || '').toLowerCase().includes(q) ||
+                    String(slip.sn || '').toLowerCase().includes(q) ||
+                    String(slip.itemName || '').toLowerCase().includes(q) ||
+                    String(slip.purpose || '').toLowerCase().includes(q) ||
+                    String(slip.targetLocation || '').toLowerCase().includes(q) ||
+                    String(slip.id || '').toLowerCase().includes(q) ||
+                    String(slip.docNumber || '').toLowerCase().includes(q)
                   );
                 });
 
@@ -832,6 +903,14 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                     <span>Xem</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleExportDocxSlip(slip)}
+                                    disabled={isExportingDocx}
+                                    className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/20 dark:text-emerald-300 rounded-lg transition-colors cursor-pointer"
+                                    title="Tải tệp Word (.docx)"
+                                  >
+                                    <FileText className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleExportGoogleDocSlip(slip)}
@@ -915,6 +994,14 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                               title="In phiếu"
                             >
                               <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExportDocxSlip(slip)}
+                              className="p-1.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 rounded-xl cursor-pointer"
+                              title="Tải Word .docx"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"

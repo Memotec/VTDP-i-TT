@@ -479,10 +479,10 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     if (!manualFilterText.trim()) return true;
     const q = manualFilterText.toLowerCase();
     return (
-      item.name.toLowerCase().includes(q) ||
-      item.sn.toLowerCase().includes(q) ||
-      (item.warehouse && item.warehouse.toLowerCase().includes(q)) ||
-      (item.loc && item.loc.toLowerCase().includes(q))
+      String(item.name || '').toLowerCase().includes(q) ||
+      String(item.sn || '').toLowerCase().includes(q) ||
+      String(item.warehouse || '').toLowerCase().includes(q) ||
+      String(item.loc || '').toLowerCase().includes(q)
     );
   });
 

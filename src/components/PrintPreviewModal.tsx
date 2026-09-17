@@ -28,6 +28,7 @@ import { InventoryItem, AuditStats, SyncConfig, AuditActionType } from '../types
 import { QRCodeSVG } from 'qrcode.react';
 import { playScanBeep } from '../utils/audio.ts';
 import { exportAuditReportToPDF } from '../utils/pdfExporter.ts';
+import { exportAuditReportToDocx, exportInventoryReportToDocx } from '../utils/docxExporter.ts';
 import { exportInventoryReportToGoogleDoc } from '../services/googleDocsService.ts';
 import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
@@ -138,6 +139,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     totalQty: number;
   } | null>(null);
   const [isExportingAuditPdf, setIsExportingAuditPdf] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
 
   if (!isOpen) return null;
 
@@ -249,6 +251,45 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       onAddToast('Có lỗi xảy ra khi khởi tạo tệp PDF.', 'error');
     } finally {
       setIsExportingAuditPdf(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (targetItems.length === 0) {
+      onAddToast('Không có thiết bị nào trong danh sách xuất Word!', 'error');
+      return;
+    }
+
+    try {
+      setIsExportingDocx(true);
+      onAddToast('Đang tạo tệp Word Docs (.docx)...', 'info');
+      if (printMode === 'AUDIT_REPORT') {
+        await exportAuditReportToDocx(
+          targetItems,
+          inspectorName,
+          auditDate,
+          auditLocation,
+          auditNote
+        );
+      } else {
+        await exportInventoryReportToDocx(targetItems, {
+          currentUsername: inspectorName || currentUsername,
+          categoryFilter,
+          reportDate: auditDate,
+          reportTitle: `BÁO CÁO DANH MỤC THIẾT BỊ CNS/ATM (${targetItems.length} MỤC)`
+        });
+      }
+      onAddToast(`Đã xuất và tải về tệp Word Docs (${targetItems.length} mục) thành công!`, 'success');
+      onAddSystemAuditLog?.(
+        'REPORT_DISPATCH',
+        'Xuất file Word Docs (.docx) báo cáo kho',
+        `Tải tệp Word .docx báo cáo ${targetItems.length} thiết bị bởi ${inspectorName}.`
+      );
+    } catch (err) {
+      console.error('Lỗi tạo file Word Docs:', err);
+      onAddToast('Có lỗi xảy ra khi khởi tạo tệp Word Docs.', 'error');
+    } finally {
+      setIsExportingDocx(false);
     }
   };
 
@@ -968,6 +1009,19 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
               className="py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               Đóng
+            </button>
+            <button
+              onClick={handleExportDocx}
+              disabled={isExportingDocx || targetItems.length === 0}
+              className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              title="Tải báo cáo kiểm kê/danh mục dạng tệp Microsoft Word (.docx)"
+            >
+              {isExportingDocx ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              <span>TẢI FILE DOCS (.DOCX)</span>
             </button>
             <button
               onClick={handleExportGoogleDoc}

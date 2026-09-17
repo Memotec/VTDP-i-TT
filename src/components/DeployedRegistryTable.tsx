@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { DispatchedRecord, Role } from '../types.ts';
 import { exportDispatchedRegistryToPDF } from '../utils/pdfExporter.ts';
+import { exportDispatchedRegistryToDocx } from '../utils/docxExporter.ts';
 
 interface DeployedRegistryTableProps {
   records: DispatchedRecord[];
@@ -44,6 +45,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEPLOYED' | 'RETURNED'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [isExportingRegistryPdf, setIsExportingRegistryPdf] = useState(false);
+  const [isExportingRegistryDocx, setIsExportingRegistryDocx] = useState(false);
   const [showAnalyticsBreakdown, setShowAnalyticsBreakdown] = useState(false);
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
 
@@ -69,6 +71,24 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
       onPrintFullRegistry();
     } else if (typeof onPrintRegistry === 'function') {
       onPrintRegistry();
+    }
+  };
+
+  const handleExportDocxRegistry = async () => {
+    if (filteredRecords.length === 0) {
+      showToast('Không có dữ liệu sổ theo dõi nào để xuất Word Docs!', 'error');
+      return;
+    }
+    try {
+      setIsExportingRegistryDocx(true);
+      showToast('Đang tạo tệp Word Docs (.docx) Sổ Tổng Hợp...', 'info');
+      await exportDispatchedRegistryToDocx(filteredRecords);
+      showToast(`Đã tải tệp Word (.docx) Sổ Theo Dõi (${filteredRecords.length} hồ sơ) thành công!`, 'success');
+    } catch (err) {
+      console.error('Lỗi xuất Word Docs sổ tổng hợp:', err);
+      showToast('Có lỗi phát sinh khi tạo tệp Word Docs sổ tổng hợp.', 'error');
+    } finally {
+      setIsExportingRegistryDocx(false);
     }
   };
 
@@ -115,16 +135,16 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
       // Search query
       if (q) {
         return (
-          record.itemName?.toLowerCase().includes(q) ||
-          record.sn?.toLowerCase().includes(q) ||
-          (record.pn && record.pn.toLowerCase().includes(q)) ||
-          (record.docNumber && record.docNumber.toLowerCase().includes(q)) ||
-          record.receiverName?.toLowerCase().includes(q) ||
-          (record.receiverDept && record.receiverDept.toLowerCase().includes(q)) ||
-          (record.giverName && record.giverName.toLowerCase().includes(q)) ||
-          (record.targetLocation && record.targetLocation.toLowerCase().includes(q)) ||
-          (record.purpose && record.purpose.toLowerCase().includes(q)) ||
-          (record.notes && record.notes.toLowerCase().includes(q))
+          String(record.itemName || '').toLowerCase().includes(q) ||
+          String(record.sn || '').toLowerCase().includes(q) ||
+          String(record.pn || '').toLowerCase().includes(q) ||
+          String(record.docNumber || '').toLowerCase().includes(q) ||
+          String(record.receiverName || '').toLowerCase().includes(q) ||
+          String(record.receiverDept || '').toLowerCase().includes(q) ||
+          String(record.giverName || '').toLowerCase().includes(q) ||
+          String(record.targetLocation || '').toLowerCase().includes(q) ||
+          String(record.purpose || '').toLowerCase().includes(q) ||
+          String(record.notes || '').toLowerCase().includes(q)
         );
       }
 
@@ -550,6 +570,20 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>XUẤT EXCEL</span>
+            </button>
+
+            <button
+              onClick={handleExportDocxRegistry}
+              disabled={isExportingRegistryDocx}
+              className="px-3 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              title="Tải Sổ Tổng Hợp Theo Dõi Thiết Bị Đã Bàn Giao dưới dạng file Word Docs (.docx)"
+            >
+              {isExportingRegistryDocx ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : (
+                <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              )}
+              <span>XUẤT DOCS SỔ</span>
             </button>
 
             <button

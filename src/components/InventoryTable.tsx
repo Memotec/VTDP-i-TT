@@ -3,11 +3,12 @@ import {
   Layers, MapPin, AlertCircle, Clock, CheckSquare, XCircle,
   History, FileText, Edit, Trash2, Camera, Box, Download, Plus,
   QrCode, Copy, Check, AlertTriangle, ShieldCheck, Tag, Sparkles,
-  LayoutGrid, Table as TableIcon, ExternalLink, ArrowRightLeft
+  LayoutGrid, Table as TableIcon, ExternalLink, ArrowRightLeft, Loader2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, Role } from '../types.ts';
 import { getEquipmentLookupUrl } from '../utils/qrParser.ts';
+import { exportInventoryReportToDocx } from '../utils/docxExporter.ts';
 
 interface InventoryTableProps {
   filteredInventory: InventoryItem[];
@@ -53,6 +54,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -153,6 +155,20 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
       auditPercent: percent
     };
   }, [filteredInventory]);
+
+  const handleExportDocx = async () => {
+    if (filteredInventory.length === 0) return;
+    try {
+      setIsExportingDocx(true);
+      await exportInventoryReportToDocx(filteredInventory, {
+        reportTitle: 'BÁO CÁO TỒN KHO & HIỆN TRẠNG THIẾT BỊ DỰ PHÒNG CNS/ATM'
+      });
+    } catch (err) {
+      console.error('Lỗi xuất Word tồn kho:', err);
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-300/80 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col min-h-[420px] w-full transition-all scroll-smooth" id="inventory-table-container">
@@ -303,6 +319,21 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               <span>+ Thêm Thiết Bị</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={handleExportDocx}
+            disabled={isExportingDocx || filteredInventory.length === 0}
+            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200/80 dark:border-blue-900/60 shadow-xs active:scale-95 disabled:opacity-60"
+            title="Tải toàn bộ danh sách thiết bị thành tệp Word Docs (.docx)"
+          >
+            {isExportingDocx ? (
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+            ) : (
+              <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            )}
+            <span>{isExportingDocx ? 'Đang tạo Word...' : 'Tải Báo Cáo Word (.docx)'}</span>
+          </button>
 
           {onExportPdf && (
             <button

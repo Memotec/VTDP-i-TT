@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, FileText, ArrowRightLeft, Printer, RotateCcw, Building2, User, MapPin, Calendar, CheckCircle2, Clock, Download, Loader2 } from 'lucide-react';
 import { DispatchedRecord, UsageSlip } from '../types.ts';
 import { exportHandoverToPDF, exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
+import { exportHandoverToDocx, exportUsageSlipToDocx } from '../utils/docxExporter.ts';
 
 interface DispatchedDetailModalProps {
   record: DispatchedRecord | null;
@@ -19,10 +20,81 @@ export const DispatchedDetailModal: React.FC<DispatchedDetailModalProps> = ({
   onReturnClick
 }) => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
 
   if (!isOpen || !record) return null;
 
   const isHandover = record.type === 'HANDOVER_DOC';
+
+  const handleExportDocx = async () => {
+    try {
+      setIsExportingDocx(true);
+      if (isHandover) {
+        const parts = record.date.split('/');
+        const day = parts[0] || '15';
+        const month = parts[1] || '09';
+        const year = parts[2] || '2026';
+
+        await exportHandoverToDocx(
+          {
+            handoverNo: record.docNumber || 'BBBG-KT',
+            handoverLocation: record.targetLocation || 'Trung tâm BĐKT',
+            handoverDay: day,
+            handoverMonth: month,
+            handoverYear: year,
+            handoverReason: record.purpose || 'Bàn giao sử dụng',
+            handoverGiverDept: record.giverDept || 'Đội Thông Tin – Trung tâm BĐKT',
+            handoverGiverName: record.giverName || 'Admin Kho',
+            handoverGiverPos: record.giverPos || 'Kỹ sư quản lý kho',
+            handoverReceiverDept: record.receiverDept || 'Tổ Vận Hành',
+            handoverReceiverName: record.receiverName || 'Kỹ sư nhận',
+            handoverReceiverPos: record.receiverPos || 'Kỹ sư trực ban'
+          },
+          [
+            {
+              id: record.id,
+              name: record.itemName,
+              unit: record.unit || 'Bộ',
+              qty: record.qty,
+              quality: 'Tốt (100%)',
+              specs: `${record.category} - ${record.pn || ''}`,
+              sn: record.sn,
+              note: record.notes || ''
+            }
+          ]
+        );
+      } else {
+        const slip: UsageSlip = {
+          id: record.id,
+          docNumber: record.docNumber || `PBSD-${record.id.slice(-4)}`,
+          itemId: record.itemId,
+          itemName: record.itemName,
+          sn: record.sn,
+          pn: record.pn || '',
+          category: record.category,
+          warehouse: 'Kho TT',
+          originalLoc: '',
+          user: record.receiverName,
+          qtyUsed: record.qty,
+          unit: record.unit || 'Chiếc',
+          giverDept: record.giverDept || 'Đội Thông Tin – Trung tâm BĐKT',
+          giverName: record.giverName || 'Admin Kho',
+          giverPos: record.giverPos || 'Kỹ sư phụ trách kho',
+          receiverDept: record.receiverDept || 'Tổ Vận Hành CNS/ATM',
+          receiverPos: record.receiverPos || 'Kỹ sư trực ban',
+          purpose: record.purpose,
+          notes: record.notes || '',
+          targetLocation: record.targetLocation,
+          date: record.date
+        };
+        await exportUsageSlipToDocx(slip);
+      }
+    } catch (err) {
+      console.error('Lỗi xuất Word Docs hồ sơ luân chuyển:', err);
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
 
   const handleExportPdf = async () => {
     try {
@@ -277,7 +349,21 @@ export const DispatchedDetailModal: React.FC<DispatchedDetailModalProps> = ({
             </button>
           ) : <div />}
 
-          <div className="flex gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              type="button"
+              onClick={handleExportDocx}
+              disabled={isExportingDocx}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 disabled:opacity-50"
+              title="Tải văn bản dưới dạng Microsoft Word (.docx)"
+            >
+              {isExportingDocx ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
+              Xuất File Docs (.docx)
+            </button>
             <button
               type="button"
               onClick={handleExportPdf}

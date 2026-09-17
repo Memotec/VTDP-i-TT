@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2, FileText } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { exportHandoverToPDF } from '../utils/pdfExporter.ts';
+import { exportHandoverToDocx } from '../utils/docxExporter.ts';
 import { exportHandoverToGoogleDoc } from '../services/googleDocsService.ts';
 import { getAccessToken, googleSignIn } from '../services/authService.ts';
 
@@ -87,8 +88,45 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
 }) => {
   const [deductStock, setDeductStock] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingGoogleDoc, setIsExportingGoogleDoc] = useState(false);
+
+  const handleDirectExportDocx = async () => {
+    if (handoverRows.length === 0) {
+      onAddToast('Danh sách thiết bị bàn giao đang trống!', 'error');
+      return;
+    }
+    try {
+      setIsExportingDocx(true);
+      if (onSaveHandoverToRegistry) {
+        onSaveHandoverToRegistry(deductStock);
+      }
+      onAddToast('Đang tạo tệp Word Docs (.docx) biên bản bàn giao...', 'info');
+      await exportHandoverToDocx(
+        {
+          handoverNo,
+          handoverLocation,
+          handoverDay,
+          handoverMonth,
+          handoverYear,
+          handoverReason,
+          handoverGiverDept,
+          handoverGiverName,
+          handoverGiverPos,
+          handoverReceiverDept,
+          handoverReceiverName,
+          handoverReceiverPos
+        },
+        handoverRows
+      );
+      onAddToast(`Đã xuất và tải về tệp Word Docs (.docx) Biên Bản Bàn Giao ${handoverNo || ''} thành công!`, 'success');
+    } catch (err) {
+      console.error('Lỗi xuất Word Docs bàn giao:', err);
+      onAddToast('Có lỗi xảy ra khi tạo tệp Word Docs biên bản bàn giao.', 'error');
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
 
   const handleDirectExportPDF = async () => {
     if (handoverRows.length === 0) {
@@ -614,6 +652,21 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
                 LƯU VÀO SỔ THEO DÕI
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleDirectExportDocx}
+              disabled={handoverRows.length === 0 || isExportingDocx}
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-5 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 disabled:opacity-40"
+              title="Tải biên bản bàn giao thành tệp Microsoft Word (.docx)"
+            >
+              {isExportingDocx ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              TẢI FILE DOCS (.DOCX)
+            </button>
 
             <button
               type="button"

@@ -97,7 +97,7 @@ export function findMatchingInventoryItems(
   for (let i = 0; i < inventory.length; i++) {
     const item = inventory[i];
     if (item.warehouse) {
-      const itemWh = item.warehouse.trim().toUpperCase();
+      const itemWh = String(item.warehouse).trim().toUpperCase();
       if (upperCandidates.includes(itemWh)) {
         return {
           matched: true,
@@ -117,7 +117,7 @@ export function findMatchingInventoryItems(
   for (let i = 0; i < inventory.length; i++) {
     const item = inventory[i];
     if (item.sn) {
-      const itemSn = item.sn.trim().toUpperCase();
+      const itemSn = String(item.sn).trim().toUpperCase();
       if (upperCandidates.includes(itemSn)) {
         snMatches.push({ item, idx: i });
       }
@@ -139,7 +139,7 @@ export function findMatchingInventoryItems(
   for (let i = 0; i < inventory.length; i++) {
     const item = inventory[i];
     if (item.id) {
-      const itemId = item.id.trim().toUpperCase();
+      const itemId = String(item.id).trim().toUpperCase();
       if (upperCandidates.includes(itemId)) {
         return {
           matched: true,
@@ -159,7 +159,7 @@ export function findMatchingInventoryItems(
   for (let i = 0; i < inventory.length; i++) {
     const item = inventory[i];
     if (item.pn) {
-      const itemPn = item.pn.trim().toUpperCase();
+      const itemPn = String(item.pn).trim().toUpperCase();
       if (upperCandidates.includes(itemPn)) {
         pnMatches.push({ item, idx: i });
       }
@@ -180,8 +180,8 @@ export function findMatchingInventoryItems(
   // Pass 5: Substring / partial match (min 4 characters)
   for (let i = 0; i < inventory.length; i++) {
     const item = inventory[i];
-    const itemWh = (item.warehouse || '').trim().toUpperCase();
-    const itemSn = (item.sn || '').trim().toUpperCase();
+    const itemWh = String(item.warehouse || '').trim().toUpperCase();
+    const itemSn = String(item.sn || '').trim().toUpperCase();
 
     for (const cand of upperCandidates) {
       if (cand.length >= 4) {

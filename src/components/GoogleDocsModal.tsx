@@ -20,6 +20,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
+import { exportInventoryReportToDocx } from '../utils/docxExporter.ts';
 import { 
   listAppGoogleDocs, 
   createBlankGoogleDoc, 
@@ -259,6 +260,31 @@ BIÊN BẢN XỬ LÝ SỰ CỐ & THAY THẾ VẬT TƯ DỰ PHÒNG TẠI CHỖ
     }
   };
 
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+
+  const handleExportDocxDirect = async () => {
+    try {
+      setIsExportingDocx(true);
+      const filtered = selectedCategory === 'ALL' 
+        ? inventory 
+        : inventory.filter(item => item.category === selectedCategory);
+
+      onAddToast(`Đang tạo tệp Word Docs (.docx) cho ${filtered.length} thiết bị...`, 'info');
+      await exportInventoryReportToDocx(filtered, {
+        currentUsername,
+        categoryFilter: selectedCategory,
+        reportDate: new Date().toLocaleDateString('vi-VN'),
+        reportTitle: `BÁO CÁO DANH MỤC THIẾT BỊ CNS/ATM (${filtered.length} MỤC)`
+      });
+      onAddToast(`Đã tải xuống tệp Word (.docx) thành công!`, 'success');
+    } catch (err: any) {
+      console.error('Lỗi tải tệp Docx:', err);
+      onAddToast('Có lỗi xảy ra khi tải tệp Word Docs.', 'error');
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
   const handleExportQuickInventoryDoc = async () => {
     try {
       setIsCreating(true);
@@ -429,16 +455,29 @@ BIÊN BẢN XỬ LÝ SỰ CỐ & THAY THẾ VẬT TƯ DỰ PHÒNG TẠI CHỖ
               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 mb-3">
-              Tạo Google Doc danh mục {inventory.length} thiết bị đang quản lý
+              Xuất danh mục {inventory.length} thiết bị đang quản lý
             </p>
-            <button
-              onClick={handleExportQuickInventoryDoc}
-              disabled={isCreating}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {isCreating ? 'Đang xuất...' : 'Xuất Báo Cáo Google Doc'}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleExportDocxDirect}
+                disabled={isExportingDocx}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                title="Tải tệp Word (.docx) trực tiếp về máy tính"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {isExportingDocx ? 'Đang tải...' : 'Tải File Docs (.docx)'}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportQuickInventoryDoc}
+                disabled={isCreating}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                {isCreating ? 'Đang xuất...' : 'Mở trên Google Docs'}
+              </button>
+            </div>
           </div>
 
           <div className="md:col-span-2 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">

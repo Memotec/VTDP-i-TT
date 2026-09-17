@@ -4603,28 +4603,6 @@ export default function App() {
 
           {/* Main Inventory Table & Actions */}
           <div className="mt-6 scroll-smooth" ref={inventorySectionRef}>
-            {/* Cloud-First Loading Banner */}
-            {isCloudFirstLoading && (
-              <div className="mb-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs animate-pulse">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-bold text-blue-950 dark:text-blue-200">
-                      Đang ưu tiên đồng bộ & tải dữ liệu mới nhất từ Cloud...
-                    </p>
-                    <p className="text-[11px] text-blue-700 dark:text-blue-300">
-                      Hệ thống tự động kết nối Google Sheets & Firestore Cloud để nạp bản ghi mới nhất.
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200 border border-blue-300/50 dark:border-blue-700/50">
-                  Ưu tiên Cloud
-                </span>
-              </div>
-            )}
-
             {/* Local Fallback Active Banner */}
             {!isCloudFirstLoading && dataSourceOrigin === 'local_fallback' && showFallbackBanner && (
               <div className="mb-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">

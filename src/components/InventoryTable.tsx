@@ -110,9 +110,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   }, [filteredInventory]);
 
   return (
-    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-[#E2E8F0] dark:border-slate-800 overflow-hidden shadow-xs flex flex-col min-h-[420px] w-full transition-all scroll-smooth" id="inventory-table-container">
+    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-300/80 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col min-h-[420px] w-full transition-all scroll-smooth" id="inventory-table-container">
       {/* Table Header & Action Toolbar */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center px-5 py-4 border-b border-[#E2E8F0] dark:border-slate-800 gap-3.5 bg-slate-50/50 dark:bg-slate-900/30">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800 gap-3.5 bg-slate-50 dark:bg-slate-900/40">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
             <Layers className="w-5 h-5" />
@@ -217,23 +217,23 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
       </div>
 
       {/* Audit Progress Mini Strip */}
-      <div className="bg-slate-100/70 dark:bg-slate-800/40 border-b border-slate-200/60 dark:border-slate-800 px-5 py-2 flex items-center justify-between gap-4 flex-wrap text-xs">
+      <div className="bg-slate-100 dark:bg-slate-800/60 border-b border-slate-300/80 dark:border-slate-800 px-5 py-2 flex items-center justify-between gap-4 flex-wrap text-xs">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" /> Tiến Độ Kiểm Kê:
           </span>
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] border border-emerald-200 dark:border-emerald-900/40">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-black text-[11px] border border-emerald-300 dark:border-emerald-800">
               ● Đủ: {okCount}
             </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 font-bold text-[11px] border border-rose-200 dark:border-rose-900/40">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 font-black text-[11px] border border-rose-300 dark:border-rose-800">
               ▲ Thiếu: {missingCount}
             </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium text-[11px]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 font-black text-[11px] border border-slate-300 dark:border-slate-700">
               Chưa kiểm: {uncheckedCount}
             </span>
             {lowStockCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-bold text-[11px] border border-amber-200 dark:border-amber-900/40">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-black text-[11px] border border-amber-300 dark:border-amber-700">
                 <AlertTriangle className="w-3 h-3" /> Sắp hết: {lowStockCount}
               </span>
             )}
@@ -241,7 +241,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="hidden sm:flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px] font-medium">
+          <div className="hidden sm:flex items-center gap-1.5 text-slate-600 dark:text-slate-400 text-[11px] font-semibold">
             <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Mã QR tra cứu điện thoại trực quan</span>
           </div>
@@ -253,7 +253,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                 style={{ width: `${auditPercent}%` }}
               />
             </div>
-            <span className="text-xs font-black text-slate-700 dark:text-slate-300 min-w-[36px] text-right">
+            <span className="text-xs font-black text-slate-800 dark:text-slate-200 min-w-[36px] text-right">
               {auditPercent}%
             </span>
           </div>
@@ -261,7 +261,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
       </div>
 
       {/* View Mode Indicator Strip */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200/70 dark:border-slate-800 px-5 py-2 flex items-center justify-between gap-3 text-xs flex-wrap">
+      <div className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-300/80 dark:border-slate-800 px-5 py-2 flex items-center justify-between gap-3 text-xs flex-wrap">
         <div className="flex items-center gap-2">
           <span className="font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
             {viewMode === 'grid' ? (
@@ -322,31 +322,31 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                 return (
                   <div
                     key={item.id}
-                    className="bg-white dark:bg-[#131B2E] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-blue-400/80 dark:hover:border-blue-700 transition-all flex flex-col justify-between group relative overflow-hidden"
+                    className="bg-white dark:bg-[#131B2E] rounded-2xl p-4 border border-slate-300 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-500 dark:hover:border-blue-700 transition-all flex flex-col justify-between group relative overflow-hidden"
                   >
                     <div>
                       {/* Card Header: Category & Audit Status */}
-                      <div className="flex items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-200 dark:border-slate-800">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/80 text-[#2563EB] dark:text-blue-400 flex items-center justify-center text-xs font-black shrink-0">
+                          <span className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-950/80 text-[#2563EB] dark:text-blue-400 flex items-center justify-center text-xs font-black shrink-0 border border-blue-200 dark:border-blue-900/60">
                             {idx + 1}
                           </span>
-                          <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider truncate">
+                          <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider truncate border border-slate-300 dark:border-slate-700">
                             {item.category || 'Khác'}
                           </span>
                         </div>
 
                         <div className="shrink-0">
                           {item.auditStatus === 'OK' ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-lg font-extrabold text-[11px] border border-emerald-200 dark:border-emerald-900/40 shadow-2xs">
+                            <span className="inline-flex items-center gap-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2.5 py-0.5 rounded-lg font-black text-[11px] border border-emerald-300 dark:border-emerald-800 shadow-2xs">
                               ● ĐỦ / TỐT
                             </span>
                           ) : item.auditStatus === 'MISSING' ? (
-                            <span className="inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-lg font-extrabold text-[11px] border border-rose-200 dark:border-rose-900/40 shadow-2xs">
+                            <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 px-2.5 py-0.5 rounded-lg font-black text-[11px] border border-rose-300 dark:border-rose-800 shadow-2xs">
                               ▲ THIẾU
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-lg font-bold text-[11px] border border-slate-200 dark:border-slate-700">
+                            <span className="inline-flex items-center gap-1 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 px-2.5 py-0.5 rounded-lg font-bold text-[11px] border border-slate-300 dark:border-slate-700">
                               Chưa kiểm
                             </span>
                           )}
@@ -370,9 +370,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                       </div>
 
                       {/* Specs and stock metadata */}
-                      <div className="space-y-1.5 text-xs bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/60 mb-3">
+                      <div className="space-y-1.5 text-xs bg-slate-100/70 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 mb-3">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Số Serial S/N:</span>
+                          <span className="text-[10px] uppercase font-black text-slate-600 dark:text-slate-400">Số Serial S/N:</span>
                           <div className="flex items-center gap-1">
                             <span className="font-mono font-bold text-slate-900 dark:text-white text-xs truncate max-w-[125px]">
                               {item.sn || 'N/A'}
@@ -381,7 +381,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                               <button
                                 type="button"
                                 onClick={(e) => handleCopySn(item.sn, item.id, e)}
-                                className="p-0.5 text-slate-400 hover:text-blue-600 rounded cursor-pointer"
+                                className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
                                 title="Sao chép S/N"
                               >
                                 {copiedId === item.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -392,28 +392,28 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
 
                         {item.pn && (
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-400">P/N:</span>
-                            <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">
+                            <span className="text-[10px] uppercase font-black text-slate-600 dark:text-slate-400">P/N:</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
                               {item.pn}
                             </span>
                           </div>
                         )}
 
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Vị trí kho:</span>
-                          <span className="text-blue-600 dark:text-blue-400 font-bold truncate max-w-[140px] flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-black text-slate-600 dark:text-slate-400">Vị trí kho:</span>
+                          <span className="text-blue-700 dark:text-blue-400 font-bold truncate max-w-[140px] flex items-center gap-1">
                             <MapPin className="w-3 h-3 shrink-0" />
                             {item.loc || 'Kho Dự Phòng'}
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Tồn kho:</span>
+                        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-200 dark:border-slate-700">
+                          <span className="text-[10px] uppercase font-black text-slate-600 dark:text-slate-400">Tồn kho:</span>
                           <div>
                             {item.qty === 0 ? (
-                              <span className="text-rose-600 dark:text-rose-400 font-black text-xs">0 cái (Hết)</span>
+                              <span className="text-rose-700 dark:text-rose-400 font-black text-xs">0 cái (Hết)</span>
                             ) : item.qty === 1 ? (
-                              <span className="text-amber-600 dark:text-amber-400 font-black text-xs">1 bộ (Sắp hết ⚠️)</span>
+                              <span className="text-amber-700 dark:text-amber-400 font-black text-xs">1 bộ (Sắp hết ⚠️)</span>
                             ) : (
                               <span className="text-slate-900 dark:text-white font-black text-xs">{item.qty} bộ</span>
                             )}
@@ -422,10 +422,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                       </div>
 
                       {/* Interactive QR Code Card */}
-                      <div className="p-2.5 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-xl border border-indigo-100/80 dark:border-slate-700 mb-3 flex items-center gap-3">
+                      <div className="p-2.5 bg-indigo-50/70 dark:bg-slate-800/80 rounded-xl border border-indigo-200/80 dark:border-slate-700 mb-3 flex items-center gap-3 shadow-2xs">
                         <div
                           onClick={() => (onOpenPublicLookup ? onOpenPublicLookup(item) : onSelectDetail(item))}
-                          className="p-1 bg-white rounded-lg shadow-2xs cursor-pointer hover:scale-105 transition-transform shrink-0"
+                          className="p-1 bg-white rounded-lg shadow-2xs cursor-pointer hover:scale-105 transition-transform shrink-0 border border-slate-200 dark:border-slate-600"
                           title="Nhấn để mở Popup thông tin tra cứu trực quan"
                         >
                           <QRCodeSVG
@@ -435,16 +435,16 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-400 tracking-wider block">
+                          <span className="text-[10px] font-black uppercase text-indigo-800 dark:text-indigo-400 tracking-wider block">
                             Mã QR Tra Cứu
                           </span>
-                          <div className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
+                          <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 truncate">
                             {item.warehouse || item.sn}
                           </div>
                           <button
                             type="button"
                             onClick={() => (onOpenPublicLookup ? onOpenPublicLookup(item) : onSelectDetail(item))}
-                            className="mt-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
+                            className="mt-1 text-[11px] font-bold text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>Mở Popup Tra Cứu</span>
@@ -454,9 +454,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                     </div>
 
                     {/* Card Action Row */}
-                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1 flex-wrap">
+                    <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 flex-wrap">
                       {/* Fast Audit Toggle */}
-                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200/60 dark:border-slate-700">
+                      <div className="flex items-center bg-slate-200 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-300 dark:border-slate-700">
                         <button
                           type="button"
                           onClick={() => onQuickAuditStatus(item, item.auditStatus === 'OK' ? null : 'OK')}
@@ -569,7 +569,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
             </button>
           </div>
           <table className="w-full text-sm text-left whitespace-nowrap min-w-[900px]">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 sticky top-0 border-b border-[#E2E8F0] dark:border-slate-800 text-xs uppercase font-black tracking-wider text-slate-500 dark:text-slate-400 z-10">
+              <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0 border-b-2 border-slate-300 dark:border-slate-700 text-xs uppercase font-black tracking-wider text-slate-800 dark:text-slate-200 z-10 shadow-2xs">
                 <tr>
                   <th className="px-3.5 py-3.5 w-[5%] text-center">STT</th>
                   <th className="px-4 py-3.5 w-[36%] text-left">Tên Trang Thiết Bị & Vật Tư</th>
@@ -580,7 +580,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                   <th className="px-4 py-3.5 w-[10%] text-center">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80">
                 {filteredInventory.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-20 text-center">
@@ -601,10 +601,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                     return (
                       <tr
                         key={item.id}
-                        className={`${idx % 2 === 0 ? 'bg-white dark:bg-[#131B2E]' : 'bg-slate-50/40 dark:bg-slate-800/20'} hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group`}
+                        className={`${idx % 2 === 0 ? 'bg-white dark:bg-[#131B2E]' : 'bg-slate-50 dark:bg-slate-900/30'} hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors group`}
                       >
                         {/* STT */}
-                        <td className="px-3.5 py-3.5 text-center font-bold text-slate-400 text-xs">
+                        <td className="px-3.5 py-3.5 text-center font-black text-slate-600 dark:text-slate-400 text-xs">
                           {idx + 1}
                         </td>
 
@@ -612,7 +612,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50 cursor-pointer shadow-xs group-hover:scale-105 group-hover:bg-[#2563EB] group-hover:text-white transition-all"
+                              className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-900/50 cursor-pointer shadow-xs group-hover:scale-105 group-hover:bg-[#2563EB] group-hover:text-white transition-all"
                               onClick={() => onSelectDetail(item)}
                               title="Xem chi tiết & lịch sử thiết bị"
                             >
@@ -628,18 +628,18 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                                   {item.name}
                                 </span>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold text-[11px] border border-slate-200/60 dark:border-slate-700/60">
+                              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-600 dark:text-slate-400 font-semibold">
+                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded-md font-bold text-[11px] border border-slate-300 dark:border-slate-700">
                                   {item.category || 'Khác'}
                                 </span>
                                 {item.pn && (
                                   <span className="flex items-center gap-1 text-[11px]">
-                                    <Tag className="w-3 h-3 text-slate-400" />
-                                    <strong className="text-slate-700 dark:text-slate-300 font-mono font-semibold">{item.pn}</strong>
+                                    <Tag className="w-3 h-3 text-slate-500" />
+                                    <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold">{item.pn}</strong>
                                   </span>
                                 )}
                                 {item.loc && (
-                                  <span className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400">
+                                  <span className="flex items-center gap-1 text-[11px] text-blue-700 dark:text-blue-400 font-bold">
                                     <MapPin className="w-3 h-3" /> {item.loc}
                                   </span>
                                 )}
@@ -651,14 +651,14 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                         {/* S/N WITH ONE-CLICK COPY */}
                         <td className="px-3.5 py-3.5">
                           <div className="flex items-center gap-1.5 group/sn">
-                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm tracking-wide bg-slate-100 dark:bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60 truncate max-w-[140px]" title={item.sn}>
+                            <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm tracking-wide bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 truncate max-w-[140px]" title={item.sn}>
                               {item.sn || 'N/A'}
                             </span>
                             {item.sn && (
                               <button
                                 type="button"
                                 onClick={(e) => handleCopySn(item.sn, item.id, e)}
-                                className="p-1 rounded-md text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                className="p-1 rounded-md text-slate-500 hover:text-[#2563EB] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                 title="Sao chép số Serial (S/N)"
                               >
                                 {copiedId === item.id ? (
@@ -676,7 +676,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                           <div className="inline-flex items-center gap-1.5">
                             <div
                               onClick={() => (onOpenPublicLookup ? onOpenPublicLookup(item) : onOpenQrModal ? onOpenQrModal(item) : onSelectDetail(item))}
-                              className="p-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer hover:scale-110 hover:border-blue-400 transition-all shrink-0"
+                              className="p-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-700 shadow-2xs cursor-pointer hover:scale-110 hover:border-blue-400 transition-all shrink-0"
                               title="Nhấn để quét / mở tra cứu nhanh điện thoại"
                             >
                               <QRCodeSVG value={lookupUrl || item.warehouse || item.sn} size={28} level="L" />
@@ -694,7 +694,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                               <button
                                 type="button"
                                 onClick={() => (onOpenPublicLookup ? onOpenPublicLookup(item) : onSelectDetail(item))}
-                                className="inline-flex items-center gap-1 text-slate-400 hover:text-blue-600 italic text-xs cursor-pointer transition-colors"
+                                className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 italic text-xs cursor-pointer transition-colors"
                                 title="Xem popup tra cứu"
                               >
                                 <QrCode className="w-3 h-3" />
@@ -707,15 +707,15 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                       {/* SỐ LƯỢNG */}
                       <td className="px-3.5 py-3.5 text-center">
                         {item.qty === 0 ? (
-                          <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 px-2.5 py-1 rounded-lg font-black text-xs border border-rose-300 dark:border-rose-800 animate-pulse" title="Hết hàng tồn kho">
+                          <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 px-2.5 py-1 rounded-lg font-black text-xs border border-rose-300 dark:border-rose-800 animate-pulse" title="Hết hàng tồn kho">
                             0 (Hết)
                           </span>
                         ) : item.qty === 1 ? (
-                          <span className="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-lg font-black text-xs border border-amber-300 dark:border-amber-700" title="Dưới ngưỡng an toàn dự phòng">
+                          <span className="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 px-2.5 py-1 rounded-lg font-black text-xs border border-amber-300 dark:border-amber-700" title="Dưới ngưỡng an toàn dự phòng">
                             1 (Sắp hết ⚠️)
                           </span>
                         ) : (
-                          <span className="font-black text-slate-900 dark:text-white text-sm bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="font-black text-slate-900 dark:text-white text-sm bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700">
                             {item.qty} bộ
                           </span>
                         )}
@@ -725,20 +725,20 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                       <td className="px-3.5 py-3.5 text-center">
                         <div className="flex flex-col items-center gap-0.5">
                           {item.auditStatus === 'OK' ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-lg font-extrabold text-xs border border-emerald-200 dark:border-emerald-900/40 shadow-2xs">
+                            <span className="inline-flex items-center gap-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-lg font-black text-xs border border-emerald-300 dark:border-emerald-800 shadow-2xs">
                               ● ĐỦ / TỐT
                             </span>
                           ) : item.auditStatus === 'MISSING' ? (
-                            <span className="inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 px-2.5 py-1 rounded-lg font-extrabold text-xs border border-rose-200 dark:border-rose-900/40 shadow-2xs">
+                            <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 px-2.5 py-1 rounded-lg font-black text-xs border border-rose-300 dark:border-rose-800 shadow-2xs">
                               ▲ THIẾU
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-200 dark:border-slate-700">
+                            <span className="inline-flex items-center gap-1 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-300 dark:border-slate-700">
                               Chưa kiểm
                             </span>
                           )}
                           {item.auditDate && (
-                            <span className="text-[10px] text-slate-400 font-medium truncate max-w-[90px]">
+                            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[90px]">
                               {item.auditDate.split(' ')[0]}
                             </span>
                           )}
@@ -749,14 +749,14 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5 justify-center">
                           {/* Fast Audit Toggle */}
-                          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200/60 dark:border-slate-700">
+                          <div className="flex items-center bg-slate-200 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-300 dark:border-slate-700">
                             <button
                               type="button"
                               onClick={() => onQuickAuditStatus(item, item.auditStatus === 'OK' ? null : 'OK')}
                               className={`px-2 py-1 rounded-lg text-xs font-black cursor-pointer transition-all ${
                                 item.auditStatus === 'OK'
                                   ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-600'
+                                  : 'text-slate-700 dark:text-slate-300 hover:text-emerald-600'
                               }`}
                               title="Duyệt nhanh: Đủ / Tốt"
                             >
@@ -768,7 +768,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                               className={`px-2 py-1 rounded-lg text-xs font-black cursor-pointer transition-all ${
                                 item.auditStatus === 'MISSING'
                                   ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-300 hover:text-rose-600'
+                                  : 'text-slate-700 dark:text-slate-300 hover:text-rose-600'
                               }`}
                               title="Duyệt nhanh: Thiếu hụt"
                             >

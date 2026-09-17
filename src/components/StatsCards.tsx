@@ -62,19 +62,19 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
   return (
     <div className="space-y-4 sm:space-y-6" id="stats-section">
       {/* Mobile Compact KPI Strip */}
-      <div className="md:hidden bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xs">
-        <div className="grid grid-cols-3 gap-2 text-center divide-x divide-slate-100 dark:divide-slate-800">
+      <div className="md:hidden bg-white dark:bg-[#131B2E] border border-slate-300/80 dark:border-slate-800 rounded-2xl p-3 shadow-xs">
+        <div className="grid grid-cols-3 gap-2 text-center divide-x divide-slate-200 dark:divide-slate-800">
           {/* Col 1: Tồn kho */}
           <div className="px-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tồn Kho</span>
+            <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider block">Tồn Kho</span>
             <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-              {stats.totalQty} <span className="text-[10px] font-semibold text-slate-400">cái</span>
+              {stats.totalQty} <span className="text-[10px] font-bold text-slate-500">cái</span>
             </div>
             {lowStockCount > 0 && onFilterLowStock && (
               <button
                 type="button"
                 onClick={onFilterLowStock}
-                className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-700"
+                className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-800 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-700"
               >
                 <AlertTriangle className="w-2.5 h-2.5" />
                 {lowStockCount} ≤1
@@ -84,22 +84,22 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
 
           {/* Col 2: Tiến độ */}
           <div className="px-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kiểm Kê</span>
+            <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider block">Kiểm Kê</span>
             <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-              {stats.checkedCount}<span className="text-[10px] font-semibold text-slate-400">/{stats.totalItems}</span>
+              {stats.checkedCount}<span className="text-[10px] font-bold text-slate-500">/{stats.totalItems}</span>
             </div>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block mt-1">
+            <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 block mt-1">
               {Math.round((stats.checkedCount / (stats.totalItems || 1)) * 100)}% xong
             </span>
           </div>
 
           {/* Col 3: An toàn */}
           <div className="px-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">An Toàn</span>
-            <div className="text-base font-black text-blue-600 dark:text-blue-400 mt-0.5">
+            <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider block">An Toàn</span>
+            <div className="text-base font-black text-blue-700 dark:text-blue-400 mt-0.5">
               {stats.healthRate}%
             </div>
-            <span className={`text-[10px] font-bold block mt-1 ${stats.missingCount > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+            <span className={`text-[10px] font-black block mt-1 ${stats.missingCount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
               {stats.missingCount > 0 ? `${stats.missingCount} thiếu` : 'Đủ bộ'}
             </span>
           </div>
@@ -109,7 +109,7 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
         <button
           type="button"
           onClick={() => setIsMobileExpanded(!isMobileExpanded)}
-          className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 cursor-pointer active:scale-98 transition-transform"
+          className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-400 cursor-pointer active:scale-98 transition-transform"
         >
           <BarChart3 className="w-3.5 h-3.5" />
           <span>{isMobileExpanded ? 'Thu gọn biểu đồ thống kê' : 'Xem biểu đồ & số liệu chi tiết'}</span>
@@ -121,27 +121,27 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
       <div className={`${isMobileExpanded ? 'block' : 'hidden md:block'} space-y-6`}>
         {/* Top 5 Metric Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between col-span-2 sm:col-span-1 transition-all hover:border-blue-300 dark:hover:border-blue-800">
+        <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between col-span-2 sm:col-span-1 transition-all hover:border-blue-500 dark:hover:border-blue-800 hover:shadow-md">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Danh mục quản lý</p>
+            <p className="text-[11px] uppercase font-black text-slate-600 dark:text-slate-400 tracking-wider">Danh mục quản lý</p>
             <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">{stats.totalItems}</h3>
-            <p className="text-xs text-slate-500 font-medium">Mã thiết bị lưu</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Mã thiết bị lưu</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-[#2563EB] dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-[#1D4ED8] dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 shadow-xs">
             <Layers className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-emerald-300 dark:hover:border-emerald-800">
+        <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-emerald-500 dark:hover:border-emerald-800 hover:shadow-md">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Tổng tồn kho</p>
+            <p className="text-[11px] uppercase font-black text-slate-600 dark:text-slate-400 tracking-wider">Tổng tồn kho</p>
             <div className="flex items-baseline gap-2 flex-wrap">
               <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">{stats.totalQty}</h3>
               {lowStockCount > 0 && onFilterLowStock && (
                 <button
                   type="button"
                   onClick={onFilterLowStock}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 animate-pulse hover:bg-amber-200 cursor-pointer"
+                  className="inline-flex items-center gap-1 text-[11px] font-black text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 animate-pulse hover:bg-amber-200 cursor-pointer"
                   title="Xem các thiết bị có số lượng <= 1"
                 >
                   <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
@@ -149,98 +149,98 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
                 </button>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-medium">Cái / chiếc tồn kho</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Cái / chiếc tồn kho</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 shadow-xs">
             <CheckSquare className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-sky-300 dark:hover:border-sky-800">
+        <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-sky-500 dark:hover:border-sky-800 hover:shadow-md">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Tiến độ kiểm kê</p>
+            <p className="text-[11px] uppercase font-black text-slate-600 dark:text-slate-400 tracking-wider">Tiến độ kiểm kê</p>
             <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              {stats.checkedCount} <span className="text-xs font-semibold text-slate-400">/ {stats.totalItems}</span>
+              {stats.checkedCount} <span className="text-xs font-bold text-slate-500">/ {stats.totalItems}</span>
             </h3>
-            <p className="text-xs text-slate-500 font-medium">{Math.round((stats.checkedCount / (stats.totalItems || 1)) * 100)}% hoàn thành</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold">{Math.round((stats.checkedCount / (stats.totalItems || 1)) * 100)}% hoàn thành</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-900/50 shadow-xs">
             <Activity className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-rose-300 dark:hover:border-rose-800">
+        <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 p-4.5 sm:p-5 rounded-2xl shadow-xs flex items-center justify-between transition-all hover:border-rose-500 dark:hover:border-rose-800 hover:shadow-md">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Thiếu / Hỏng hóc</p>
+            <p className="text-[11px] uppercase font-black text-slate-600 dark:text-slate-400 tracking-wider">Thiếu / Hỏng hóc</p>
             <h3 className={`text-2xl sm:text-3xl font-black tracking-tight ${stats.missingCount > 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
               {stats.missingCount}
             </h3>
-            <p className="text-xs text-slate-500 font-medium">Thiết bị cần xử lý</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Thiết bị cần xử lý</p>
           </div>
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center border shadow-xs ${stats.missingCount > 0 ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center border shadow-xs ${stats.missingCount > 0 ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-900/50' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'}`}>
             <XCircle className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-gradient-to-tr from-[#2563EB] to-blue-700 text-white p-4.5 sm:p-5 rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-between col-span-2 lg:col-span-1">
+        <div className="bg-gradient-to-tr from-[#1D4ED8] to-blue-700 text-white p-4.5 sm:p-5 rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-between col-span-2 lg:col-span-1">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase font-bold text-blue-100 tracking-wider">Độ an toàn kho</p>
+            <p className="text-[11px] uppercase font-black text-blue-100 tracking-wider">Độ an toàn kho</p>
             <h3 className="text-2xl sm:text-3xl font-black tracking-tight">{stats.healthRate}%</h3>
-            <p className="text-xs text-blue-100 font-medium">Sẵn sàng kỹ thuật</p>
+            <p className="text-xs text-blue-100 font-semibold">Sẵn sàng kỹ thuật</p>
           </div>
-          <div className="w-12 h-12 bg-white/15 rounded-xl backdrop-blur-md flex items-center justify-center border border-white/20">
+          <div className="w-12 h-12 bg-white/15 rounded-xl backdrop-blur-md flex items-center justify-center border border-white/25">
             <Check className="w-6 h-6 text-white" />
           </div>
         </div>
       </section>
 
       {/* Analytics Visual Banner with Pie Chart */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300">
+      <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300">
         <div className="flex flex-col space-y-2.5 text-left w-full md:w-1/2">
-          <span className="p-1 px-2.5 bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 text-xs font-bold rounded-lg uppercase tracking-wider w-fit border border-blue-100 dark:border-blue-900/40">
+          <span className="p-1 px-2.5 bg-blue-50 dark:bg-blue-950/60 text-[#1D4ED8] dark:text-blue-400 text-xs font-black rounded-lg uppercase tracking-wider w-fit border border-blue-200 dark:border-blue-900/40">
             Phân Tích Trực Quan
           </span>
-          <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-wider">
+          <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider">
             Tỷ Lệ Trạng Thái Kiểm Kê Toàn Bộ Kho
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+          <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
             Biểu đồ tròn trực quan giám sát chặt chẽ tình hình hao hụt, hỏng hóc và tiến độ thực hiện kiểm đếm định kỳ toàn bộ kho tài sản Bảo Đảm Kỹ Thuật.
           </p>
 
           <div className="pt-3 space-y-3 w-full">
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs sm:text-sm font-bold">
-                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Đủ / Tốt
+                <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Đủ / Tốt
                 </span>
-                <span className="text-slate-600 dark:text-slate-400 font-bold">{totalOk} cái ({ratioOk}%)</span>
+                <span className="text-slate-800 dark:text-slate-200 font-black">{totalOk} cái ({ratioOk}%)</span>
               </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${ratioOk}%` }}></div>
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div className="bg-emerald-600 h-full rounded-full transition-all duration-500" style={{ width: `${ratioOk}%` }}></div>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs sm:text-sm font-bold">
-                <span className="text-rose-500 dark:text-rose-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Thiếu / Hỏng
+                <span className="text-rose-700 dark:text-rose-400 flex items-center gap-1.5 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Thiếu / Hỏng
                 </span>
-                <span className="text-slate-600 dark:text-slate-400 font-bold">{totalMissing} cái ({ratioMissing}%)</span>
+                <span className="text-slate-800 dark:text-slate-200 font-black">{totalMissing} cái ({ratioMissing}%)</span>
               </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                <div className="bg-rose-500 h-full rounded-full transition-all duration-500" style={{ width: `${ratioMissing}%` }}></div>
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div className="bg-rose-600 h-full rounded-full transition-all duration-500" style={{ width: `${ratioMissing}%` }}></div>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs sm:text-sm font-bold">
-                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Chưa kiểm kê
+                <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Chưa kiểm kê
                 </span>
-                <span className="text-slate-600 dark:text-slate-400 font-bold">{totalUnchecked} cái ({ratioUnchecked}%)</span>
+                <span className="text-slate-800 dark:text-slate-200 font-black">{totalUnchecked} cái ({ratioUnchecked}%)</span>
               </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                <div className="bg-slate-400 h-full rounded-full transition-all duration-500" style={{ width: `${ratioUnchecked}%` }}></div>
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div className="bg-slate-500 h-full rounded-full transition-all duration-500" style={{ width: `${ratioUnchecked}%` }}></div>
               </div>
             </div>
           </div>
@@ -291,9 +291,9 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
           </ResponsiveContainer>
 
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-xs uppercase font-extrabold text-slate-400 tracking-widest text-center leading-tight">Tổng Kho</span>
-            <span className="text-3xl sm:text-4xl font-black text-slate-800 dark:text-white mt-0.5">{totalAll}</span>
-            <span className="text-xs font-extrabold text-slate-500 tracking-wider">CÁI / BỘ</span>
+            <span className="text-xs uppercase font-extrabold text-slate-500 tracking-widest text-center leading-tight">Tổng Kho</span>
+            <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mt-0.5">{totalAll}</span>
+            <span className="text-xs font-black text-slate-600 dark:text-slate-400 tracking-wider">CÁI / BỘ</span>
           </div>
         </div>
       </div>

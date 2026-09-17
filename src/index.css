@@ -7,14 +7,14 @@
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-primary: #1D4ED8;
   --color-primary-hover: #1E40AF;
-  --color-bg: #F8FAFC;
+  --color-bg: #F1F5F9;
   --color-card: #FFFFFF;
   --color-text: #0F172A;
-  --color-text-muted: #64748B;
+  --color-text-muted: #475569;
   --color-success: #15803D;
   --color-warning: #B45309;
   --color-danger: #B91C1C;
-  --color-border: #E2E8F0;
+  --color-border: #CBD5E1;
 }
 
 .dark {
@@ -28,6 +28,76 @@
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
   --color-border: #334155;
+}
+
+/* High Contrast, Sharp & Intuitive Light Mode Enhancements */
+html:not(.dark) {
+  color-scheme: light;
+}
+
+html:not(.dark) body {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+/* Fix faint/washed-out text in Light Mode: ensure high readability */
+html:not(.dark) .text-slate-400 {
+  color: #475569 !important;
+}
+
+html:not(.dark) .text-slate-500 {
+  color: #334155 !important;
+}
+
+/* Fix faint borders in Light Mode: ensure crisp, distinct card and table borders */
+html:not(.dark) .border-slate-200,
+html:not(.dark) .border-\[\#E2E8F0\],
+html:not(.dark) .border-slate-200\/60,
+html:not(.dark) .border-slate-200\/70,
+html:not(.dark) .border-slate-200\/80,
+html:not(.dark) .border-slate-200\/90 {
+  border-color: #CBD5E1 !important;
+}
+
+html:not(.dark) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html:not(.dark) .divide-slate-200\/60 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #E2E8F0 !important;
+}
+
+/* Crisp card shadows in Light Mode for tactile elevation and clear boundaries */
+html:not(.dark) .shadow-xs {
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Input readability in Light Mode */
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #64748B !important;
+  opacity: 1;
+}
+
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea {
+  border-color: #CBD5E1;
+}
+
+/* Badge clarity & vibrancy in Light Mode */
+html:not(.dark) .bg-emerald-50 {
+  background-color: #ECFDF5;
+  color: #065F46;
+}
+html:not(.dark) .bg-rose-50 {
+  background-color: #FFF1F2;
+  color: #9F1239;
+}
+html:not(.dark) .bg-blue-50 {
+  background-color: #EFF6FF;
+  color: #1E40AF;
+}
+html:not(.dark) .bg-amber-50 {
+  background-color: #FFFBEB;
+  color: #92400E;
 }
 
 @layer base {

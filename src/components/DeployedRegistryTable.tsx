@@ -210,84 +210,84 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
       {/* KPI Stats Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Card 1: Active Deployed */}
-        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-[#E2E8F0] dark:border-slate-800 shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-900/50">
             <Layers className="w-5.5 h-5.5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Đang Sử Dụng / Vận Hành
             </span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className="text-xl font-black text-slate-900 dark:text-white">
                 {stats.totalDeployedQty}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">bộ/chiếc</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">bộ/chiếc</span>
             </div>
-            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block truncate">
+            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold block truncate">
               Trong {stats.activeDeployedCount} lượt xuất kho
             </span>
           </div>
         </div>
 
         {/* Card 2: Handover vs Usage */}
-        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-[#E2E8F0] dark:border-slate-800 shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-200 dark:border-rose-900/50">
             <ArrowRightLeft className="w-5.5 h-5.5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Hồ Sơ Bàn Giao & Phiếu
             </span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className="text-xl font-black text-slate-900 dark:text-white">
                 {stats.totalRecords}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">hồ sơ</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">hồ sơ</span>
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block truncate">
+            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-semibold block truncate">
               {stats.handoverCount} Biên bản • {stats.usageCount} Phiếu
             </span>
           </div>
         </div>
 
         {/* Card 3: Returned to Stock */}
-        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-[#E2E8F0] dark:border-slate-800 shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-900/50">
             <RotateCcw className="w-5.5 h-5.5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Đã Thu Hồi / Hoàn Kho
             </span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className="text-xl font-black text-slate-900 dark:text-white">
                 {stats.totalReturnedQty}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">bộ nhập lại</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">bộ nhập lại</span>
             </div>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block truncate">
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">
               Đã hoàn tất thử nghiệm/thay thế
             </span>
           </div>
         </div>
 
         {/* Card 4: Locations */}
-        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-[#E2E8F0] dark:border-slate-800 shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-[#2563EB] dark:text-blue-400 flex items-center justify-center shrink-0">
+        <div className="bg-white dark:bg-[#131B2E] p-4 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-blue-500/15 text-[#2563EB] dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-900/50">
             <MapPin className="w-5.5 h-5.5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Vị Trí & Hệ Thống Đích
             </span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className="text-xl font-black text-slate-900 dark:text-white">
                 {stats.uniqueLocationsCount}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">địa điểm</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">địa điểm</span>
             </div>
-            <span className="text-[10px] text-[#2563EB] dark:text-blue-400 font-semibold block truncate">
+            <span className="text-[10px] text-blue-700 dark:text-blue-400 font-bold block truncate">
               Đài KSV, Phòng máy ATM, Lab...
             </span>
           </div>
@@ -295,22 +295,22 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
       </div>
 
       {/* Main Toolbar & Search */}
-      <div className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-[#131B2E] border border-slate-300 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3.5">
           {/* Search bar */}
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400" />
+            <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm kiếm: Tên thiết bị, S/N, P/N, Số hiệu, Kỹ sư nhận, Nơi lắp đặt, Mục đích..."
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 text-xs sm:text-sm font-medium placeholder:text-slate-400"
+              className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 text-xs sm:text-sm font-bold placeholder:text-slate-500"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer p-0.5"
               >
                 ×
               </button>
@@ -365,19 +365,19 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
-          <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider flex items-center gap-1 mr-1">
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-200 dark:border-slate-800 text-xs font-bold">
+          <span className="text-[10px] uppercase font-black text-slate-600 dark:text-slate-400 tracking-wider flex items-center gap-1 mr-1">
             <Filter className="w-3 h-3 text-[#2563EB]" /> Lọc theo:
           </span>
 
           {/* Type filters */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+          <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl gap-1 border border-slate-300 dark:border-slate-700">
             <button
               onClick={() => setTypeFilter('ALL')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
                 typeFilter === 'ALL'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
               Tất cả ({records.length})
@@ -386,8 +386,8 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
               onClick={() => setTypeFilter('USAGE_SLIP')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
                 typeFilter === 'USAGE_SLIP'
-                  ? 'bg-amber-500 text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-amber-600'
+                  ? 'bg-amber-600 text-white shadow-xs font-black'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-amber-700'
               }`}
             >
               Phiếu sử dụng ({records.filter(r => r.type === 'USAGE_SLIP').length})
@@ -397,7 +397,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
                 typeFilter === 'HANDOVER_DOC'
                   ? 'bg-[#2563EB] text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-blue-600'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-blue-700'
               }`}
             >
               BB Bàn giao ({records.filter(r => r.type === 'HANDOVER_DOC').length})
@@ -405,13 +405,13 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
           </div>
 
           {/* Status filters */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+          <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl gap-1 border border-slate-300 dark:border-slate-700">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
                 statusFilter === 'ALL'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
               Mọi trạng thái
@@ -421,7 +421,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
                 statusFilter === 'DEPLOYED'
                   ? 'bg-emerald-600 text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-emerald-700'
               }`}
             >
               Đang hoạt động ({records.filter(r => r.status === 'DEPLOYED').length})
@@ -430,8 +430,8 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
               onClick={() => setStatusFilter('RETURNED')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
                 statusFilter === 'RETURNED'
-                  ? 'bg-slate-700 text-white shadow-xs font-black'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                  ? 'bg-slate-800 text-white shadow-xs font-black'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
               Đã thu hồi ({records.filter(r => r.status === 'RETURNED').length})
@@ -443,7 +443,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-none rounded-xl px-3 py-1 text-xs font-bold focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1 text-xs font-black focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
             >
               <option value="ALL">Tất cả chủng loại</option>
               {uniqueCategories.map(cat => (
@@ -460,7 +460,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                 setStatusFilter('ALL');
                 setCategoryFilter('ALL');
               }}
-              className="text-[10px] text-rose-500 hover:underline font-extrabold uppercase ml-auto cursor-pointer"
+              className="text-[10px] text-rose-600 hover:underline font-extrabold uppercase ml-auto cursor-pointer"
             >
               Xóa bộ lọc
             </button>
@@ -469,7 +469,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
       </div>
 
       {/* Main Table */}
-      <div className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+      <div className="bg-white dark:bg-[#131B2E] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         {filteredRecords.length === 0 ? (
           <div className="py-16 px-6 text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-2xl">
@@ -494,7 +494,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-[#E2E8F0] dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-[10.5px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                   <th className="py-3.5 px-4 w-12 text-center">STT</th>
                   <th className="py-3.5 px-4">Hồ Sơ / Loại</th>
                   <th className="py-3.5 px-4 min-w-[220px]">Thiết Bị & Thông Số</th>
@@ -505,35 +505,35 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                   <th className="py-3.5 px-4 text-right min-w-[140px]">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium text-slate-700 dark:text-slate-300">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
                 {filteredRecords.map((record, index) => {
                   const isHandover = record.type === 'HANDOVER_DOC';
 
                   return (
                     <tr 
                       key={record.id}
-                      className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors group"
+                      className={`${index % 2 === 0 ? 'bg-white dark:bg-[#131B2E]' : 'bg-slate-50 dark:bg-slate-900/30'} hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors group`}
                     >
                       {/* 1. STT */}
-                      <td className="py-3 px-4 text-center text-slate-400 font-bold text-[11px]">
+                      <td className="py-3.5 px-4 text-center text-slate-600 dark:text-slate-400 font-black text-xs">
                         {index + 1}
                       </td>
 
                       {/* 2. Document & Type */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="flex flex-col items-start gap-1">
-                          <span className={`inline-flex items-center gap-1 text-[9.5px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
                             isHandover 
-                              ? 'bg-blue-50 text-[#2563EB] dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900' 
-                              : 'bg-amber-50 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                              ? 'bg-blue-100 text-[#2563EB] dark:bg-blue-950/80 dark:text-blue-300 border border-blue-300 dark:border-blue-900' 
+                              : 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-900'
                           }`}>
                             {isHandover ? <ArrowRightLeft className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                             {isHandover ? 'BB Bàn Giao' : 'Phiếu Sử Dụng'}
                           </span>
-                          <span className="font-mono text-xs font-extrabold text-slate-900 dark:text-white">
+                          <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
                             {record.docNumber || `#${record.id.slice(-6)}`}
                           </span>
-                          <span className="text-[9.5px] text-slate-400 font-semibold">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
                             {record.date}
                           </span>
                         </div>
@@ -549,16 +549,16 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                           >
                             {record.itemName}
                           </button>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 font-semibold">
+                            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
                               S/N: {record.sn}
                             </span>
                             {record.pn && (
-                              <span className="text-slate-400">
+                              <span className="text-slate-500 font-mono">
                                 • P/N: {record.pn}
                               </span>
                             )}
-                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded text-slate-500 dark:text-slate-400">
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-bold">
                               {record.category}
                             </span>
                           </div>
@@ -566,22 +566,22 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                       </td>
 
                       {/* 4. Quantity */}
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center justify-center font-black text-xs px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center justify-center font-black text-xs px-2.5 py-1 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-[#2563EB] dark:text-blue-300 border border-blue-300 dark:border-blue-800 shadow-2xs">
                           x{record.qty} {record.unit || 'chiếc'}
                         </span>
                       </td>
 
                       {/* 5. Receiver */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <div className="font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                             <User className="w-3.5 h-3.5 text-[#2563EB]" />
                             <span>{record.receiverName}</span>
                           </div>
                           {record.receiverDept && (
-                            <div className="text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate" title={record.receiverDept}>
-                              <Building2 className="w-3 h-3 text-slate-400" />
+                            <div className="text-[10.5px] text-slate-600 dark:text-slate-400 font-semibold flex items-center gap-1 truncate" title={record.receiverDept}>
+                              <Building2 className="w-3 h-3 text-slate-500" />
                               <span>{record.receiverDept}</span>
                             </div>
                           )}
@@ -589,31 +589,31 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                       </td>
 
                       {/* 6. Target Location & Purpose */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="space-y-0.5 max-w-[260px]">
-                          <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 text-[11.5px] truncate" title={record.targetLocation}>
-                            <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1 text-[11.5px] truncate" title={record.targetLocation}>
+                            <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                             <span>{record.targetLocation}</span>
                           </div>
-                          <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate italic" title={record.purpose}>
+                          <p className="text-[10.5px] text-slate-600 dark:text-slate-400 truncate italic font-medium" title={record.purpose}>
                             {record.purpose}
                           </p>
                         </div>
                       </td>
 
                       {/* 7. Status */}
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center">
                         {record.status === 'DEPLOYED' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 px-2.5 py-0.5 rounded-lg shadow-2xs">
                             <CheckCircle2 className="w-3 h-3" /> Đang dùng
                           </span>
                         ) : (
                           <div className="inline-flex flex-col items-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-800 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-0.5 rounded-md">
                               <RotateCcw className="w-2.5 h-2.5" /> Đã hoàn kho
                             </span>
                             {record.returnedDate && (
-                              <span className="text-[9px] text-slate-400 mt-0.5 font-mono">
+                              <span className="text-[9px] text-slate-500 mt-0.5 font-mono font-semibold">
                                 {record.returnedDate.split(' ')[0]}
                               </span>
                             )}
@@ -622,13 +622,13 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                       </td>
 
                       {/* 8. Actions */}
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* View Detail */}
                           <button
                             type="button"
                             onClick={() => onViewDetail(record)}
-                            className="p-1.5 text-slate-500 hover:text-[#2563EB] hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-slate-600 hover:text-[#2563EB] hover:bg-blue-100 dark:hover:bg-blue-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-blue-200"
                             title="Xem chi tiết hồ sơ bàn giao/sử dụng"
                           >
                             <Eye className="w-4 h-4" />
@@ -638,7 +638,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                           <button
                             type="button"
                             onClick={() => onPrintRecord(record)}
-                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-amber-200"
                             title="In lại phiếu / biên bản này"
                           >
                             <Printer className="w-4 h-4" />
@@ -649,7 +649,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                             <button
                               type="button"
                               onClick={() => onReturnRecord(record)}
-                              className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-emerald-200"
                               title="Thu hồi và hoàn trả thiết bị này về kho dự phòng"
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -661,7 +661,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                             <button
                               type="button"
                               onClick={() => onDeleteRecord(record.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200"
                               title="Xóa bản ghi lưu trữ (Admin)"
                             >
                               <Trash2 className="w-4 h-4" />

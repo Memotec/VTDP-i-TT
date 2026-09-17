@@ -4,7 +4,8 @@ import {
   User, Lock, LogOut, Sun, Moon, FileSpreadsheet, Printer,
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Crown, AlertTriangle,
-  Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud, ArrowUp
+  Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud, ArrowUp,
+  Mail, KeyRound, ShieldCheck, Sparkles
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
@@ -116,6 +117,8 @@ export default function App() {
   // Inventory state - initialized directly from LocalDatabase (excluding any mock initialData)
   const [inventory, setInventory] = useState<InventoryItem[]>(() => LocalDatabase.getInventory().filter(item => !isInitialMockItem(item)));
   const [role, setRole] = useState<Role>(() => {
+    const isLoggedOut = localStorage.getItem('cns_logged_out') === 'true';
+    if (isLoggedOut) return null;
     const saved = localStorage.getItem('cns_session_active');
     if (saved === 'admin' || saved === 'guest') return saved as Role;
     return 'admin';
@@ -172,6 +175,18 @@ export default function App() {
   });
 
   // Login form state
+  const [loginMethod, setLoginMethod] = useState<'GMAIL' | 'CREDENTIALS'>('GMAIL');
+  const [gmailInput, setGmailInput] = useState<string>('tailieutbtt@gmail.com');
+  const [recentGmails, setRecentGmails] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('cns_recent_gmails');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* fallback */ }
+    return ['tailieutbtt@gmail.com'];
+  });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -1256,8 +1271,20 @@ export default function App() {
     const u = username.toLowerCase().trim();
     const p = password;
 
+    if (!u) {
+      setLoginError('Vui lòng nhập tên tài khoản hoặc địa chỉ Gmail!');
+      return;
+    }
+
+    // If user typed a Gmail/email address into username field
+    if (u.includes('@gmail.com') || (u.includes('@') && !p)) {
+      handleDirectGmailLogin(u);
+      return;
+    }
+
     const matchedUser = users.find(
-      account => account.username.toLowerCase() === u && account.password === p
+      account => (account.username.toLowerCase() === u || (account.email && account.email.toLowerCase() === u)) &&
+        (account.password === p || (!account.password && !p))
     );
 
     if (matchedUser) {
@@ -1271,6 +1298,10 @@ export default function App() {
       setCurrentUsername(matchedUser.username);
       localStorage.setItem('cns_session_active', matchedUser.role);
       localStorage.setItem('cns_current_username', matchedUser.username);
+      if (matchedUser.email) {
+        localStorage.setItem('cns_current_email', matchedUser.email);
+      }
+      localStorage.removeItem('cns_logged_out');
       setLoginError('');
       setUsername('');
       setPassword('');
@@ -1348,6 +1379,8 @@ export default function App() {
         setCurrentUsername(matchedUser.username);
         localStorage.setItem('cns_session_active', effectiveRole);
         localStorage.setItem('cns_current_username', matchedUser.username);
+        localStorage.setItem('cns_current_email', email);
+        localStorage.removeItem('cns_logged_out');
 
         addToast(`Xin chào ${displayName}! Đăng nhập thành công qua tài khoản Gmail.`, 'success');
         playScanBeep(1000, 0.15);
@@ -1381,6 +1414,8 @@ export default function App() {
         setCurrentUsername(newUser.username);
         localStorage.setItem('cns_session_active', effectiveRole);
         localStorage.setItem('cns_current_username', newUser.username);
+        localStorage.setItem('cns_current_email', email);
+        localStorage.removeItem('cns_logged_out');
 
         addToast(`Đăng nhập thành công với Gmail (${email}) - Vai trò: ${effectiveRole === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}!`, 'success');
         playScanBeep(1000, 0.15);
@@ -1395,16 +1430,15 @@ export default function App() {
       console.error('Google Sign In Error:', err);
       const msg = err?.message || '';
       if (msg.includes('POPUP_BLOCKED')) {
-        setLoginError('Trình duyệt hoặc khung xem trước (iframe) đang chặn cửa sổ Pop-up Google! Bạn có thể nhấn chọn "Xác thực Gmail trực tiếp" bên dưới.');
-        addToast('Trình duyệt chặn Pop-up Google. Vui lòng thử Xác thực Gmail trực tiếp!', 'warning');
+        setLoginError('Trình duyệt hoặc khung xem trước (iframe) đang chặn cửa sổ Pop-up Google! Bạn có thể dùng tính năng "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
+        addToast('Trình duyệt chặn Pop-up Google. Vui lòng bấm "Xác thực & Đăng nhập ngay bằng Gmail"!', 'warning');
       } else if (msg.includes('UNAUTHORIZED_DOMAIN') || msg.includes('OPERATION_NOT_ALLOWED')) {
-        setLoginError('Tên miền xem trước chưa được ủy quyền trong Firebase Auth. Vui lòng chọn "Xác thực Gmail trực tiếp" bên dưới.');
-        addToast('Chế độ xem trước: Sử dụng Xác thực Gmail trực tiếp để đăng nhập.', 'info');
+        setLoginError('Tên miền xem trước chưa được thêm vào Firebase Authorized Domains. Bạn hãy bấm "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
+        addToast('Đang ở môi trường xem trước: Hãy dùng nút "Xác thực & Đăng nhập ngay bằng Gmail"!', 'info');
       } else if (msg.includes('popup-closed-by-user') || msg.includes('cancelled-popup-request')) {
-        // User closed the popup intentionally
         addToast('Đã hủy thao tác mở cửa sổ Google.', 'info');
       } else {
-        setLoginError('Đăng nhập Pop-up Google bị gián đoạn. Bạn có thể chọn "Xác thực Gmail trực tiếp" bên dưới!');
+        setLoginError('Đăng nhập Pop-up Google bị gián đoạn. Vui lòng dùng nút "Xác thực & Đăng nhập ngay bằng Gmail" phía trên!');
         playScanBeep(300, 0.25);
       }
     } finally {
@@ -1414,14 +1448,26 @@ export default function App() {
 
   // Direct Gmail account authentication fallback for preview/iframe environments
   const handleDirectGmailLogin = (inputEmail?: string) => {
-    const email = (inputEmail || 'tailieutbtt@gmail.com').toLowerCase().trim();
-    if (!email || !email.includes('@')) {
-      setLoginError('Vui lòng nhập địa chỉ Email Gmail hợp lệ!');
+    const raw = (inputEmail || gmailInput || 'tailieutbtt@gmail.com').trim();
+    const email = raw.toLowerCase();
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      setLoginError('Vui lòng nhập địa chỉ Email Gmail hợp lệ (ví dụ: tailieutbtt@gmail.com)!');
+      playScanBeep(300, 0.25);
       return;
     }
 
-    const displayName = email === 'tailieutbtt@gmail.com' ? 'Super Admin (TailieuTBTT)' : email.split('@')[0];
+    setLoginError('');
+
+    // Record to recent Gmail accounts
+    try {
+      const recent: string[] = JSON.parse(localStorage.getItem('cns_recent_gmails') || '[]');
+      const nextRecent = Array.from(new Set([email, ...recent])).slice(0, 5);
+      localStorage.setItem('cns_recent_gmails', JSON.stringify(nextRecent));
+      setRecentGmails(nextRecent);
+    } catch { /* fallback */ }
+
     const isSuperAdminEmail = email === 'tailieutbtt@gmail.com' || email.startsWith('tailieutbtt@');
+    const displayName = isSuperAdminEmail ? 'Super Admin (TailieuTBTT)' : email.split('@')[0];
 
     let matchedUser = users.find(
       account => (account.email && account.email.toLowerCase() === email) ||
@@ -1431,7 +1477,7 @@ export default function App() {
 
     if (matchedUser) {
       if (matchedUser.status === 'locked') {
-        setLoginError(`Tài khoản Google (${email}) đã bị Quản trị viên khóa! Vui lòng liên hệ Trưởng ca.`);
+        setLoginError(`Tài khoản Gmail (${email}) đã bị Quản trị viên khóa! Vui lòng liên hệ Trưởng ca.`);
         playScanBeep(300, 0.3);
         return;
       }
@@ -1456,8 +1502,10 @@ export default function App() {
       setCurrentUsername(matchedUser.username);
       localStorage.setItem('cns_session_active', effectiveRole);
       localStorage.setItem('cns_current_username', matchedUser.username);
+      localStorage.setItem('cns_current_email', email);
+      localStorage.removeItem('cns_logged_out');
 
-      addToast(`Xin chào ${displayName}! Đăng nhập thành công qua tài khoản Gmail.`, 'success');
+      addToast(`Xin chào ${displayName}! Đăng nhập thành công qua tài khoản Gmail (${email}).`, 'success');
       playScanBeep(1000, 0.15);
 
       addSystemAuditLog(
@@ -1487,6 +1535,8 @@ export default function App() {
       setCurrentUsername(newUser.username);
       localStorage.setItem('cns_session_active', effectiveRole);
       localStorage.setItem('cns_current_username', newUser.username);
+      localStorage.setItem('cns_current_email', email);
+      localStorage.removeItem('cns_logged_out');
 
       addToast(`Đăng nhập thành công với Gmail (${email}) - Vai trò: ${effectiveRole === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}!`, 'success');
       playScanBeep(1000, 0.15);
@@ -1502,12 +1552,14 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('cns_session_active');
     localStorage.removeItem('cns_current_username');
+    localStorage.removeItem('cns_current_email');
+    localStorage.setItem('cns_logged_out', 'true');
     setRole(null);
     setCurrentUsername('');
     setEditingItem(null);
     setIsItemFormModalOpen(false);
     clearForm();
-    addToast('Đã đăng xuất tài khoản.', 'info');
+    addToast('Đã đăng xuất tài khoản. Bạn có thể kiểm tra đăng nhập bằng địa chỉ Gmail.', 'info');
   };
 
   const toggleTheme = useCallback(() => {
@@ -3506,7 +3558,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-800 dark:text-slate-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#F1F5F9] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
       {/* Toast notifications */}
       <div className="fixed top-6 right-6 z-[99999] flex flex-col gap-3 w-full max-w-sm">
         {toasts.map(t => (
@@ -3561,165 +3613,323 @@ export default function App() {
 
       {/* NOT LOGGED IN SCREEN */}
       {!role ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[#1E2430] dark:bg-[#1E2430]">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 px-8 py-10 sm:px-10 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/25">
-                <QrCode className="w-8 h-8 text-white" />
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-900 dark:bg-slate-950 min-h-screen">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 px-6 py-8 sm:px-9 sm:py-9 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
+            {/* Header / Brand Title */}
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 rounded-2xl flex items-center justify-center mx-auto mb-3.5 shadow-lg shadow-blue-500/25">
+                <QrCode className="w-7 h-7 text-white" />
               </div>
-              <h1 className="text-2xl sm:text-[26px] font-black text-slate-900 dark:text-white tracking-tight leading-snug">
-                Kho Vật tư dự phòng Đội Thông tin -TT BĐKT
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-snug">
+                Kho Vật tư dự phòng Đội Thông tin - TT BĐKT
               </h1>
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-2.5 uppercase tracking-wider">
+              <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 mt-1.5 uppercase tracking-wider">
                 Hệ Thống Quản Lý & Kiểm Kê Trang Thiết Bị
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">
-                  Tài khoản đăng nhập
-                </label>
-                <div className="relative">
-                  <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white font-medium outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm placeholder:text-slate-400"
-                    placeholder="Nhập 'admin' hoặc 'guest'"
-                  />
+            {/* Login Method Switcher Tabs */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl mb-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('GMAIL');
+                  setLoginError('');
+                }}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  loginMethod === 'GMAIL'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>Đăng nhập Gmail</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('CREDENTIALS');
+                  setLoginError('');
+                }}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  loginMethod === 'CREDENTIALS'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span>Tài khoản nội bộ</span>
+              </button>
+            </div>
+
+            {/* TAB 1: GMAIL AUTHENTICATION */}
+            {loginMethod === 'GMAIL' ? (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5 ml-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Địa chỉ Gmail xác thực
+                    </label>
+                    <span className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Xác thực an toàn
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-3.5 w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <input
+                      type="email"
+                      value={gmailInput}
+                      onChange={(e) => {
+                        setGmailInput(e.target.value);
+                        setLoginError('');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleDirectGmailLogin(gmailInput);
+                        }
+                      }}
+                      className="w-full pl-12 pr-10 py-3.5 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 text-slate-900 dark:text-white font-mono font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                      placeholder="Nhập địa chỉ Gmail (vd: tailieutbtt@gmail.com)"
+                      autoComplete="email"
+                    />
+                    {gmailInput && (
+                      <button
+                        type="button"
+                        onClick={() => setGmailInput('')}
+                        className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                        title="Xóa địa chỉ"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Real-time Role Preview Banner */}
+                {(() => {
+                  const cleaned = (gmailInput || '').trim().toLowerCase();
+                  const isSuperAdmin = cleaned === 'tailieutbtt@gmail.com' || cleaned.startsWith('tailieutbtt@');
+
+                  if (isSuperAdmin) {
+                    return (
+                      <div className="p-3 bg-amber-500/10 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/30 mt-0.5">
+                          <Crown className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                            Quyền Hạn: Super Admin (Toàn Quyền)
+                          </p>
+                          <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 font-medium leading-snug mt-0.5">
+                            Tài khoản Quản trị viên chính Đội Thông tin - TT BĐKT. Toàn quyền quản trị kho, xuất nhập, phân quyền và kết nối Cloud.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="p-3 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/30 mt-0.5">
+                        <User className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-blue-900 dark:text-blue-200 uppercase tracking-wide">
+                          Quyền Hạn: Kiểm Kê Viên (Tiêu chuẩn)
+                        </p>
+                        <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80 font-medium leading-snug mt-0.5">
+                          Tài khoản phục vụ kiểm đếm hiện vật, quét mã QR, đối chiếu số liệu và lập phiếu xuất kho thiết bị.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Quick 1-Click Gmail Account Chips */}
+                <div>
+                  <p className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 ml-1">
+                    Chọn nhanh tài khoản Gmail:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGmailInput('tailieutbtt@gmail.com');
+                        handleDirectGmailLogin('tailieutbtt@gmail.com');
+                      }}
+                      className="px-3 py-2 bg-gradient-to-r from-amber-50 to-amber-100/70 dark:from-amber-950/40 dark:to-amber-900/30 hover:from-amber-100 hover:to-amber-200/80 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                      title="1 Chạm: Đăng nhập ngay với tailieutbtt@gmail.com (Super Admin)"
+                    >
+                      <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>tailieutbtt@gmail.com</span>
+                      <span className="text-[9.5px] bg-amber-200/80 dark:bg-amber-900/80 px-1 py-0.2 rounded font-mono">Admin</span>
+                    </button>
+
+                    {recentGmails
+                      .filter(g => g.toLowerCase() !== 'tailieutbtt@gmail.com')
+                      .slice(0, 3)
+                      .map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => {
+                            setGmailInput(g);
+                            handleDirectGmailLogin(g);
+                          }}
+                          className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Mail className="w-3 h-3 text-slate-500" />
+                          <span className="font-mono truncate max-w-[150px]">{g}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {loginError && (
+                  <div className="bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl text-xs font-semibold border border-rose-200 dark:border-rose-900/50 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                {/* Main Action Buttons for Gmail */}
+                <div className="space-y-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleDirectGmailLogin(gmailInput)}
+                    className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 transition-all text-sm tracking-wide active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5"
+                  >
+                    <Mail className="w-4.5 h-4.5" />
+                    <span>XÁC THỰC & ĐĂNG NHẬP NGAY BẰNG GMAIL</span>
+                  </button>
+
+                  <div className="relative my-2 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+                    </div>
+                    <span className="relative bg-white dark:bg-slate-900 px-3 text-[10.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Hoặc dùng cửa sổ Google Pop-up
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleAccountLogin}
+                    disabled={isLoggingInGoogle}
+                    className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-100 font-bold py-3 px-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center gap-3 transition-all text-xs cursor-pointer disabled:opacity-60 active:scale-[0.98]"
+                  >
+                    <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>{isLoggingInGoogle ? 'Đang mở cửa sổ Google...' : 'Đăng nhập Google OAuth Pop-up'}</span>
+                  </button>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase ml-1">
-                  Mật khẩu
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white font-medium outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm placeholder:text-slate-400"
-                    placeholder="Mật khẩu tương ứng"
-                  />
+            ) : (
+              /* TAB 2: INTERNAL USERNAME / PASSWORD FORM */
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider ml-1">
+                    Tên tài khoản hoặc Email
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white font-medium outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm placeholder:text-slate-400"
+                      placeholder="Nhập 'admin', 'guest' hoặc Gmail"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {loginError && (
-                <div className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-xl text-xs font-medium border border-rose-100 dark:border-rose-900/40">
-                  {loginError}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider ml-1">
+                    Mật khẩu
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white font-medium outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm placeholder:text-slate-400"
+                      placeholder="Mật khẩu tương ứng"
+                    />
+                  </div>
                 </div>
-              )}
 
-              <div className="flex flex-col gap-2.5 mt-5">
+                {loginError && (
+                  <div className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl text-xs font-semibold border border-rose-200 dark:border-rose-900/40 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all text-sm tracking-wide active:scale-[0.98] cursor-pointer"
                 >
-                  ĐĂNG NHẬP HỆ THỐNG
+                  ĐĂNG NHẬP NỘI BỘ
                 </button>
+              </form>
+            )}
 
-                <div className="relative my-1 flex items-center justify-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-                  </div>
-                  <span className="relative bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Hoặc đăng nhập với
-                  </span>
-                </div>
+            {/* Instant Debug Bypass for Administrator */}
+            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setRole('admin');
+                  setCurrentUsername('admin');
+                  localStorage.setItem('cns_session_active', 'admin');
+                  localStorage.setItem('cns_current_username', 'admin');
+                  localStorage.removeItem('cns_logged_out');
+                  addToast('Đã vào hệ thống với quyền Quản trị viên (Super Admin).', 'success');
+                }}
+                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-2.5 rounded-xl transition-all text-xs cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-500" />
+                <span>Bỏ qua & Vào ngay với quyền Super Admin</span>
+              </button>
 
-                <button
-                  type="button"
-                  onClick={handleGoogleAccountLogin}
-                  disabled={isLoggingInGoogle}
-                  className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-100 font-bold py-3 px-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center gap-3 transition-all text-sm cursor-pointer disabled:opacity-60 active:scale-[0.98]"
-                >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  {isLoggingInGoogle ? 'Đang kết nối Google...' : 'Đăng nhập Google Pop-up'}
-                </button>
-
-                {/* Direct Gmail Login Options (Quick & Bypass Pop-up block) */}
-                <div className="p-3 bg-blue-50/70 dark:bg-blue-950/40 rounded-2xl border border-blue-100 dark:border-blue-900/50 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider">
-                      ⚡ Xác thực Gmail Trực tiếp
-                    </span>
-                    <span className="text-[10px] text-blue-500 font-semibold">Khuyến nghị khi dùng Iframe</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDirectGmailLogin('tailieutbtt@gmail.com')}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                      title="Đăng nhập trực tiếp với Gmail tailieutbtt@gmail.com (Super Admin)"
-                    >
-                      <span>tailieutbtt@gmail.com</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const userEmail = prompt('Nhập địa chỉ Gmail của bạn:', 'tailieutbtt@gmail.com');
-                        if (userEmail) handleDirectGmailLogin(userEmail);
-                      }}
-                      className="bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold py-2 px-3 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap"
-                    >
-                      Email khác...
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRole('admin');
-                    setCurrentUsername('admin');
-                    localStorage.setItem('cns_session_active', 'admin');
-                    localStorage.setItem('cns_current_username', 'admin');
-                    addToast('Đã vào hệ thống với quyền Quản trị viên (Super Admin).', 'success');
-                  }}
-                  className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2.5 rounded-2xl transition-all text-xs cursor-pointer mt-0.5"
-                >
-                  Bỏ qua & Vào ngay với quyền Super Admin
-                </button>
+              <div className="text-center text-[10.5px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                <p className="font-semibold">
+                  Tài khoản Super Admin mặc định: <span className="font-mono font-bold text-amber-600 dark:text-amber-400">tailieutbtt@gmail.com</span>
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Tài khoản nội bộ: <span className="font-mono font-bold text-slate-600 dark:text-slate-300">admin / admin</span> • <span className="font-mono font-bold text-slate-600 dark:text-slate-300">guest / 123456</span>
+                </p>
               </div>
-            </form>
-
-            <div className="mt-8 border-t border-slate-100 dark:border-slate-800 pt-6 text-center text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
-              <p className="font-bold">Gợi ý đăng nhập mặc định:</p>
-              <p className="mt-1">Super Admin: <span className="font-mono font-bold text-slate-700 dark:text-slate-200">admin / admin</span> • Kiểm kê: <span className="font-mono font-bold text-slate-700 dark:text-slate-200">guest / 123456</span></p>
-              <p className="mt-1 text-[9.5px] italic text-amber-600 dark:text-amber-400 font-semibold">* Tài khoản Admin có quyền thêm, sửa, xóa, khóa/mở khóa & phân quyền người dùng</p>
             </div>
           </div>
         </div>
       ) : (
         /* MODERN ENTERPRISE DASHBOARD LAYOUT */
-        <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-800 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
+        <div className="min-h-screen bg-[#F1F5F9] dark:bg-[#0B0F19] text-slate-900 dark:text-[#F8FAFC] flex flex-col md:flex-row w-full font-sans antialiased">
           {/* Left Sidebar (Desktop Only) */}
-          <aside className="hidden md:flex md:w-72 bg-white dark:bg-[#131B2E] border-r border-[#E2E8F0] dark:border-slate-800 flex-col shrink-0">
+          <aside className="hidden md:flex md:w-72 bg-white dark:bg-[#131B2E] border-r border-slate-300/80 dark:border-slate-800 flex-col shrink-0 shadow-xs">
             {/* Sidebar Brand Header */}
-            <div className="p-5 border-b border-[#E2E8F0] dark:border-slate-800 flex items-center gap-3">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
                 <Database className="w-5.5 h-5.5" />
               </div>
@@ -3944,7 +4154,7 @@ export default function App() {
             />
 
             {/* Top Enterprise Header (Desktop screens only) */}
-            <header className="hidden md:flex bg-white dark:bg-[#131B2E] border-b border-[#E2E8F0] dark:border-slate-800 px-6 py-4 items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+            <header className="hidden md:flex bg-white dark:bg-[#131B2E] border-b border-slate-300/80 dark:border-slate-800 px-6 py-4 items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="min-w-0">
                   <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
@@ -4064,6 +4274,7 @@ export default function App() {
                   const currentUserObj = users.find(u => u.username.toLowerCase() === (currentUsername || '').toLowerCase());
                   const displayName = currentUserObj?.fullName || currentUsername || 'Người dùng';
                   const userPhotoUrl = currentUserObj?.photoURL;
+                  const currentEmail = currentUserObj?.email || localStorage.getItem('cns_current_email') || '';
 
                   return (
                     <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
@@ -4076,16 +4287,28 @@ export default function App() {
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-7 h-7 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white ${
+                            role === 'admin' ? 'bg-amber-600' : 'bg-blue-600'
+                          }`}>
                             {role === 'admin' ? <Crown className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
                           </div>
                         )}
                         <div className="min-w-0 text-left hidden lg:block">
-                          <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[130px]">
-                            {displayName}
-                          </p>
-                          <p className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider truncate">
-                            {role === 'admin' ? 'Super Admin' : 'Kiểm kê viên'}
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[130px]">
+                              {displayName}
+                            </p>
+                            {currentEmail && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] font-mono text-blue-700 dark:text-blue-300 bg-blue-100/70 dark:bg-blue-950/70 px-1.5 py-0.2 rounded font-bold border border-blue-200 dark:border-blue-900"
+                                title={`Đã đăng nhập bằng Gmail: ${currentEmail}`}
+                              >
+                                <Mail className="w-2.5 h-2.5" /> Gmail
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider truncate" title={currentEmail || undefined}>
+                            {role === 'admin' ? 'Super Admin' : 'Kiểm kê viên'} {currentEmail ? `• ${currentEmail}` : ''}
                           </p>
                         </div>
 
@@ -4182,22 +4405,22 @@ export default function App() {
           </div>
 
           {/* Search and Action Toolbar */}
-          <section className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3.5 shadow-xs">
+          <section className="bg-white dark:bg-[#131B2E] border border-slate-300/80 dark:border-slate-800 rounded-2xl p-4 mt-6 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3.5 shadow-xs">
             {/* Search Input */}
             <div className="relative flex-1 max-w-full xl:max-w-md">
-              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500 dark:text-slate-400" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm: Tên thiết bị, S/N, P/N, Vị trí, Mã kho..."
-                className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-semibold placeholder:text-slate-500 shadow-2xs"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                  className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer p-0.5"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -4412,8 +4635,8 @@ export default function App() {
           {/* Filter & Category Bar */}
           <div className="mt-4 flex flex-col xl:flex-row gap-3 items-stretch">
             {/* Category Filter */}
-            <div className="flex-1 bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-2.5 shadow-xs flex items-center gap-2 overflow-x-auto custom-scrollbar">
-              <span className="text-xs uppercase font-black text-slate-400 tracking-wider shrink-0 flex items-center gap-1.5 pl-1.5">
+            <div className="flex-1 bg-white dark:bg-[#131B2E] border border-slate-300/80 dark:border-slate-800 rounded-2xl p-2.5 shadow-xs flex items-center gap-2 overflow-x-auto custom-scrollbar">
+              <span className="text-xs uppercase font-black text-slate-700 dark:text-slate-300 tracking-wider shrink-0 flex items-center gap-1.5 pl-1.5">
                 <Filter className="w-3.5 h-3.5 text-[#2563EB]" /> Phân Loại:
               </span>
               {categories.map(cat => (
@@ -4423,10 +4646,10 @@ export default function App() {
                     setSelectedCategory(cat);
                     scrollToInventorySection();
                   }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-2xs ${
                     selectedCategory === cat
-                      ? 'bg-[#2563EB] text-white shadow-xs font-black'
-                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
+                      ? 'bg-[#1D4ED8] text-white shadow-xs font-black'
+                      : 'bg-white hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-bold'
                   }`}
                 >
                   {cat}
@@ -4435,7 +4658,7 @@ export default function App() {
             </div>
 
             {/* Status Audit Filter */}
-            <div className="bg-white dark:bg-[#131B2E] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-2 shadow-xs flex items-center gap-1 shrink-0 overflow-x-auto custom-scrollbar">
+            <div className="bg-white dark:bg-[#131B2E] border border-slate-300/80 dark:border-slate-800 rounded-2xl p-2 shadow-xs flex items-center gap-1.5 shrink-0 overflow-x-auto custom-scrollbar">
               <button
                 onClick={() => {
                   setStatusFilter('ALL');
@@ -4444,7 +4667,7 @@ export default function App() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'ALL'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-300'
                 }`}
               >
                 Tất cả ({stats.totalItems})
@@ -4457,7 +4680,7 @@ export default function App() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'OK'
                     ? 'bg-emerald-600 text-white font-black shadow-xs'
-                    : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                    : 'text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-300 font-bold'
                 }`}
               >
                 Đủ / Tốt ({stats.okCount})
@@ -4470,7 +4693,7 @@ export default function App() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'MISSING'
                     ? 'bg-rose-600 text-white font-black shadow-xs'
-                    : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                    : 'text-rose-800 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-300 font-bold'
                 }`}
               >
                 Thiếu / Hỏng ({stats.missingCount})
@@ -4483,7 +4706,7 @@ export default function App() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === 'UNCHECKED'
                     ? 'bg-blue-600 text-white font-black shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-300 font-bold'
                 }`}
               >
                 Chưa kiểm ({stats.totalItems - stats.checkedCount})
@@ -4495,10 +4718,10 @@ export default function App() {
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   statusFilter === 'LOW_STOCK'
-                    ? 'bg-amber-500 text-white font-black shadow-xs'
+                    ? 'bg-amber-600 text-white font-black shadow-xs'
                     : lowStockItems.length > 0
-                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
-                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    ? 'text-amber-800 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 font-black'
+                    : 'text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent font-bold'
                 }`}
               >
                 <AlertTriangle className="w-3.5 h-3.5" />

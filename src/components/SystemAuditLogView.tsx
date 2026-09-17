@@ -481,9 +481,6 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
                   System Audit Trail
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Tự động lưu vết và giám sát minh bạch tất cả các tác vụ nghiệp vụ: <strong>Thêm mới vật tư</strong>, <strong>Chỉnh sửa thông số</strong>, <strong>Xóa dữ liệu</strong>, <strong>Lập biên bản bàn giao</strong>, <strong>Xuất sử dụng & Thu hồi</strong>.
-              </p>
             </div>
           </div>
 

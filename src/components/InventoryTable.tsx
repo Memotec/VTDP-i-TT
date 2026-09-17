@@ -129,9 +129,6 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
                 Tổng: {totalQty} / hiện vật
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-              Kho vật tư dự phòng tại chỗ Đội Thông Tin • Trực quan hoá thông số & quản lý kiểm kê
-            </p>
           </div>
         </div>
 

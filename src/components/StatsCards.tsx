@@ -196,16 +196,13 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
 
       {/* Analytics Visual Banner with Pie Chart */}
       <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300">
-        <div className="flex flex-col space-y-2.5 text-left w-full md:w-1/2">
+        <div className="flex flex-col space-y-2 text-left w-full md:w-1/2">
           <span className="p-1 px-2.5 bg-blue-50 dark:bg-blue-950/60 text-[#1D4ED8] dark:text-blue-400 text-xs font-black rounded-lg uppercase tracking-wider w-fit border border-blue-200 dark:border-blue-900/40">
             Phân Tích Trực Quan
           </span>
           <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider">
             Tỷ Lệ Trạng Thái Kiểm Kê Toàn Bộ Kho
           </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-            Biểu đồ tròn trực quan giám sát chặt chẽ tình hình hao hụt, hỏng hóc và tiến độ thực hiện kiểm đếm định kỳ toàn bộ kho tài sản Bảo Đảm Kỹ Thuật.
-          </p>
 
           <div className="pt-3 space-y-3 w-full">
             <div className="space-y-1.5">

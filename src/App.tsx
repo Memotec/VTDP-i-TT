@@ -4670,21 +4670,6 @@ export default function App() {
               </div>
             )}
 
-            {role !== 'admin' && (
-              <div className="mb-4 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                      Chế độ Kiểm kê viên (Guest): <span className="font-normal text-slate-600 dark:text-slate-400">Bạn có toàn quyền tra cứu, quét mã QR/mã vạch kiểm kê hiện vật và xuất báo cáo PDF/Excel.</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <InventoryTable
               filteredInventory={filteredInventory}
               role={role}

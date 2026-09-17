@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, HardDrive, Upload, Download, Trash2, RefreshCw, CheckCircle2, 
   ExternalLink, LogIn, LogOut, FileText, FileSpreadsheet, ShieldAlert,
-  Folder, Loader2, Database, FolderCheck, Edit2, Check
+  Folder, Loader2, Database, FolderCheck, Edit2, Check, AlertTriangle
 } from 'lucide-react';
 import { googleSignIn, googleLogout, initAuthListener, getAccessToken } from '../services/authService.ts';
 import { 
@@ -37,6 +37,39 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [restoringFileId, setRestoringFileId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  
+  const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+  // Direct offline JSON backup export (works 100% without Google login or popups)
+  const handleDirectDownloadBackup = () => {
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fileName = `CNS_Inventory_Backup_${dateStr}.json`;
+      const backupData = {
+        app: 'CNS Equipment Inventory Management',
+        version: '2.5.0',
+        exportedAt: now.toISOString(),
+        itemCount: inventory.length,
+        dispatchedCount: dispatchedRecords.length,
+        inventory,
+        dispatchedRecords
+      };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      onAddToast(`Đã xuất và tải tệp sao lưu ${fileName} về máy tính thành công!`, 'success');
+    } catch (e: any) {
+      onAddToast(`Lỗi tải tệp: ${e.message}`, 'error');
+    }
+  };
   
   // Configured Drive Folder
   const [folderId, setFolderId] = useState<string>(() => getStoredDriveFolderId());
@@ -81,10 +114,12 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
   const handleSignIn = async () => {
     try {
       setIsLoggingIn(true);
+      setPopupBlocked(false);
       const result = await googleSignIn();
       if (result) {
         setCurrentUser(result.user);
         setToken(result.accessToken);
+        setPopupBlocked(false);
         onAddToast(`Đăng nhập thành công với tài khoản ${result.user.email}!`, 'success');
         loadDriveFiles(result.accessToken);
       }
@@ -95,7 +130,8 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
       console.error('Đăng nhập thất bại:', err);
       const msg = err?.message || '';
       if (msg.includes('POPUP_BLOCKED')) {
-        onAddToast('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Vui lòng cho phép Pop-up trên trình duyệt hoặc mở ứng dụng ở Tab mới!', 'error');
+        setPopupBlocked(true);
+        onAddToast('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Vui lòng nhấn "Mở ở Tab mới" bên dưới!', 'error');
       } else if (msg.includes('UNAUTHORIZED_DOMAIN')) {
         onAddToast('Tên miền ứng dụng chưa được ủy quyền trong Firebase Auth Console. Vui lòng kiểm tra cấu hình domain.', 'error');
       } else {
@@ -335,30 +371,81 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-3 space-y-2 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Đăng nhập tài khoản Google để bật tính năng sao lưu tự động vào Google Drive cá nhân
+              <div className="flex flex-col items-center justify-center py-2 space-y-3 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
+                  Đăng nhập tài khoản Google để tự động đồng bộ & sao lưu danh mục vật tư lên Google Drive
                 </p>
 
                 {/* Standard Google Sign-In Button */}
-                <button
-                  type="button"
-                  onClick={handleSignIn}
-                  disabled={isLoggingIn}
-                  className="mt-1 px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2.5 disabled:opacity-50"
-                >
-                  {isLoggingIn ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                  ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                    </svg>
-                  )}
-                  <span>Đăng nhập với Google</span>
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSignIn}
+                    disabled={isLoggingIn}
+                    className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2.5 disabled:opacity-50"
+                  >
+                    {isLoggingIn ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                      </svg>
+                    )}
+                    <span>{isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập với Google'}</span>
+                  </button>
+
+                  {/* Fallback Direct JSON Download */}
+                  <button
+                    type="button"
+                    onClick={handleDirectDownloadBackup}
+                    className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2"
+                    title="Tải tệp JSON về máy tính ngay mà không cần tài khoản Google"
+                  >
+                    <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Tải bản sao lưu JSON về máy</span>
+                  </button>
+                </div>
+
+                {/* Prominent Helper & Resolution Box when in Iframe or Popup is Blocked */}
+                {(popupBlocked || isIframe) && (
+                  <div className="w-full p-4 mt-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/80 text-left space-y-3 animate-fade-in">
+                    <div className="flex items-start gap-3">
+                      <div className="p-1.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded-xl shrink-0 mt-0.5">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <div className="text-xs text-amber-950 dark:text-amber-100 flex-1">
+                        <p className="font-extrabold text-sm text-amber-900 dark:text-amber-200">
+                          {popupBlocked ? 'Cửa sổ Google Pop-up bị trình duyệt / Iframe chặn' : 'Lưu ý khi mở trong khung xem trước (Iframe)'}
+                        </p>
+                        <p className="mt-1 text-[11.5px] leading-relaxed text-amber-800 dark:text-amber-300/90">
+                          Trình duyệt thường chặn mở cửa sổ Pop-up bên trong khung iframe nhúng. Để đăng nhập Google Drive thành công 100%, hãy nhấn nút <span className="font-bold underline">Mở ứng dụng ở Tab mới</span> bên dưới!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => window.open(window.location.href, '_blank')}
+                        className="w-full sm:w-auto flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Mở ứng dụng ở Tab mới (Khắc phục chặn Pop-up)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDirectDownloadBackup}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Lưu file JSON trực tiếp</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

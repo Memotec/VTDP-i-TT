@@ -5,7 +5,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, X, History, Settings, Camera, Check, Filter,
   FileText, ArrowRightLeft, Layers, Crown, AlertTriangle,
   Smartphone, Download, Tag, Activity, PlusCircle, HardDrive, ChevronDown, FileDown, FileCode, Cloud, ArrowUp,
-  Mail, KeyRound, ShieldCheck, Sparkles
+  Mail, KeyRound, ShieldCheck, Sparkles, ExternalLink
 } from 'lucide-react';
 
 import { InventoryItem, SyncConfig, StorageConfig, Role, AuditStats, AuditHistoryEntry, UsageSlip, UserAccount, DispatchedRecord, SystemAuditLogEntry, AuditActionType, DataSourceOrigin } from './types.ts';
@@ -1430,10 +1430,10 @@ export default function App() {
       console.error('Google Sign In Error:', err);
       const msg = err?.message || '';
       if (msg.includes('POPUP_BLOCKED')) {
-        setLoginError('Trình duyệt hoặc khung xem trước (iframe) đang chặn cửa sổ Pop-up Google! Bạn có thể dùng tính năng "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
-        addToast('Trình duyệt chặn Pop-up Google. Vui lòng bấm "Xác thực & Đăng nhập ngay bằng Gmail"!', 'warning');
+        setLoginError('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Bạn có thể nhấn nút "Đăng nhập ngay bằng Gmail" (không cần Pop-up) hoặc "Mở ở Tab mới" bên dưới.');
+        addToast('Trình duyệt chặn Pop-up Google. Vui lòng bấm "Đăng nhập ngay bằng Gmail" hoặc "Mở ở Tab mới"!', 'warning');
       } else if (msg.includes('UNAUTHORIZED_DOMAIN') || msg.includes('OPERATION_NOT_ALLOWED')) {
-        setLoginError('Tên miền xem trước chưa được thêm vào Firebase Authorized Domains. Bạn hãy bấm "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
+        setLoginError('Tên miền xem trước chưa được thêm vào Firebase Authorized Domains. Bạn hãy dùng tính năng "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
         addToast('Đang ở môi trường xem trước: Hãy dùng nút "Xác thực & Đăng nhập ngay bằng Gmail"!', 'info');
       } else if (msg.includes('popup-closed-by-user') || msg.includes('cancelled-popup-request')) {
         addToast('Đã hủy thao tác mở cửa sổ Google.', 'info');

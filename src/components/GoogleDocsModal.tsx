@@ -16,7 +16,8 @@ import {
   ArrowRight,
   LogIn,
   LogOut,
-  UserCheck
+  UserCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { 
@@ -65,6 +66,8 @@ export const GoogleDocsModal: React.FC<GoogleDocsModalProps> = ({
   // Confirmation dialog for deletion
   const [deleteTarget, setDeleteTarget] = useState<GoogleDocFile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   // Init auth listener
   useEffect(() => {
@@ -116,16 +119,27 @@ export const GoogleDocsModal: React.FC<GoogleDocsModalProps> = ({
   const handleSignIn = async () => {
     try {
       setIsLoggingIn(true);
+      setPopupBlocked(false);
       const res = await googleSignIn();
       if (res) {
         setCurrentUser(res.user);
         setToken(res.accessToken);
+        setPopupBlocked(false);
         onAddToast(`Đã kết nối Google Workspace với tài khoản ${res.user.email}!`, 'success');
         loadDocs(res.accessToken);
       }
     } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user' || err?.message?.includes('popup-closed-by-user')) {
+        return;
+      }
       console.error('Đăng nhập thất bại:', err);
-      onAddToast(`Đăng nhập Google thất bại: ${err.message || 'Vui lòng thử lại'}`, 'error');
+      const msg = err?.message || '';
+      if (msg.includes('POPUP_BLOCKED')) {
+        setPopupBlocked(true);
+        onAddToast('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Vui lòng mở ứng dụng ở Tab mới!', 'error');
+      } else {
+        onAddToast(`Đăng nhập Google thất bại: ${msg || 'Vui lòng thử lại'}`, 'error');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -367,19 +381,43 @@ BIÊN BẢN XỬ LÝ SỰ CỐ & THAY THẾ VẬT TƯ DỰ PHÒNG TẠI CHỖ
         </div>
 
         {!currentUser && (
-          <div className="mb-5 p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <span>Chưa kết nối tài khoản Google Workspace. Đăng nhập để tự động lưu & đồng bộ tài liệu Google Docs trực tiếp vào Google Drive.</span>
+          <div className="mb-5 space-y-2">
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>Chưa kết nối tài khoản Google Workspace. Đăng nhập để tự động lưu & đồng bộ tài liệu Google Docs trực tiếp vào Google Drive.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignIn}
+                disabled={isLoggingIn}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shrink-0 transition-all cursor-pointer shadow-xs"
+              >
+                {isLoggingIn ? 'Đang kết nối...' : 'Đăng Nhập Google'}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleSignIn}
-              disabled={isLoggingIn}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shrink-0 transition-all cursor-pointer"
-            >
-              {isLoggingIn ? 'Đang mở...' : 'Đăng Nhập Ngay'}
-            </button>
+
+            {(popupBlocked || isIframe) && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200 animate-fade-in">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Cửa sổ Google Pop-up bị chặn bởi iframe?</span>
+                    <p className="text-[11px] text-blue-800 dark:text-blue-300">
+                      Mở ứng dụng ở tab trình duyệt mới để thực hiện đăng nhập và cấp quyền Google Docs không bị chặn.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.open(window.location.href, '_blank')}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Mở Tab mới ↗</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

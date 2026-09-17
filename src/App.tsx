@@ -4773,6 +4773,7 @@ export default function App() {
               setIsScannerOpen(false);
               setSelectedItemDetail(item);
             }}
+            currentUsername={currentUsername}
           />
         </Suspense>
       )}

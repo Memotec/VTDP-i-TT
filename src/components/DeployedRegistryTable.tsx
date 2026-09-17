@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   FileText, ArrowRightLeft, Search, Filter, Printer, FileSpreadsheet, 
   RotateCcw, Trash2, CheckCircle2, MapPin, Plus,
-  Layers, Building2, User, Eye, Download, Loader2
+  Layers, Building2, User, Eye, Download, Loader2, QrCode, Check,
+  BarChart3, ChevronDown, ChevronUp, ShieldCheck
 } from 'lucide-react';
 import { DispatchedRecord, Role } from '../types.ts';
 import { exportDispatchedRegistryToPDF } from '../utils/pdfExporter.ts';
@@ -20,6 +21,7 @@ interface DeployedRegistryTableProps {
   onPrintFullRegistry?: () => void;
   onPrintRegistry?: () => void;
   onAddToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onOpenPrintCenter?: (mode: 'QR' | 'LABEL' | 'AUDIT_REPORT', defaultScope?: 'ALL' | 'FILTERED', selectedItems?: any[]) => void;
 }
 
 export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React.memo(({
@@ -34,13 +36,16 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
   onCreateHandoverDoc,
   onPrintFullRegistry,
   onPrintRegistry,
-  onAddToast
+  onAddToast,
+  onOpenPrintCenter
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'USAGE_SLIP' | 'HANDOVER_DOC'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEPLOYED' | 'RETURNED'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [isExportingRegistryPdf, setIsExportingRegistryPdf] = useState(false);
+  const [showAnalyticsBreakdown, setShowAnalyticsBreakdown] = useState(false);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
 
   // Safe toast helper
   const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -161,6 +166,99 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
     };
   }, [records]);
 
+  // Breakdown statistics by location, department, and category
+  const breakdownStats = useMemo(() => {
+    const locMap: Record<string, { count: number; qty: number }> = {};
+    const deptMap: Record<string, { count: number; qty: number }> = {};
+    const catMap: Record<string, { count: number; qty: number }> = {};
+
+    records.forEach(r => {
+      const loc = (r.targetLocation || 'Khác / Hiện trường').trim();
+      const dept = (r.receiverDept || 'Tổ kỹ thuật / Tiếp nhận').trim();
+      const cat = (r.category || 'Vật tư CNS').trim();
+      const qty = r.qty || 1;
+
+      if (!locMap[loc]) locMap[loc] = { count: 0, qty: 0 };
+      locMap[loc].count++;
+      locMap[loc].qty += qty;
+
+      if (!deptMap[dept]) deptMap[dept] = { count: 0, qty: 0 };
+      deptMap[dept].count++;
+      deptMap[dept].qty += qty;
+
+      if (!catMap[cat]) catMap[cat] = { count: 0, qty: 0 };
+      catMap[cat].count++;
+      catMap[cat].qty += qty;
+    });
+
+    const topLocations = Object.entries(locMap).sort((a, b) => b[1].qty - a[1].qty);
+    const topDepts = Object.entries(deptMap).sort((a, b) => b[1].qty - a[1].qty);
+    const topCats = Object.entries(catMap).sort((a, b) => b[1].qty - a[1].qty);
+
+    return { topLocations, topDepts, topCats };
+  }, [records]);
+
+  // Batch selection helper functions
+  const isAllSelected = filteredRecords.length > 0 && filteredRecords.every(r => selectedRecordIds.has(r.id));
+  const isPartiallySelected = filteredRecords.some(r => selectedRecordIds.has(r.id)) && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRecordIds(new Set());
+    } else {
+      const allIds = new Set(filteredRecords.map(r => r.id));
+      setSelectedRecordIds(allIds);
+    }
+  };
+
+  const handleToggleSelectRecord = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedRecordIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedRecordIds(next);
+  };
+
+  // Trigger batch print with selected or filtered items
+  const handleTriggerBatchPrint = (mode: 'QR' | 'LABEL' | 'AUDIT_REPORT', useSelectedOnly: boolean = false) => {
+    if (typeof onOpenPrintCenter !== 'function') {
+      showToast('Trung tâm in ấn tem nhãn đang tải...', 'info');
+      return;
+    }
+
+    const sourceRecords = useSelectedOnly && selectedRecordIds.size > 0
+      ? filteredRecords.filter(r => selectedRecordIds.has(r.id))
+      : filteredRecords;
+
+    if (sourceRecords.length === 0) {
+      showToast('Không có thiết bị nào được chọn để in tem!', 'error');
+      return;
+    }
+
+    const targetItems = sourceRecords.map(r => ({
+      id: r.itemId || r.id,
+      name: r.itemName,
+      category: r.category || 'Vật tư CNS',
+      sn: r.sn || 'N/A',
+      pn: r.pn || '',
+      warehouse: r.warehouse || 'Kho Trung tâm',
+      loc: r.targetLocation || 'Tại hiện trường',
+      qty: r.qty || 1,
+      minQty: 1,
+      unit: r.unit || 'Cái',
+      auditStatus: 'OK' as const,
+      auditDate: r.date,
+      condition: 'GOOD' as const,
+      notes: r.purpose || ''
+    }));
+
+    onOpenPrintCenter(mode, useSelectedOnly ? 'SELECTED' : 'FILTERED', targetItems);
+    showToast(`Đã nạp ${targetItems.length} thiết bị vào Trung tâm in ấn!`, 'success');
+  };
+
   // Export Excel specifically for deployed and handed-over equipment
   const handleExportExcel = async () => {
     if (records.length === 0) {
@@ -207,6 +305,117 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Top Professional Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 p-5 rounded-2xl text-white shadow-md border border-blue-900/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 uppercase tracking-wider">
+              Phân Hệ Thống Kê Riêng Biệt
+            </span>
+            <span className="text-xs text-blue-300 font-mono hidden sm:inline">
+              CNS/ATM Dispatched & Handover Asset Registry
+            </span>
+          </div>
+          <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+            <span>VẬT TƯ, THIẾT BỊ ĐÃ BÁO SỬ DỤNG & BÀN GIAO</span>
+          </h2>
+          <p className="text-xs text-slate-300 mt-1 max-w-2xl font-medium leading-relaxed">
+            Khu vực lưu vết, theo dõi và quản lý tập trung toàn bộ trang thiết bị, vật tư dự phòng đã được lập Phiếu Báo Sử Dụng xuất kho hoặc ký Biên Bản Bàn Giao đưa vào vận hành tại các đài trạm.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 self-stretch md:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowAnalyticsBreakdown(!showAnalyticsBreakdown)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+              showAnalyticsBreakdown
+                ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-amber-300" />
+            <span>{showAnalyticsBreakdown ? 'Thu Gọn Phân Bổ' : 'Thống Kê Phân Bổ'}</span>
+            {showAnalyticsBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable Visual Breakdown Drawer */}
+      {showAnalyticsBreakdown && (
+        <div className="bg-white dark:bg-[#131B2E] p-5 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm space-y-4 animate-scale-in">
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4.5 h-4.5 text-[#2563EB]" />
+              <h3 className="text-xs font-black uppercase text-slate-900 dark:text-white tracking-wider">
+                Thống Kê Chi Tiết Phân Bổ Thiết Bị Đang Vận Hành Theo Vị Trí & Đơn Vị
+              </h3>
+            </div>
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+              Tổng số: {stats.totalDeployedQty} chiếc đang triển khai
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Top Locations */}
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-500" /> Vị Trí / Đài Trạm Đang Lắp Đặt
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pt-1">
+                {breakdownStats.topLocations.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Chưa có dữ liệu vị trí</p>
+                ) : (
+                  breakdownStats.topLocations.map(([loc, data]) => (
+                    <div key={loc} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-800/80">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={loc}>{loc}</span>
+                      <span className="font-black text-[#2563EB] dark:text-blue-400 shrink-0 font-mono">{data.qty} cái ({data.count} hồ sơ)</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Top Departments */}
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-500" /> Đơn Vị / Tổ Kỹ Thuật Tiếp Nhận
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pt-1">
+                {breakdownStats.topDepts.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Chưa có dữ liệu đơn vị</p>
+                ) : (
+                  breakdownStats.topDepts.map(([dept, data]) => (
+                    <div key={dept} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-800/80">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={dept}>{dept}</span>
+                      <span className="font-black text-emerald-600 dark:text-emerald-400 shrink-0 font-mono">{data.qty} cái ({data.count} hồ sơ)</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Top Categories */}
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-purple-500" /> Chủng Loại Thiết Bị Bàn Giao
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pt-1">
+                {breakdownStats.topCats.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Chưa có dữ liệu chủng loại</p>
+                ) : (
+                  breakdownStats.topCats.map(([cat, data]) => (
+                    <div key={cat} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-800/80">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={cat}>{cat}</span>
+                      <span className="font-black text-purple-600 dark:text-purple-400 shrink-0 font-mono">{data.qty} cái</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPI Stats Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Card 1: Active Deployed */}
@@ -319,6 +528,21 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Batch Print Dropdown */}
+            {onOpenPrintCenter && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleTriggerBatchPrint('QR', selectedRecordIds.size > 0)}
+                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border border-indigo-200/80 dark:border-indigo-800 shadow-xs active:scale-95"
+                  title="In ấn mã QR / Tem nhãn hàng loạt cho các mục đã chọn hoặc danh sách đang lọc"
+                >
+                  <QrCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>IN TEM HÀNG LOẠT ({selectedRecordIds.size > 0 ? `${selectedRecordIds.size} mục` : `${filteredRecords.length}`})</span>
+                </button>
+              </div>
+            )}
+
             <button
               onClick={handleExportExcel}
               className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
@@ -495,7 +719,19 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-[10.5px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                  <th className="py-3.5 px-4 w-12 text-center">STT</th>
+                  <th className="py-3.5 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={el => {
+                        if (el) el.indeterminate = isPartiallySelected;
+                      }}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      title="Chọn tất cả danh sách đang hiển thị"
+                    />
+                  </th>
+                  <th className="py-3.5 px-3 w-10 text-center">STT</th>
                   <th className="py-3.5 px-4">Hồ Sơ / Loại</th>
                   <th className="py-3.5 px-4 min-w-[220px]">Thiết Bị & Thông Số</th>
                   <th className="py-3.5 px-4 text-center">SL Xuất</th>
@@ -508,14 +744,32 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
                 {filteredRecords.map((record, index) => {
                   const isHandover = record.type === 'HANDOVER_DOC';
+                  const isSelected = selectedRecordIds.has(record.id);
 
                   return (
                     <tr 
                       key={record.id}
-                      className={`${index % 2 === 0 ? 'bg-white dark:bg-[#131B2E]' : 'bg-slate-50 dark:bg-slate-900/30'} hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors group`}
+                      onClick={(e) => handleToggleSelectRecord(record.id, e)}
+                      className={`${
+                        isSelected
+                          ? 'bg-blue-50 dark:bg-blue-950/40 ring-1 ring-blue-500/30'
+                          : index % 2 === 0
+                          ? 'bg-white dark:bg-[#131B2E]'
+                          : 'bg-slate-50 dark:bg-slate-900/30'
+                      } hover:bg-blue-50/70 dark:hover:bg-slate-800/60 transition-colors group cursor-pointer`}
                     >
+                      {/* 0. Checkbox */}
+                      <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => handleToggleSelectRecord(record.id, e as unknown as React.MouseEvent)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
                       {/* 1. STT */}
-                      <td className="py-3.5 px-4 text-center text-slate-600 dark:text-slate-400 font-black text-xs">
+                      <td className="py-3.5 px-3 text-center text-slate-600 dark:text-slate-400 font-black text-xs">
                         {index + 1}
                       </td>
 
@@ -634,15 +888,49 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Print record */}
+                          {/* Print record (Document) */}
                           <button
                             type="button"
-                            onClick={() => onPrintRecord(record)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPrintRecord(record);
+                            }}
                             className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                            title="In lại phiếu / biên bản này"
+                            title="In lại phiếu / biên bản gốc"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
+
+                          {/* Print QR / Barcode tag for this deployed item */}
+                          {onOpenPrintCenter && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const singleItem = {
+                                  id: record.itemId || record.id,
+                                  name: record.itemName,
+                                  category: record.category || 'Vật tư CNS',
+                                  sn: record.sn || 'N/A',
+                                  pn: record.pn || '',
+                                  warehouse: record.warehouse || 'Kho Trung tâm',
+                                  loc: record.targetLocation || 'Tại hiện trường',
+                                  qty: record.qty || 1,
+                                  minQty: 1,
+                                  unit: record.unit || 'Cái',
+                                  auditStatus: 'OK' as const,
+                                  auditDate: record.date,
+                                  condition: 'GOOD' as const,
+                                  notes: record.purpose || ''
+                                };
+                                onOpenPrintCenter('QR', 'SELECTED', [singleItem]);
+                              }}
+                              className="p-1.5 text-slate-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-200"
+                              title="In tem nhãn / mã QR cho thiết bị này"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                          )}
 
                           {/* Return to Stock if currently deployed */}
                           {record.status === 'DEPLOYED' && (

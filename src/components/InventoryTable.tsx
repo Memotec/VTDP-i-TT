@@ -3,7 +3,7 @@ import {
   Layers, MapPin, AlertCircle, Clock, CheckSquare, XCircle,
   History, FileText, Edit, Trash2, Camera, Box, Download, Plus,
   QrCode, Copy, Check, AlertTriangle, ShieldCheck, Tag, Sparkles,
-  LayoutGrid, Table as TableIcon, ExternalLink
+  LayoutGrid, Table as TableIcon, ExternalLink, ArrowRightLeft
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { InventoryItem, Role } from '../types.ts';
@@ -26,6 +26,8 @@ interface InventoryTableProps {
   isExportingPdf?: boolean;
   onAddNewItem?: () => void;
   onOpenPrintCenter?: (mode: 'QR' | 'LABEL' | 'AUDIT_REPORT', defaultScope?: 'ALL' | 'FILTERED', selectedItems?: InventoryItem[]) => void;
+  dispatchedCount?: number;
+  onOpenDispatchedRegistry?: () => void;
 }
 
 export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
@@ -44,7 +46,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
   onExportPdf,
   isExportingPdf = false,
   onAddNewItem,
-  onOpenPrintCenter
+  onOpenPrintCenter,
+  dispatchedCount = 0,
+  onOpenDispatchedRegistry
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -169,12 +173,36 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                 Tổng: {totalQty} / hiện vật
               </span>
+              {dispatchedCount > 0 && onOpenDispatchedRegistry && (
+                <button
+                  type="button"
+                  onClick={onOpenDispatchedRegistry}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Chuyển sang xem Mục Thống Kê & Quản Lý Vật Tư Đã Báo Sử Dụng & Bàn Giao"
+                >
+                  <ArrowRightLeft className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                  <span>Đã báo SD & bàn giao: {dispatchedCount} hồ sơ</span>
+                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-start lg:justify-end">
+          {onOpenDispatchedRegistry && (
+            <button
+              type="button"
+              onClick={onOpenDispatchedRegistry}
+              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="Mở Mục Thống Kê & Quản Lý Thiết Bị Đã Báo Sử Dụng & Bàn Giao"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>SỔ ĐÃ BÀN GIAO ({dispatchedCount})</span>
+            </button>
+          )}
+
           {/* View Mode Toggle: Table vs Grid */}
           <div className="flex items-center bg-slate-200/90 dark:bg-slate-800 p-1 rounded-xl border border-slate-300 dark:border-slate-700 shadow-xs">
             <button

@@ -62,7 +62,7 @@ export const MobileAppHeader: React.FC<MobileAppHeaderProps> = ({
       case 'INVENTORY':
         return { name: 'Kho Vật Tư', count: inventoryCount, unit: 'vật tư', icon: Database };
       case 'DISPATCHED':
-        return { name: 'Sổ Bàn Giao', count: dispatchedCount, unit: 'hồ sơ', icon: Layers };
+        return { name: 'Đã Báo SD & Bàn Giao', count: dispatchedCount, unit: 'hồ sơ', icon: Layers };
       case 'AUDIT_LOG':
         return { name: 'Nhật Ký Hệ Thống', count: auditLogsCount, unit: 'bản ghi', icon: FileText };
       default:

@@ -180,8 +180,8 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Layers className="w-4.5 h-4.5" />
-                  <span>Sổ Bàn Giao & Điều Chuyển</span>
+                  <Layers className="w-4.5 h-4.5 text-amber-500" />
+                  <span>Vật Tư Đã Báo SD & Bàn Giao</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                   activeWorkspaceTab === 'DISPATCHED' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'

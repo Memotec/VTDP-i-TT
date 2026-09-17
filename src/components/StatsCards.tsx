@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Layers, CheckSquare, Activity, XCircle, Check, AlertTriangle, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { Layers, CheckSquare, Activity, XCircle, Check, AlertTriangle, ChevronDown, ChevronUp, BarChart3, ArrowRight, ArrowRightLeft } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { AuditStats, InventoryItem } from '../types.ts';
 
@@ -7,9 +7,19 @@ interface StatsCardsProps {
   stats: AuditStats;
   inventory: InventoryItem[];
   onFilterLowStock?: () => void;
+  dispatchedCount?: number;
+  dispatchedQty?: number;
+  onNavigateToDispatched?: () => void;
 }
 
-export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, inventory, onFilterLowStock }) => {
+export const StatsCards: React.FC<StatsCardsProps> = React.memo(({
+  stats,
+  inventory,
+  onFilterLowStock,
+  dispatchedCount = 0,
+  dispatchedQty = 0,
+  onNavigateToDispatched
+}) => {
   const [isMobileExpanded, setIsMobileExpanded] = React.useState(false);
 
   const { totalOk, totalMissing, totalUnchecked, totalAll, lowStockCount, chartData, ratioOk, ratioMissing, ratioUnchecked } = useMemo(() => {
@@ -193,6 +203,44 @@ export const StatsCards: React.FC<StatsCardsProps> = React.memo(({ stats, invent
           </div>
         </div>
       </section>
+
+      {/* Banner / Stat Card for Dispatched & Handed Over Equipment */}
+      {dispatchedCount > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-indigo-500/10 dark:from-amber-950/30 dark:via-blue-950/30 dark:to-indigo-950/30 border border-amber-300/70 dark:border-amber-700/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
+              <ArrowRightLeft className="w-5.5 h-5.5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  Mục Thống Kê Vật Tư Đã Báo Sử Dụng & Bàn Giao
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-black bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                  {dispatchedCount} hồ sơ
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-black bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700">
+                  {dispatchedQty} bộ đang vận hành
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-medium">
+                Vật tư và thiết bị đã xuất kho đưa vào vận hành tại các đài trạm / phòng máy được tách riêng sang sổ theo dõi để tiện đối soát.
+              </p>
+            </div>
+          </div>
+
+          {onNavigateToDispatched && (
+            <button
+              type="button"
+              onClick={onNavigateToDispatched}
+              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-amber-600/20 shrink-0 self-stretch sm:self-auto justify-center active:scale-95"
+            >
+              <span>Xem Sổ Thống Kê Bàn Giao</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Analytics Visual Banner with Pie Chart */}
       <div className="bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300">

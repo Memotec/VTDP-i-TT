@@ -4218,6 +4218,7 @@ export default function App() {
                 onDeleteRecord={handleDeleteDispatchedRecord}
                 onPrintRecord={handlePrintDispatchedRecord}
                 onPrintFullRegistry={handlePrintDispatchedRegistry}
+                onOpenPrintCenter={handleOpenPrintCenter}
                 onCreateUsageSlip={() => {
                   if (inventory.length > 0) {
                     setSelectedItemForUsage(inventory[0]);

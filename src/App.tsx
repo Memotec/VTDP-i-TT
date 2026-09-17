@@ -1177,19 +1177,24 @@ export default function App() {
     saveCategoriesToFirestore(newCats).catch(err => console.warn('Firestore categories save:', err));
   };
 
-  const lowStockItems = useMemo(() => {
-    return inventory.filter(item => (item.qty ?? 0) <= 1);
+  // In-stock inventory in warehouse (excluding items fully dispatched/handed over with 0 qty)
+  const inStockInventory = useMemo(() => {
+    return inventory.filter(item => (item.qty ?? 0) > 0);
   }, [inventory]);
 
+  const lowStockItems = useMemo(() => {
+    return inStockInventory.filter(item => (item.qty ?? 0) === 1);
+  }, [inStockInventory]);
+
   const stats = useMemo<AuditStats>(() => {
-    const totalItems = inventory.length;
+    const totalItems = inStockInventory.length;
     let totalQty = 0;
     let checkedCount = 0;
     let okCount = 0;
     let missingCount = 0;
 
     for (let i = 0; i < totalItems; i++) {
-      const item = inventory[i];
+      const item = inStockInventory[i];
       totalQty += (item.qty || 0);
       if (item.auditStatus === 'OK') {
         checkedCount++;
@@ -1211,11 +1216,11 @@ export default function App() {
       healthRate,
       lowStockCount: lowStockItems.length
     };
-  }, [inventory, lowStockItems.length]);
+  }, [inStockInventory, lowStockItems.length]);
 
   const filteredInventory = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return inventory.filter(item => {
+    return inStockInventory.filter(item => {
       if (selectedCategory !== 'Tất cả loại' && item.category !== selectedCategory) return false;
       if (statusFilter === 'OK' && item.auditStatus !== 'OK') return false;
       if (statusFilter === 'MISSING' && item.auditStatus !== 'MISSING') return false;
@@ -1233,7 +1238,7 @@ export default function App() {
       }
       return true;
     });
-  }, [inventory, selectedCategory, statusFilter, searchQuery]);
+  }, [inStockInventory, selectedCategory, statusFilter, searchQuery]);
 
   // Auto-Lock Inactivity Timer for Admin
   useEffect(() => {
@@ -4265,7 +4270,7 @@ export default function App() {
               <div className="mt-6">
             <StatsCards
               stats={stats}
-              inventory={inventory}
+              inventory={inStockInventory}
               onFilterLowStock={() => setStatusFilter('LOW_STOCK')}
             />
           </div>

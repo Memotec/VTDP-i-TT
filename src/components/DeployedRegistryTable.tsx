@@ -3,11 +3,12 @@ import {
   FileText, ArrowRightLeft, Search, Filter, Printer, FileSpreadsheet, 
   RotateCcw, Trash2, CheckCircle2, MapPin, Plus,
   Layers, Building2, User, Eye, Download, Loader2, QrCode, Check,
-  BarChart3, ChevronDown, ChevronUp, ShieldCheck
+  BarChart3, ChevronDown, ChevronUp, ShieldCheck, Sparkles, Smartphone
 } from 'lucide-react';
 import { DispatchedRecord, Role } from '../types.ts';
 import { exportDispatchedRegistryToPDF } from '../utils/pdfExporter.ts';
 import { exportDispatchedRegistryToDocx } from '../utils/docxExporter.ts';
+import { SwipeableDeployedCard } from './SwipeableDeployedCard.tsx';
 
 interface DeployedRegistryTableProps {
   records: DispatchedRecord[];
@@ -231,8 +232,10 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
     }
   };
 
-  const handleToggleSelectRecord = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleSelectRecord = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     const next = new Set(selectedRecordIds);
     if (next.has(id)) {
       next.delete(id);
@@ -726,7 +729,7 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* Main Table & Mobile Card View Container */}
       <div className="bg-white dark:bg-[#131B2E] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         {filteredRecords.length === 0 ? (
           <div className="py-16 px-6 text-center space-y-3">
@@ -749,8 +752,62 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div>
+            {/* MOBILE VIEW (Visible on mobile, hidden on md+) */}
+            <div className="block md:hidden p-3.5 space-y-3">
+              {/* Mobile Quick Guide & Selection Bar */}
+              <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800/80 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-black text-slate-800 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={el => {
+                      if (el) el.indeterminate = isPartiallySelected;
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="w-4.5 h-4.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Chọn tất cả ({filteredRecords.length})</span>
+                </label>
+
+                {selectedRecordIds.size > 0 && (
+                  <span className="text-[11px] font-black text-[#2563EB] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-900">
+                    Đã chọn: {selectedRecordIds.size}
+                  </span>
+                )}
+              </div>
+
+              {/* Mobile Swipe Guidance Banner */}
+              <div className="flex items-center gap-2.5 text-[11px] text-slate-700 dark:text-slate-300 bg-blue-50/80 dark:bg-blue-950/40 px-3.5 py-2.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60">
+                <Smartphone className="w-4 h-4 text-[#2563EB] shrink-0" />
+                <p className="leading-tight">
+                  <span className="font-black text-[#2563EB]">Giao diện di động:</span> Vuốt thẻ sang trái <span className="font-bold text-emerald-600">⟵</span> để thu hồi nhanh, hoặc dùng các nút chạm lớn (44px).
+                </p>
+              </div>
+
+              {/* Mobile Swipeable Card List */}
+              <div className="space-y-3 pt-1">
+                {filteredRecords.map((record, index) => (
+                  <SwipeableDeployedCard
+                    key={record.id}
+                    record={record}
+                    index={index}
+                    isSelected={selectedRecordIds.has(record.id)}
+                    role={role}
+                    onToggleSelect={(id) => handleToggleSelectRecord(id)}
+                    onViewDetail={onViewDetail}
+                    onPrintRecord={onPrintRecord}
+                    onReturnRecord={onReturnRecord}
+                    onDeleteRecord={onDeleteRecord}
+                    onOpenPrintCenter={onOpenPrintCenter}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* DESKTOP / TABLET TABLE VIEW (Hidden on mobile, block on md+) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-[10.5px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                   <th className="py-3.5 px-3 w-10 text-center">
@@ -909,96 +966,106 @@ export const DeployedRegistryTable: React.FC<DeployedRegistryTableProps> = React
                         )}
                       </td>
 
-                      {/* 8. Actions */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* View Detail */}
-                          <button
-                            type="button"
-                            onClick={() => onViewDetail(record)}
-                            className="p-1.5 text-slate-600 hover:text-[#2563EB] hover:bg-blue-100 dark:hover:bg-blue-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-blue-200"
-                            title="Xem chi tiết hồ sơ bàn giao/sử dụng"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {/* Print record (Document) */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onPrintRecord(record);
-                            }}
-                            className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                            title="In lại phiếu / biên bản gốc"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-
-                          {/* Print QR / Barcode tag for this deployed item */}
-                          {onOpenPrintCenter && (
+                        {/* 8. Actions (Upgraded Touch Targets) */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* View Detail */}
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const singleItem = {
-                                  id: record.itemId || record.id,
-                                  name: record.itemName,
-                                  category: record.category || 'Vật tư CNS',
-                                  sn: record.sn || 'N/A',
-                                  pn: record.pn || '',
-                                  warehouse: record.warehouse || 'Kho Trung tâm',
-                                  loc: record.targetLocation || 'Tại hiện trường',
-                                  qty: record.qty || 1,
-                                  minQty: 1,
-                                  unit: record.unit || 'Cái',
-                                  auditStatus: 'OK' as const,
-                                  auditDate: record.date,
-                                  condition: 'GOOD' as const,
-                                  notes: record.purpose || ''
-                                };
-                                onOpenPrintCenter('QR', 'SELECTED', [singleItem]);
+                                onViewDetail(record);
                               }}
-                              className="p-1.5 text-slate-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-200"
-                              title="In tem nhãn / mã QR cho thiết bị này"
+                              className="min-w-[40px] min-h-[40px] p-2 text-slate-600 hover:text-[#2563EB] hover:bg-blue-100 dark:hover:bg-blue-950/50 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700/80 hover:border-blue-300 active:scale-95 flex items-center justify-center touch-manipulation"
+                              title="Xem chi tiết hồ sơ bàn giao/sử dụng"
                             >
-                              <QrCode className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
-                          )}
 
-                          {/* Return to Stock if currently deployed */}
-                          {record.status === 'DEPLOYED' && (
+                            {/* Print record (Document) */}
                             <button
                               type="button"
-                              onClick={() => onReturnRecord(record)}
-                              className="p-1.5 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-emerald-200"
-                              title="Thu hồi và hoàn trả thiết bị này về kho dự phòng"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPrintRecord(record);
+                              }}
+                              className="min-w-[40px] min-h-[40px] p-2 text-amber-700 hover:text-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/50 rounded-xl transition-all cursor-pointer border border-amber-200 dark:border-amber-900/60 hover:border-amber-300 active:scale-95 flex items-center justify-center touch-manipulation"
+                              title="In lại phiếu / biên bản gốc"
                             >
-                              <RotateCcw className="w-4 h-4" />
+                              <Printer className="w-4 h-4" />
                             </button>
-                          )}
 
-                          {/* Delete if admin */}
-                          {role === 'admin' && (
-                            <button
-                              type="button"
-                              onClick={() => onDeleteRecord(record.id)}
-                              className="p-1.5 text-slate-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200"
-                              title="Xóa bản ghi lưu trữ (Admin)"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                            {/* Print QR / Barcode tag for this deployed item */}
+                            {onOpenPrintCenter && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const singleItem = {
+                                    id: record.itemId || record.id,
+                                    name: record.itemName,
+                                    category: record.category || 'Vật tư CNS',
+                                    sn: record.sn || 'N/A',
+                                    pn: record.pn || '',
+                                    warehouse: record.warehouse || 'Kho Trung tâm',
+                                    loc: record.targetLocation || 'Tại hiện trường',
+                                    qty: record.qty || 1,
+                                    minQty: 1,
+                                    unit: record.unit || 'Cái',
+                                    auditStatus: 'OK' as const,
+                                    auditDate: record.date,
+                                    condition: 'GOOD' as const,
+                                    notes: record.purpose || ''
+                                  };
+                                  onOpenPrintCenter('QR', 'SELECTED', [singleItem]);
+                                }}
+                                className="min-w-[40px] min-h-[40px] p-2 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 rounded-xl transition-all cursor-pointer border border-indigo-200 dark:border-indigo-900/60 hover:border-indigo-300 active:scale-95 flex items-center justify-center touch-manipulation"
+                                title="In tem nhãn / mã QR cho thiết bị này"
+                              >
+                                <QrCode className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Return to Stock if currently deployed */}
+                            {record.status === 'DEPLOYED' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReturnRecord(record);
+                                }}
+                                className="min-w-[40px] min-h-[40px] p-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 rounded-xl transition-all cursor-pointer border border-emerald-200 dark:border-emerald-900/60 hover:border-emerald-300 active:scale-95 flex items-center justify-center touch-manipulation"
+                                title="Thu hồi và hoàn trả thiết bị này về kho dự phòng"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Delete if admin */}
+                            {role === 'admin' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteRecord(record.id);
+                                }}
+                                className="min-w-[40px] min-h-[40px] p-2 text-rose-600 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-xl transition-all cursor-pointer border border-rose-200 dark:border-rose-900/60 hover:border-rose-300 active:scale-95 flex items-center justify-center touch-manipulation"
+                                title="Xóa bản ghi lưu trữ (Admin)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 });

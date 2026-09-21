@@ -490,25 +490,61 @@ export const UsageModal: React.FC<UsageModalProps> = ({
               </div>
             </div>
 
-            {/* Target Item summary banner */}
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-3xl border border-slate-150 dark:border-slate-700 mb-6 space-y-1.5">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thiết bị bốc dỡ:</div>
-              <div className="text-xs font-black text-slate-800 dark:text-white truncate">
+            {/* Target Item summary banner with real-time stock & registry calculation */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-3xl border border-slate-200 dark:border-slate-700 mb-5 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                  Thiết bị xuất sử dụng:
+                </span>
+                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-900">
+                  {selectedItemForUsage.category || 'Vật tư CNS'}
+                </span>
+              </div>
+
+              <div className="text-sm font-black text-slate-900 dark:text-white truncate">
                 {selectedItemForUsage.name}
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] font-medium pt-1 border-t border-dashed border-slate-200 dark:border-slate-700">
+
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-medium pt-1.5 border-t border-dashed border-slate-200 dark:border-slate-700">
                 <div>
-                  <span className="text-slate-400">S/N:</span> <strong className="font-mono text-slate-700 dark:text-slate-300">{selectedItemForUsage.sn}</strong>
+                  <span className="text-slate-400">S/N:</span> <strong className="font-mono text-slate-800 dark:text-slate-200">{selectedItemForUsage.sn}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">P/N:</span> <strong className="text-slate-700 dark:text-slate-300">{selectedItemForUsage.pn || 'N/A'}</strong>
+                  <span className="text-slate-400">P/N:</span> <strong className="text-slate-800 dark:text-slate-200">{selectedItemForUsage.pn || 'N/A'}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">Kho hàng:</span> <strong className="text-slate-700 dark:text-slate-300">{selectedItemForUsage.warehouse || 'N/A'}</strong>
+                  <span className="text-slate-400">Kho hàng:</span> <strong className="text-slate-800 dark:text-slate-200">{selectedItemForUsage.warehouse || 'N/A'}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">Tồn hiện tại:</span> <strong className="text-amber-600 dark:text-amber-400">x{selectedItemForUsage.qty} chiếc</strong>
+                  <span className="text-slate-400">Vị trí lưu kho:</span> <strong className="text-slate-800 dark:text-slate-200">{selectedItemForUsage.loc || 'Kệ chính'}</strong>
                 </div>
+              </div>
+
+              {/* Dynamic stock calculation bar */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/80">
+                <div className="flex items-center justify-between text-xs bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-2xl border border-amber-200 dark:border-amber-900/60">
+                  <div className="text-center">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-bold">Tồn hiện tại</span>
+                    <strong className="text-slate-800 dark:text-slate-200 text-xs font-black">x{selectedItemForUsage.qty}</strong>
+                  </div>
+                  <span className="text-amber-500 font-black">−</span>
+                  <div className="text-center">
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 block font-bold">Xuất sử dụng</span>
+                    <strong className="text-amber-700 dark:text-amber-400 text-xs font-black">x{usageQty}</strong>
+                  </div>
+                  <span className="text-amber-500 font-black">=</span>
+                  <div className="text-center">
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-bold">Tồn kho sau xuất</span>
+                    <strong className={`text-xs font-black ${selectedItemForUsage.qty - usageQty <= 1 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                      x{Math.max(0, selectedItemForUsage.qty - usageQty)} {usageUnit}
+                    </strong>
+                  </div>
+                </div>
+                {selectedItemForUsage.qty - usageQty <= 1 && (
+                  <p className="text-[10.5px] text-rose-600 dark:text-rose-400 font-bold mt-1 text-center">
+                    ⚠️ Sau khi xuất, tồn kho sẽ còn dưới ngưỡng an toàn (≤ 1)!
+                  </p>
+                )}
               </div>
             </div>
 

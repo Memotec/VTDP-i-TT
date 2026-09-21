@@ -325,77 +325,80 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
       let startSuccess = false;
 
+      // Helper to safely attempt starting the scanner with varied configs
+      const tryStart = async (camConfig: string | { facingMode: string } | { facingMode: { exact: string } }) => {
+        try {
+          await scanner.start(camConfig as any, qrConfig, handleCodeScanned, () => {});
+          return true;
+        } catch (e) {
+          console.warn('Scanner tryStart failed with config:', camConfig, e);
+          return false;
+        }
+      };
+
       // Candidate 1: Specified camera ID or facing mode
       if (cameraIdToUse) {
-        try {
-          if (cameraIdToUse === 'environment' || cameraIdToUse === 'user') {
-            await scanner.start({ facingMode: cameraIdToUse }, qrConfig, handleCodeScanned, () => {});
-          } else {
-            await scanner.start(cameraIdToUse, qrConfig, handleCodeScanned, () => {});
+        if (cameraIdToUse === 'environment' || cameraIdToUse === 'user') {
+          if (await tryStart({ facingMode: cameraIdToUse }) || 
+              await tryStart({ facingMode: { exact: cameraIdToUse } }) ||
+              await tryStart(cameraIdToUse)) {
+            setSelectedCameraId(cameraIdToUse);
+            startSuccess = true;
           }
-          setSelectedCameraId(cameraIdToUse);
-          startSuccess = true;
-        } catch (errId) {
-          console.warn(`Starting with specified camera ID ${cameraIdToUse} failed:`, errId);
+        } else {
+          if (await tryStart(cameraIdToUse)) {
+            setSelectedCameraId(cameraIdToUse);
+            startSuccess = true;
+          }
         }
       }
 
       // Candidate 2: Current selectedCameraId
       if (!startSuccess && selectedCameraId) {
-        try {
-          if (selectedCameraId === 'environment' || selectedCameraId === 'user') {
-            await scanner.start({ facingMode: selectedCameraId }, qrConfig, handleCodeScanned, () => {});
-          } else {
-            await scanner.start(selectedCameraId, qrConfig, handleCodeScanned, () => {});
+        if (selectedCameraId === 'environment' || selectedCameraId === 'user') {
+          if (await tryStart({ facingMode: selectedCameraId }) || 
+              await tryStart({ facingMode: { exact: selectedCameraId } }) ||
+              await tryStart(selectedCameraId)) {
+            startSuccess = true;
           }
-          startSuccess = true;
-        } catch (errSel) {
-          console.warn(`Starting with selectedCameraId ${selectedCameraId} failed:`, errSel);
+        } else {
+          if (await tryStart(selectedCameraId)) {
+            startSuccess = true;
+          }
         }
       }
 
-      // Candidate 3: Prefer rear/back camera
+      // Candidate 3: Prefer rear/back camera from detected devices
       if (!startSuccess && detectedDevs.length > 0) {
         const backCam = detectedDevs.find(c => /back|rear|sau|environment/i.test(c.label));
-        const firstCam = backCam || detectedDevs[0];
-        try {
-          await scanner.start(firstCam.id, qrConfig, handleCodeScanned, () => {});
-          setSelectedCameraId(firstCam.id);
-          startSuccess = true;
-        } catch {
-          for (const dev of detectedDevs) {
-            if (dev.id === firstCam.id) continue;
-            try {
-              await scanner.start(dev.id, qrConfig, handleCodeScanned, () => {});
-              setSelectedCameraId(dev.id);
-              startSuccess = true;
-              break;
-            } catch {
-              // continue
-            }
+        const ordered = backCam ? [backCam, ...detectedDevs.filter(c => c.id !== backCam.id)] : detectedDevs;
+        
+        for (const dev of ordered) {
+          if (dev.id && await tryStart(dev.id)) {
+            setSelectedCameraId(dev.id);
+            startSuccess = true;
+            break;
           }
         }
       }
 
       // Candidate 4: facingMode 'environment'
       if (!startSuccess) {
-        try {
-          await scanner.start({ facingMode: 'environment' }, qrConfig, handleCodeScanned, () => {});
+        if (await tryStart({ facingMode: 'environment' }) || 
+            await tryStart({ facingMode: { exact: 'environment' } }) ||
+            await tryStart('environment')) {
           setSelectedCameraId('environment');
           startSuccess = true;
-        } catch {
-          // ignore
         }
       }
 
       // Candidate 5: facingMode 'user'
       if (!startSuccess) {
-        try {
-          await scanner.start({ facingMode: 'user' }, qrConfig, handleCodeScanned, () => {});
+        if (await tryStart({ facingMode: 'user' }) || 
+            await tryStart({ facingMode: { exact: 'user' } }) ||
+            await tryStart('user')) {
           setSelectedCameraId('user');
           startSuccess = true;
-        } catch {
-          // ignore
         }
       }
 
@@ -405,15 +408,10 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           const allMedia = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = allMedia.filter(d => d.kind === 'videoinput');
           for (const vi of videoInputs) {
-            if (vi.deviceId) {
-              try {
-                await scanner.start(vi.deviceId, qrConfig, handleCodeScanned, () => {});
-                setSelectedCameraId(vi.deviceId);
-                startSuccess = true;
-                break;
-              } catch {
-                // continue
-              }
+            if (vi.deviceId && await tryStart(vi.deviceId)) {
+              setSelectedCameraId(vi.deviceId);
+              startSuccess = true;
+              break;
             }
           }
         } catch {

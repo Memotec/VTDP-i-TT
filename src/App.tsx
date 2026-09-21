@@ -2968,12 +2968,13 @@ export default function App() {
     addToast(`Đã xuất phiếu báo sử dụng chuẩn form (${slip.sn})!`, 'success');
   };
 
-  const handleSubmitUsage = (newSlip: UsageSlip, deductInv: boolean) => {
+  const handleSubmitUsage = (newSlip: UsageSlip, deductInv: boolean = true) => {
+    // 1. Save usage slip to Usage History
     const nextSlips = [newSlip, ...usageSlips];
     setUsageSlips(nextSlips);
     LocalDatabase.saveUsageSlips(nextSlips);
 
-    // Also register into the centralized Dispatched Equipment Registry
+    // 2. Also register into the centralized Sổ Thiết Bị Đã Bàn Giao / Đưa Vào Sử Dụng (Dispatched Equipment Registry)
     const rawDispatchRecord: DispatchedRecord = {
       id: `disp-u-${Date.now()}`,
       type: 'USAGE_SLIP',
@@ -3005,10 +3006,17 @@ export default function App() {
     saveDispatchedRecordsLocally(nextDispatches);
     syncService.enqueue('dispatched_record', newDispatchRecord.id, 'CREATE', newDispatchRecord, currentUsername);
 
-    if (deductInv && selectedItemForUsage) {
-      let resultedQty = selectedItemForUsage.qty;
+    // 3. Find target item and deduct inventory stock
+    const targetItem = inventory.find(i => i.id === newSlip.itemId) 
+      || (selectedItemForUsage ? inventory.find(i => i.id === selectedItemForUsage.id) : null)
+      || (newSlip.sn && newSlip.sn !== 'N/A' ? inventory.find(i => i.sn.toLowerCase() === newSlip.sn.toLowerCase()) : null);
+
+    let prevQty = targetItem ? targetItem.qty : (selectedItemForUsage?.qty || 1);
+    let resultedQty = targetItem ? Math.max(0, targetItem.qty - newSlip.qtyUsed) : 0;
+
+    if (deductInv && targetItem) {
       const updatedInv = inventory.map(item => {
-        if (item.id === selectedItemForUsage.id) {
+        if (item.id === targetItem.id) {
           const newQty = Math.max(0, item.qty - newSlip.qtyUsed);
           resultedQty = newQty;
           const updatedHistory = item.history ? [...item.history] : [];
@@ -3016,7 +3024,7 @@ export default function App() {
             id: `h-use-${Date.now()}`,
             status: 'OK',
             date: newSlip.date,
-            note: `Xuất sử dụng x${newSlip.qtyUsed} bộ tại: ${newSlip.targetLocation || 'Hệ thống'} (Người nhận: ${newSlip.user})`,
+            note: `Lập Phiếu Báo Sử Dụng (${newSlip.docNumber || 'PBSD'}): Xuất dùng x${newSlip.qtyUsed} ${newSlip.unit || 'chiếc'} tại ${newSlip.targetLocation || 'Hệ thống'} (Người tiếp nhận: ${newSlip.user}). Tồn kho còn lại: x${newQty}`,
             user: currentUsername || role || 'guest'
           });
           const withMeta = LocalDatabase.applyMetadata({ ...item, qty: newQty, history: updatedHistory }, currentUsername || 'guest', false);
@@ -3029,25 +3037,25 @@ export default function App() {
 
       if (resultedQty <= 1) {
         setTimeout(() => {
-          addToast(`⚠️ CẢNH BÁO TỒN KHO: Sau khi xuất, thiết bị "${selectedItemForUsage.name}" chỉ còn lại ${resultedQty} cái (Dưới ngưỡng an toàn <= 1)! Cần lập kế hoạch nhập bổ sung.`, 'error');
-        }, 500);
+          addToast(`⚠️ CẢNH BÁO TỒN KHO: Sau khi xuất sử dụng, thiết bị "${targetItem.name}" chỉ còn lại x${resultedQty} ${newSlip.unit || 'chiếc'} (Dưới ngưỡng an toàn <= 1)! Cần lập kế hoạch nhập bổ sung.`, 'error');
+        }, 600);
       }
     }
 
     playScanBeep(1000, 0.2);
-    addToast('Đã đăng ký phiếu sử dụng & tổng hợp vào Sổ Theo Dõi!', 'success');
+    addToast(`Đã lập Phiếu báo sử dụng "${newSlip.itemName}" (x${newSlip.qtyUsed}): Đã trừ tồn kho (còn x${resultedQty}) & tự động ghi vào Sổ Thiết Bị Đang Sử Dụng!`, 'success');
 
     addSystemAuditLog(
       'USAGE_DISPATCH',
-      'Xuất phiếu báo sử dụng thiết bị',
-      `Xuất x${newSlip.qtyUsed} bộ "${newSlip.itemName}" (S/N: ${newSlip.sn || 'N/A'}) cho ${newSlip.user} tại vị trí: ${newSlip.targetLocation || 'Hệ thống'}. Mục đích: ${newSlip.purpose}`,
+      'Xuất phiếu báo sử dụng & Cập nhật tồn kho',
+      `Lập Phiếu báo sử dụng ${newSlip.docNumber || ''} cho thiết bị "${newSlip.itemName}" (S/N: ${newSlip.sn || 'N/A'}, SL: x${newSlip.qtyUsed} ${newSlip.unit || 'chiếc'}) cho ${newSlip.user} tại vị trí: ${newSlip.targetLocation || 'Hệ thống'}. Tồn kho: ${prevQty} → ${resultedQty}. Đã lưu vào Sổ Thiết Bị Đưa Vào Sử Dụng.`,
       {
         id: newSlip.itemId,
         name: newSlip.itemName,
         sn: newSlip.sn,
         category: newSlip.category,
-        prevData: `Tồn kho trước: ${selectedItemForUsage?.qty || 0}`,
-        newData: `Tồn kho sau: ${Math.max(0, (selectedItemForUsage?.qty || 0) - (deductInv ? newSlip.qtyUsed : 0))}`
+        prevData: `Tồn kho trước: ${prevQty}`,
+        newData: `Tồn kho sau: ${resultedQty}`
       }
     );
 

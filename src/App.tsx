@@ -2649,23 +2649,26 @@ export default function App() {
     }
 
     const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
-    const giverName = slip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho');
-    const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật';
-    const giverPos = slip.giverPos || 'Kỹ sư phụ trách kho';
-    const receiverName = slip.user || 'Kỹ sư tiếp nhận';
-    const receiverDept = slip.receiverDept || 'Tổ Vận Hành CNS/ATM';
-    const receiverPos = slip.receiverPos || 'Kỹ sư trực ban / Khai thác';
+    const giverName = slip.giverName || (currentUsername ? `${currentUsername}` : '');
+    const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm BĐKT';
+    const giverPos = slip.giverPos || 'Nhân Viên Kỹ Thuật';
+    const receiverName = slip.user || 'Nguyễn Chí Thanh';
+    const receiverDept = slip.receiverDept || 'Kíp Trực';
+    const receiverPos = slip.receiverPos || 'Nhân Viên Kỹ Thuật';
+    const targetLoc = slip.targetLocation || 'MUX MP4100 VSAT';
+    const purpose = slip.purpose || 'Bảo dưỡng định kỳ / Thay thế dự phòng';
+    const notes = slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định.';
 
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ - ${docNo}</title>
+          <title>PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG - ${docNo}</title>
           <style>
             @page {
               size: A4 portrait;
-              margin: 15mm 15mm 15mm 20mm;
+              margin: 16mm 18mm 16mm 20mm;
             }
             @media print {
               html, body {
@@ -2678,8 +2681,8 @@ export default function App() {
             body {
               font-family: 'Times New Roman', Times, serif;
               color: #000000;
-              line-height: 1.42;
-              font-size: 13pt;
+              line-height: 1.45;
+              font-size: 11pt;
               background: #ffffff;
               margin: 0;
               padding: 0;
@@ -2693,7 +2696,7 @@ export default function App() {
               width: 100%;
               border-collapse: collapse;
               border: none;
-              margin-bottom: 18px;
+              margin-bottom: 14px;
             }
             .header-table td {
               border: none;
@@ -2701,105 +2704,88 @@ export default function App() {
               padding: 0;
             }
             .left-header {
-              width: 46%;
+              width: 48%;
               text-align: center;
             }
             .right-header {
-              width: 54%;
+              width: 52%;
               text-align: center;
             }
-            .org-parent {
+            .org-line {
               font-size: 10.5pt;
+              font-weight: bold;
               text-transform: uppercase;
-              font-weight: normal;
+              line-height: 1.3;
               margin: 0;
             }
-            .org-company {
-              font-size: 11pt;
-              font-weight: bold;
-              text-transform: uppercase;
-              margin: 1px 0;
-            }
-            .org-center {
-              font-size: 11pt;
-              font-weight: bold;
-              text-transform: uppercase;
-              margin: 1px 0;
-            }
-            .org-dept {
-              font-size: 12pt;
-              font-weight: bold;
-              text-transform: uppercase;
-              margin: 2px 0 0 0;
-            }
             .doc-number {
-              font-size: 11.5pt;
+              font-size: 10.5pt;
               font-style: italic;
-              margin-top: 6px;
+              margin-top: 4px;
             }
             .nat-title {
-              font-size: 11.5pt;
+              font-size: 10.5pt;
               font-weight: bold;
               text-transform: uppercase;
+              line-height: 1.3;
               margin: 0;
             }
             .nat-subtitle {
-              font-size: 12.5pt;
+              font-size: 11pt;
               font-weight: bold;
-              margin: 2px 0 0 0;
+              line-height: 1.3;
+              margin: 0;
             }
             .date-location {
-              font-size: 12pt;
+              font-size: 10.5pt;
               font-style: italic;
               margin-top: 4px;
             }
             .title-box {
               text-align: center;
-              margin: 22px 0 16px 0;
+              margin: 18px 0 14px 0;
             }
             .main-title {
-              font-size: 16pt;
+              font-size: 14pt;
               font-weight: bold;
               text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin: 0 0 4px 0;
+              letter-spacing: 0.3px;
+              margin: 0 0 3px 0;
             }
             .sub-title {
-              font-size: 11.5pt;
+              font-size: 10.5pt;
               font-style: italic;
               margin: 0;
             }
             .section-heading {
-              font-size: 12.5pt;
+              font-size: 11pt;
               font-weight: bold;
               text-transform: uppercase;
-              margin: 14px 0 6px 0;
+              margin: 12px 0 5px 0;
             }
             .info-list {
-              font-size: 12.5pt;
-              line-height: 1.5;
-              margin-bottom: 12px;
+              font-size: 11pt;
+              line-height: 1.45;
+              margin-bottom: 10px;
             }
             .info-row {
-              margin: 4px 0;
+              margin: 3px 0;
             }
             .data-table {
               width: 100%;
               border-collapse: collapse;
-              margin: 12px 0 16px 0;
-              font-size: 11.5pt;
+              margin: 8px 0 12px 0;
+              font-size: 10pt;
+              border: 1px solid #000000;
             }
             .data-table th, .data-table td {
               border: 1px solid #000000;
-              padding: 6px 6px;
+              padding: 5px 4px;
               vertical-align: middle;
             }
             .data-table th {
-              background-color: #f2f2f2;
               font-weight: bold;
               text-align: center;
-              text-transform: uppercase;
-              font-size: 11pt;
             }
             .data-table td.center {
               text-align: center;
@@ -2807,51 +2793,45 @@ export default function App() {
             .data-table td.bold {
               font-weight: bold;
             }
-            .data-table td.mono {
-              font-family: 'Courier New', Courier, monospace;
-              font-weight: bold;
-            }
             .terms-box {
-              font-size: 11.5pt;
+              font-size: 10.5pt;
               font-style: italic;
               line-height: 1.45;
-              margin: 12px 0 18px 0;
+              margin: 10px 0 16px 0;
             }
-            .terms-box p {
-              margin: 3px 0;
+            .terms-box div {
+              margin: 2px 0;
             }
             .signature-table {
               width: 100%;
               border-collapse: collapse;
               border: none;
-              margin-top: 22px;
+              margin-top: 20px;
               page-break-inside: avoid;
             }
             .signature-table td {
               border: none;
-              width: 25%;
+              width: 33.33%;
               text-align: center;
               vertical-align: top;
               padding: 0 4px;
             }
             .sig-role {
               font-weight: bold;
-              font-size: 11.5pt;
+              font-size: 11pt;
               text-transform: uppercase;
-              line-height: 1.2;
             }
             .sig-note {
-              font-size: 10.5pt;
+              font-size: 10pt;
               font-style: italic;
               margin-top: 2px;
             }
             .sig-spacing {
-              height: 70px;
+              height: 65px;
             }
             .sig-fullname {
               font-weight: bold;
-              font-size: 12pt;
-              text-transform: uppercase;
+              font-size: 11pt;
             }
           </style>
         </head>
@@ -2860,10 +2840,9 @@ export default function App() {
             <table class="header-table">
               <tr>
                 <td class="left-header">
-                  <div class="org-parent">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
-                  <div class="org-company">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
-                  <div class="org-center">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-                  <div class="org-dept"><u>ĐỘI THÔNG TIN CNS/ATM</u></div>
+                  <div class="org-line">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+                  <div class="org-line">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
+                  <div class="org-line"><u>ĐỘI THÔNG TIN</u></div>
                   <div class="doc-number">Số: <strong>${docNo}</strong></div>
                 </td>
                 <td class="right-header">
@@ -2875,8 +2854,8 @@ export default function App() {
             </table>
 
             <div class="title-box">
-              <div class="main-title">PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ</div>
-              <div class="sub-title">(V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)</div>
+              <div class="main-title">PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG</div>
+              <div class="sub-title">(V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật)</div>
             </div>
 
             <div class="section-heading">I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:</div>
@@ -2884,53 +2863,53 @@ export default function App() {
               <div class="info-row">
                 <strong>1. Bên Giao (Cấp xuất kho):</strong> ${giverDept}
               </div>
-              <div class="info-row" style="padding-left: 18px;">
+              <div class="info-row" style="padding-left: 14px;">
                 - Đại diện: <strong>${giverName}</strong> 
-                &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; 
+                &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; 
                 Chức vụ: <strong>${giverPos}</strong>
               </div>
-              <div class="info-row" style="margin-top: 6px;">
+              <div class="info-row" style="margin-top: 4px;">
                 <strong>2. Bên Nhận (Tiếp nhận sử dụng):</strong> ${receiverDept}
               </div>
-              <div class="info-row" style="padding-left: 18px;">
+              <div class="info-row" style="padding-left: 14px;">
                 - Đại diện: <strong>${receiverName}</strong> 
-                &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; 
+                &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; 
                 Chức vụ: <strong>${receiverPos}</strong>
               </div>
-              <div class="info-row" style="margin-top: 6px;">
+              <div class="info-row" style="margin-top: 4px;">
                 <strong>3. Thời gian cấp xuất:</strong> ${slip.date}
               </div>
               <div class="info-row">
-                <strong>4. Vị trí lắp đặt / Hệ thống đích:</strong> <strong>${slip.targetLocation || 'Hệ thống thiết bị chuyên ngành'}</strong>
+                <strong>4. Vị trí lắp đặt / Hệ thống đích:</strong> <strong>${targetLoc}</strong>
               </div>
             </div>
 
-            <div class="section-heading">II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ BÀN GIAO:</div>
+            <div class="section-heading">II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ :</div>
             <table class="data-table">
               <thead>
                 <tr>
                   <th style="width: 32px;">STT</th>
-                  <th>Tên Trang Thiết Bị / Vật Tư</th>
-                  <th style="width: 90px;">Chủng Loại</th>
-                  <th style="width: 85px;">Part No.</th>
-                  <th style="width: 105px;">Serial No. (S/N)</th>
-                  <th style="width: 42px;">SL</th>
-                  <th style="width: 48px;">ĐVT</th>
-                  <th style="width: 85px;">Kho Xuất</th>
-                  <th style="width: 85px;">Hiện Trạng</th>
+                  <th>Tên Thiết Bị / Vật Tư</th>
+                  <th style="width: 75px;">Chủng Loại</th>
+                  <th style="width: 95px;">Part No.</th>
+                  <th style="width: 95px;">Serial No.</th>
+                  <th style="width: 28px;">SL</th>
+                  <th style="width: 36px;">ĐVT</th>
+                  <th style="width: 70px;">Kho Xuất</th>
+                  <th style="width: 68px;">Hiện Trạng</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="center">01</td>
+                  <td class="center bold">01</td>
                   <td class="bold">${slip.itemName}</td>
-                  <td class="center">${slip.category || 'Vật tư CNS'}</td>
-                  <td class="center">${slip.pn || 'N/A'}</td>
-                  <td class="center mono">${slip.sn}</td>
-                  <td class="center bold">${slip.qtyUsed}</td>
+                  <td class="center">${slip.category || 'MP2100 & MP4100'}</td>
+                  <td class="center" style="font-size: 9pt; word-break: break-all;">${slip.pn || '-'}</td>
+                  <td class="center bold">${slip.sn}</td>
+                  <td class="center bold">${slip.qtyUsed || 1}</td>
                   <td class="center">${slip.unit || 'Chiếc'}</td>
-                  <td class="center">${slip.warehouse || 'Kho TT'}</td>
-                  <td class="center" style="font-weight: bold;">Tốt (100%)</td>
+                  <td class="center" style="font-size: 9pt;">${slip.warehouse || 'MN-DHB-TBK-1122'}</td>
+                  <td class="center bold">Tốt<br/>(100%)</td>
                 </tr>
               </tbody>
             </table>
@@ -2938,45 +2917,39 @@ export default function App() {
             <div class="section-heading">III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:</div>
             <div class="info-list">
               <div class="info-row">
-                - <strong>Mục đích sử dụng:</strong> ${slip.purpose || 'Thay thế dự phòng / Bảo dưỡng định kỳ'}
+                - <strong>Mục đích sử dụng:</strong> ${purpose}
               </div>
               <div class="info-row">
-                - <strong>Ghi chú & Tham số kỹ thuật:</strong> ${slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định trước khi đưa vào vận hành.'}
+                - <strong>Ghi chú & Tham số kỹ thuật:</strong> <em>${notes}</em>
               </div>
             </div>
 
             <div class="section-heading">IV. TRÁCH NHIỆM & QUY ĐỊNH BẢO QUẢN:</div>
             <div class="terms-box">
-              <p>1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không quy định.</p>
-              <p>2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời cho Phụ trách kho và Lãnh đạo Đội để lập biên bản xử lý cập nhật hệ thống.</p>
-              <p>3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị tiếp nhận sử dụng.</p>
+              <div>1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không.</div>
+              <div>2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời để lập biên bản xử lý cập nhật.</div>
+              <div>3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị sử dụng.</div>
             </div>
 
             <table class="signature-table">
               <tr>
                 <td>
-                  <div class="sig-role">KỸ SƯ TIẾP NHẬN</div>
+                  <div class="sig-role">NGƯỜI BÁO SỬ DỤNG</div>
                   <div class="sig-note">(Ký, ghi rõ họ tên)</div>
                   <div class="sig-spacing"></div>
                   <div class="sig-fullname">${receiverName}</div>
                 </td>
                 <td>
-                  <div class="sig-role">NGƯỜI LẬP PHIẾU</div>
-                  <div class="sig-note">(Ký, ghi rõ họ tên)</div>
-                  <div class="sig-spacing"></div>
-                  <div class="sig-fullname">${giverName}</div>
-                </td>
-                <td>
                   <div class="sig-role">PHỤ TRÁCH KHO</div>
                   <div class="sig-note">(Ký, ghi rõ họ tên)</div>
                   <div class="sig-spacing"></div>
-                  <div class="sig-fullname">...............................</div>
+                  <div style="font-size: 10pt; color: #666;">...........................</div>
                 </td>
                 <td>
                   <div class="sig-role">LÃNH ĐẠO ĐỘI</div>
-                  <div class="sig-note">(Ký, đóng dấu duyệt)</div>
+                  <div class="sig-note">(Ký, duyệt đóng dấu)</div>
                   <div class="sig-spacing"></div>
-                  <div class="sig-fullname">...............................</div>
+                  <div style="font-size: 10pt; color: #666;">...........................</div>
                 </td>
               </tr>
             </table>
@@ -2986,7 +2959,7 @@ export default function App() {
               window.focus();
               window.print();
             };
-          <\/script>
+          </script>
         </body>
       </html>
     `;

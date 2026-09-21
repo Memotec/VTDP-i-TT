@@ -637,7 +637,7 @@ export async function exportHandoverToDocx(
 }
 
 /**
- * 3. XUẤT PHIẾU BÁO SỬ DỤNG VẬT TƯ / THIẾT BỊ RA TỆP WORD (.DOCX)
+ * 3. XUẤT PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG RA TỆP WORD (.DOCX)
  */
 export async function exportUsageSlipToDocx(
   slip: UsageSlip,
@@ -658,12 +658,15 @@ export async function exportUsageSlipToDocx(
   }
 
   const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
-  const giverName = slip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho');
-  const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật';
-  const giverPos = slip.giverPos || 'Kỹ sư phụ trách kho';
-  const receiverName = slip.user || 'Kỹ sư tiếp nhận';
-  const receiverDept = slip.receiverDept || 'Tổ Vận Hành CNS/ATM';
-  const receiverPos = slip.receiverPos || 'Kỹ sư trực ban / Khai thác';
+  const giverName = slip.giverName || (currentUsername ? `${currentUsername}` : '');
+  const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm BĐKT';
+  const giverPos = slip.giverPos || 'Nhân Viên Kỹ Thuật';
+  const receiverName = slip.user || 'Nguyễn Chí Thanh';
+  const receiverDept = slip.receiverDept || 'Kíp Trực';
+  const receiverPos = slip.receiverPos || 'Nhân Viên Kỹ Thuật';
+  const targetLoc = slip.targetLocation || 'MUX MP4100 VSAT';
+  const purpose = slip.purpose || 'Bảo dưỡng định kỳ / Thay thế dự phòng';
+  const notes = slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định.';
 
   const doc = new Document({
     sections: [
@@ -696,11 +699,10 @@ export async function exportUsageSlipToDocx(
                   new TableCell({
                     width: { size: 48, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM', size: 17 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CÔNG TY QUẢN LÝ BAY MIỀN NAM', size: 18, bold: true })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'TRUNG TÂM BẢO ĐẢM KỸ THUẬT', size: 18, bold: true })] }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐỘI THÔNG TIN CNS/ATM', size: 19, bold: true, underline: {} })] }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60 }, children: [new TextRun({ text: `Số: ${docNo}`, size: 19, bold: true, italics: true })] })
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐỘI THÔNG TIN', size: 19, bold: true, underline: {} })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40 }, children: [new TextRun({ text: `Số: ${docNo}`, size: 18, italics: true })] })
                     ]
                   }),
                   new TableCell({
@@ -708,7 +710,7 @@ export async function exportUsageSlipToDocx(
                     children: [
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', bold: true, size: 19 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', bold: true, underline: {}, size: 20 })] }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100 }, children: [new TextRun({ text: `TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}`, italics: true, size: 19 })] })
+                      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: `TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}`, italics: true, size: 18 })] })
                     ]
                   })
                 ]
@@ -719,10 +721,10 @@ export async function exportUsageSlipToDocx(
           // Title
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 240, after: 60 },
+            spacing: { before: 200, after: 40 },
             children: [
               new TextRun({
-                text: 'PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ',
+                text: 'PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG',
                 bold: true,
                 size: 26
               })
@@ -730,10 +732,10 @@ export async function exportUsageSlipToDocx(
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            spacing: { after: 180 },
             children: [
               new TextRun({
-                text: '(V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)',
+                text: '(V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật)',
                 italics: true,
                 size: 19
               })
@@ -741,72 +743,72 @@ export async function exportUsageSlipToDocx(
           }),
 
           // Section I
-          new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: 'I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:', bold: true, size: 20 })] }),
-          new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: '1. Bên Giao (Cấp xuất kho): ', bold: true, size: 20 }), new TextRun({ text: giverDept, size: 20 })] }),
-          new Paragraph({ spacing: { after: 60 }, indent: { left: 400 }, children: [
+          new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: 'I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:', bold: true, size: 20 })] }),
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '1. Bên Giao (Cấp xuất kho): ', bold: true, size: 20 }), new TextRun({ text: giverDept, size: 20 })] }),
+          new Paragraph({ spacing: { after: 40 }, indent: { left: 350 }, children: [
             new TextRun({ text: '- Đại diện: ', size: 20 }),
             new TextRun({ text: giverName, bold: true, size: 20 }),
             new TextRun({ text: '   |   Chức vụ: ', size: 20 }),
             new TextRun({ text: giverPos, bold: true, size: 20 })
           ] }),
-          new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: '2. Bên Nhận (Tiếp nhận sử dụng): ', bold: true, size: 20 }), new TextRun({ text: receiverDept, size: 20 })] }),
-          new Paragraph({ spacing: { after: 60 }, indent: { left: 400 }, children: [
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '2. Bên Nhận (Tiếp nhận sử dụng): ', bold: true, size: 20 }), new TextRun({ text: receiverDept, size: 20 })] }),
+          new Paragraph({ spacing: { after: 40 }, indent: { left: 350 }, children: [
             new TextRun({ text: '- Đại diện: ', size: 20 }),
             new TextRun({ text: receiverName, bold: true, size: 20 }),
             new TextRun({ text: '   |   Chức vụ: ', size: 20 }),
             new TextRun({ text: receiverPos, bold: true, size: 20 })
           ] }),
-          new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: '3. Thời gian cấp xuất: ', bold: true, size: 20 }), new TextRun({ text: slip.date, size: 20 })] }),
-          new Paragraph({ spacing: { after: 140 }, children: [new TextRun({ text: '4. Vị trí lắp đặt / Hệ thống đích: ', bold: true, size: 20 }), new TextRun({ text: slip.targetLocation || 'Hệ thống thiết bị chuyên ngành', bold: true, size: 20 })] }),
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '3. Thời gian cấp xuất: ', bold: true, size: 20 }), new TextRun({ text: slip.date, size: 20 })] }),
+          new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: '4. Vị trí lắp đặt / Hệ thống đích: ', bold: true, size: 20 }), new TextRun({ text: targetLoc, bold: true, size: 20 })] }),
 
           // Section II: Items Table
-          new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: 'II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ BÀN GIAO:', bold: true, size: 20 })] }),
+          new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: 'II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ :', bold: true, size: 20 })] }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
                 tableHeader: true,
                 children: [
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'STT', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 2600, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tên Thiết Bị / Vật Tư', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1200, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Chủng Loại', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1300, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Part No.', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Serial No.', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 600, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SL', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 700, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐVT', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Kho Xuất', bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Hiện Trạng', bold: true, size: 19 })] })] })
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'STT', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 2800, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tên Thiết Bị / Vật Tư', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1200, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Chủng Loại', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1300, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Part No.', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1400, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Serial No.', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'SL', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 600, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐVT', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Kho Xuất', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, shading: headerBgShading, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Hiện Trạng', bold: true, size: 18 })] })] })
                 ]
               }),
               new TableRow({
                 children: [
-                  new TableCell({ borders: cellBorders, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '01', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 2600, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: slip.itemName, bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 1200, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.category || 'Vật tư CNS', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 1300, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.pn || 'N/A', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 1500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.sn, bold: true, font: 'Consolas', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 600, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${slip.qtyUsed}`, bold: true, size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 700, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.unit || 'Chiếc', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.warehouse || 'Kho TT', size: 19 })] })] }),
-                  new TableCell({ borders: cellBorders, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tốt (100%)', bold: true, size: 19 })] })] })
+                  new TableCell({ borders: cellBorders, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '01', bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 2800, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: slip.itemName, bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 1200, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.category || 'MP2100 & MP4100', size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 1300, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.pn || '-', size: 17 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 1400, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.sn, bold: true, font: 'Consolas', size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 500, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${slip.qtyUsed || 1}`, bold: true, size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 600, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.unit || 'Chiếc', size: 18 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: slip.warehouse || 'MN-DHB-TBK-1122', size: 17 })] })] }),
+                  new TableCell({ borders: cellBorders, width: { size: 1100, type: WidthType.DXA }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tốt (100%)', bold: true, size: 18 })] })] })
                 ]
               })
             ]
           }),
 
           // Section III
-          new Paragraph({ spacing: { before: 180, after: 60 }, children: [new TextRun({ text: 'III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:', bold: true, size: 20 })] }),
-          new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: '- Mục đích sử dụng: ', bold: true, size: 20 }), new TextRun({ text: slip.purpose || 'Thay thế dự phòng / Bảo dưỡng định kỳ', size: 20 })] }),
-          new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: '- Ghi chú & Tham số kỹ thuật: ', bold: true, size: 20 }), new TextRun({ text: slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định.', italics: true, size: 20 })] }),
+          new Paragraph({ spacing: { before: 160, after: 50 }, children: [new TextRun({ text: 'III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:', bold: true, size: 20 })] }),
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '- Mục đích sử dụng: ', bold: true, size: 20 }), new TextRun({ text: purpose, size: 20 })] }),
+          new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: '- Ghi chú & Tham số kỹ thuật: ', bold: true, size: 20 }), new TextRun({ text: notes, italics: true, size: 20 })] }),
 
           // Section IV
-          new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: 'IV. TRÁCH NHIỆM & QUY ĐỊNH BẢO QUẢN:', bold: true, size: 20 })] }),
-          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không.', italics: true, size: 19 })] }),
-          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: '2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời để lập biên bản xử lý cập nhật.', italics: true, size: 19 })] }),
-          new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: '3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị sử dụng.', italics: true, size: 19 })] }),
+          new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: 'IV. TRÁCH NHIỆM & QUY ĐỊNH BẢO QUẢN:', bold: true, size: 20 })] }),
+          new Paragraph({ spacing: { after: 25 }, children: [new TextRun({ text: '1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không.', italics: true, size: 18 })] }),
+          new Paragraph({ spacing: { after: 25 }, children: [new TextRun({ text: '2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời để lập biên bản xử lý cập nhật.', italics: true, size: 18 })] }),
+          new Paragraph({ spacing: { after: 140 }, children: [new TextRun({ text: '3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị sử dụng.', italics: true, size: 18 })] }),
 
-          // 4 Signatures
-          new Paragraph({ spacing: { before: 160 } }),
+          // 3 Signatures
+          new Paragraph({ spacing: { before: 140 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             borders: {
@@ -821,25 +823,16 @@ export async function exportUsageSlipToDocx(
               new TableRow({
                 children: [
                   new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    width: { size: 33.33, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'KỸ SƯ TIẾP NHẬN', bold: true, size: 18 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'NGƯỜI BÁO SỬ DỤNG', bold: true, size: 18 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true, size: 16 })] }),
                       new Paragraph({ spacing: { before: 800 } }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: receiverName, bold: true, size: 19 })] })
                     ]
                   }),
                   new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
-                    children: [
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'NGƯỜI LẬP PHIẾU', bold: true, size: 18 })] }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true, size: 16 })] }),
-                      new Paragraph({ spacing: { before: 800 } }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: giverName, bold: true, size: 19 })] })
-                    ]
-                  }),
-                  new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    width: { size: 33.33, type: WidthType.PERCENTAGE },
                     children: [
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'PHỤ TRÁCH KHO', bold: true, size: 18 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true, size: 16 })] }),
@@ -848,7 +841,7 @@ export async function exportUsageSlipToDocx(
                     ]
                   }),
                   new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    width: { size: 33.33, type: WidthType.PERCENTAGE },
                     children: [
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'LÃNH ĐẠO ĐỘI', bold: true, size: 18 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '(Ký, duyệt đóng dấu)', italics: true, size: 16 })] }),

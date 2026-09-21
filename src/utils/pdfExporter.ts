@@ -320,7 +320,7 @@ export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[
 }
 
 /**
- * 2. Xuất PHIẾU BÁO SỬ DỤNG THIẾT BỊ thành PDF
+ * 2. Xuất PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG thành PDF
  */
 export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: string) {
   const now = new Date();
@@ -338,145 +338,141 @@ export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: st
   }
 
   const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
-  const giverName = slip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho');
-  const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm Bảo đảm Kỹ thuật';
-  const giverPos = slip.giverPos || 'Kỹ sư phụ trách kho';
-  const receiverName = slip.user || 'Kỹ sư tiếp nhận';
-  const receiverDept = slip.receiverDept || 'Tổ Vận Hành CNS/ATM';
-  const receiverPos = slip.receiverPos || 'Kỹ sư trực ban / Khai thác';
+  const giverName = slip.giverName || (currentUsername ? `${currentUsername}` : '');
+  const giverDept = slip.giverDept || 'Đội Thông Tin – Trung tâm BĐKT';
+  const giverPos = slip.giverPos || 'Nhân Viên Kỹ Thuật';
+  const receiverName = slip.user || 'Nguyễn Chí Thanh';
+  const receiverDept = slip.receiverDept || 'Kíp Trực';
+  const receiverPos = slip.receiverPos || 'Nhân Viên Kỹ Thuật';
+  const targetLoc = slip.targetLocation || 'MUX MP4100 VSAT';
+  const purpose = slip.purpose || 'Bảo dưỡng định kỳ / Thay thế dự phòng';
+  const notes = slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định.';
 
   const html = `
-    <div style="padding: 15mm 15mm 15mm 20mm; box-sizing: border-box; background: #fff; width: 210mm;">
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px;">
+    <div style="padding: 16mm 18mm 16mm 20mm; box-sizing: border-box; background: #fff; width: 210mm; font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.45;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
         <tr>
-          <td style="width: 46%; text-align: center; vertical-align: top;">
-            <div style="font-size: 10pt; text-transform: uppercase;">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
-            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
-            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-            <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;"><u>ĐỘI THÔNG TIN CNS/ATM</u></div>
-            <div style="font-size: 11pt; font-style: italic; margin-top: 6px;">Số: <strong>${docNo}</strong></div>
+          <td style="width: 48%; text-align: center; vertical-align: top; padding: 0;">
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; line-height: 1.3;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; line-height: 1.3;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; line-height: 1.3;"><u>ĐỘI THÔNG TIN</u></div>
+            <div style="font-size: 10.5pt; font-style: italic; margin-top: 4px;">Số: <strong>${docNo}</strong></div>
           </td>
-          <td style="width: 54%; text-align: center; vertical-align: top;">
-            <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-            <div style="font-size: 12pt; font-weight: bold; margin-top: 2px;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
-            <div style="font-size: 11.5pt; font-style: italic; margin-top: 6px;">TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}</div>
+          <td style="width: 52%; text-align: center; vertical-align: top; padding: 0;">
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; line-height: 1.3;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+            <div style="font-size: 11pt; font-weight: bold; line-height: 1.3;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
+            <div style="font-size: 10.5pt; font-style: italic; margin-top: 4px;">TP. Hồ Chí Minh, ngày ${printDay} tháng ${printMonth} năm ${printYear}</div>
           </td>
         </tr>
       </table>
 
-      <div style="text-align: center; margin: 22px 0 16px 0;">
-        <h1 style="font-size: 15pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">
-          PHIẾU BÁO SỬ DỤNG - BÀN GIAO THIẾT BỊ
+      <div style="text-align: center; margin: 18px 0 14px 0;">
+        <h1 style="font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; margin: 0;">
+          PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG
         </h1>
-        <div style="font-size: 11pt; font-style: italic; margin-top: 4px; color: #333;">
-          (V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật hàng không)
+        <div style="font-size: 10.5pt; font-style: italic; margin-top: 3px;">
+          (V/v trích xuất, cấp phát và luân chuyển vật tư dự phòng phục vụ kỹ thuật)
         </div>
       </div>
 
-      <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin-top: 14px; margin-bottom: 6px;">
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 12px; margin-bottom: 5px;">
         I. CĂN CỨ VÀ THÀNH PHẦN THỰC HIỆN:
       </div>
 
-      <div style="font-size: 11.5pt; line-height: 1.5; margin-bottom: 12px;">
-        <div style="margin: 4px 0;">
+      <div style="font-size: 11pt; line-height: 1.45; margin-bottom: 10px;">
+        <div style="margin: 3px 0;">
           <strong>1. Bên Giao (Cấp xuất kho):</strong> ${giverDept}
         </div>
-        <div style="margin: 4px 0; padding-left: 18px;">
+        <div style="margin: 3px 0; padding-left: 14px;">
           - Đại diện: <strong>${giverName}</strong> &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; Chức vụ: <strong>${giverPos}</strong>
         </div>
-        <div style="margin: 6px 0 4px 0;">
+        <div style="margin: 4px 0 3px 0;">
           <strong>2. Bên Nhận (Tiếp nhận sử dụng):</strong> ${receiverDept}
         </div>
-        <div style="margin: 4px 0; padding-left: 18px;">
+        <div style="margin: 3px 0; padding-left: 14px;">
           - Đại diện: <strong>${receiverName}</strong> &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; Chức vụ: <strong>${receiverPos}</strong>
         </div>
-        <div style="margin: 6px 0 4px 0;">
+        <div style="margin: 4px 0 3px 0;">
           <strong>3. Thời gian cấp xuất:</strong> ${slip.date}
         </div>
-        <div style="margin: 4px 0;">
-          <strong>4. Vị trí lắp đặt / Hệ thống đích:</strong> <strong>${slip.targetLocation || 'Hệ thống thiết bị chuyên ngành'}</strong>
+        <div style="margin: 3px 0;">
+          <strong>4. Vị trí lắp đặt / Hệ thống đích:</strong> <strong>${targetLoc}</strong>
         </div>
       </div>
 
-      <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin-top: 14px; margin-bottom: 6px;">
-        II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ BÀN GIAO:
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 12px; margin-bottom: 5px;">
+        II. DANH MỤC TRANG THIẾT BỊ VÀ VẬT TƯ :
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; margin: 10px 0 16px 0; font-size: 11pt;">
+      <table style="width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; border: 1px solid #000;">
         <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 32px; text-align: center; font-weight: bold; text-transform: uppercase;">STT</th>
-            <th style="border: 1px solid #000; padding: 7px 6px; text-align: center; font-weight: bold; text-transform: uppercase;">Tên Trang Thiết Bị / Vật Tư</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 85px; text-align: center; font-weight: bold; text-transform: uppercase;">Chủng Loại</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 85px; text-align: center; font-weight: bold; text-transform: uppercase;">Part No.</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 105px; text-align: center; font-weight: bold; text-transform: uppercase;">Serial No. (S/N)</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 42px; text-align: center; font-weight: bold; text-transform: uppercase;">SL</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 48px; text-align: center; font-weight: bold; text-transform: uppercase;">ĐVT</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 80px; text-align: center; font-weight: bold; text-transform: uppercase;">Kho Xuất</th>
-            <th style="border: 1px solid #000; padding: 7px 4px; width: 80px; text-align: center; font-weight: bold; text-transform: uppercase;">Hiện Trạng</th>
+          <tr>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 32px; text-align: center; font-weight: bold;">STT</th>
+            <th style="border: 1px solid #000; padding: 5px 4px; text-align: center; font-weight: bold;">Tên Thiết Bị / Vật Tư</th>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 75px; text-align: center; font-weight: bold;">Chủng Loại</th>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 95px; text-align: center; font-weight: bold;">Part No.</th>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 95px; text-align: center; font-weight: bold;">Serial No.</th>
+            <th style="border: 1px solid #000; padding: 5px 2px; width: 28px; text-align: center; font-weight: bold;">SL</th>
+            <th style="border: 1px solid #000; padding: 5px 2px; width: 36px; text-align: center; font-weight: bold;">ĐVT</th>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 70px; text-align: center; font-weight: bold;">Kho Xuất</th>
+            <th style="border: 1px solid #000; padding: 5px 3px; width: 68px; text-align: center; font-weight: bold;">Hiện Trạng</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center;">01</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: left; font-weight: bold;">${slip.itemName}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center;">${slip.category || 'Vật tư CNS'}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center;">${slip.pn || 'N/A'}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: monospace; font-weight: bold;">${slip.sn}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${slip.qtyUsed}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center;">${slip.unit || 'Chiếc'}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center;">${slip.warehouse || 'Kho TT'}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Tốt (100%)</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center; font-weight: bold;">01</td>
+            <td style="border: 1px solid #000; padding: 5px 4px; text-align: left; font-weight: bold;">${slip.itemName}</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center;">${slip.category || 'MP2100 & MP4100'}</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center; font-size: 9pt; word-break: break-all;">${slip.pn || '-'}</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center; font-weight: bold;">${slip.sn}</td>
+            <td style="border: 1px solid #000; padding: 5px 2px; text-align: center; font-weight: bold;">${slip.qtyUsed || 1}</td>
+            <td style="border: 1px solid #000; padding: 5px 2px; text-align: center;">${slip.unit || 'Chiếc'}</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center; font-size: 9pt;">${slip.warehouse || 'MN-DHB-TBK-1122'}</td>
+            <td style="border: 1px solid #000; padding: 5px 3px; text-align: center; font-weight: bold;">Tốt<br/>(100%)</td>
           </tr>
         </tbody>
       </table>
 
-      <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin-top: 14px; margin-bottom: 6px;">
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 12px; margin-bottom: 5px;">
         III. MỤC ĐÍCH SỬ DỤNG VÀ THÔNG SỐ KỸ THUẬT:
       </div>
-      <div style="font-size: 11.5pt; line-height: 1.5; margin-bottom: 12px;">
-        <div style="margin: 3px 0;">
-          - <strong>Mục đích sử dụng:</strong> ${slip.purpose || 'Thay thế dự phòng / Bảo dưỡng định kỳ'}
+      <div style="font-size: 10.5pt; line-height: 1.45; margin-bottom: 10px;">
+        <div style="margin: 2px 0;">
+          - <strong>Mục đích sử dụng:</strong> ${purpose}
         </div>
-        <div style="margin: 3px 0;">
-          - <strong>Ghi chú & Tham số kỹ thuật:</strong> ${slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định trước khi đưa vào vận hành.'}
+        <div style="margin: 2px 0;">
+          - <strong>Ghi chú & Tham số kỹ thuật:</strong> <em>${notes}</em>
         </div>
       </div>
 
-      <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin-top: 14px; margin-bottom: 6px;">
+      <div style="font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 12px; margin-bottom: 5px;">
         IV. TRÁCH NHIỆM & QUY ĐỊNH BẢO QUẢN:
       </div>
-      <div style="font-size: 11pt; font-style: italic; line-height: 1.45; margin-bottom: 18px;">
-        <p style="margin: 3px 0;">1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không quy định.</p>
-        <p style="margin: 3px 0;">2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời cho Phụ trách kho và Lãnh đạo Đội để lập biên bản xử lý cập nhật hệ thống.</p>
-        <p style="margin: 3px 0;">3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị tiếp nhận sử dụng.</p>
+      <div style="font-size: 10.5pt; font-style: italic; line-height: 1.45; margin-bottom: 16px;">
+        <div style="margin: 2px 0;">1. Bên nhận chịu trách nhiệm tiếp nhận, bảo quản và vận hành trang thiết bị đúng quy trình kỹ thuật hàng không.</div>
+        <div style="margin: 2px 0;">2. Khi có sự cố hư hỏng hoặc thu hồi hoàn kho, kỹ sư quản lý phải báo cáo kịp thời để lập biên bản xử lý cập nhật.</div>
+        <div style="margin: 2px 0;">3. Phiếu này được lập thành 02 bản có giá trị pháp lý như nhau, lưu tại Sổ Theo Dõi Đội Thông Tin và Đơn vị sử dụng.</div>
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; margin-top: 22px;">
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px; page-break-inside: avoid;">
         <tr>
-          <td style="width: 25%; text-align: center; vertical-align: top; padding: 0 4px;">
-            <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">KỸ SƯ TIẾP NHẬN</div>
+          <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
+            <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">NGƯỜI BÁO SỬ DỤNG</div>
             <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
             <div style="height: 65px;"></div>
-            <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase;">${receiverName}</div>
+            <div style="font-weight: bold; font-size: 11pt;">${receiverName}</div>
           </td>
-          <td style="width: 25%; text-align: center; vertical-align: top; padding: 0 4px;">
-            <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">NGƯỜI LẬP PHIẾU</div>
-            <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
-            <div style="height: 65px;"></div>
-            <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase;">${giverName}</div>
-          </td>
-          <td style="width: 25%; text-align: center; vertical-align: top; padding: 0 4px;">
+          <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
             <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">PHỤ TRÁCH KHO</div>
             <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
             <div style="height: 65px;"></div>
-            <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase;">...............................</div>
+            <div style="font-size: 10pt; color: #666;">...........................</div>
           </td>
-          <td style="width: 25%; text-align: center; vertical-align: top; padding: 0 4px;">
+          <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
             <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">LÃNH ĐẠO ĐỘI</div>
-            <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, đóng dấu duyệt)</div>
+            <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, duyệt đóng dấu)</div>
             <div style="height: 65px;"></div>
-            <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase;">...............................</div>
+            <div style="font-size: 10pt; color: #666;">...........................</div>
           </td>
         </tr>
       </table>

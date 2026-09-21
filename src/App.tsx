@@ -2301,9 +2301,9 @@ export default function App() {
     }
   };
 
-  // Automatic startup Cloud-First priority fetch
+  // Automatic startup Cloud-First priority fetch (silent to avoid disruptive initial popups)
   useEffect(() => {
-    fetchCloudData(undefined, false, true);
+    fetchCloudData(undefined, true, true);
   }, []);
 
   // Automatic 30-second background connection to Google Sheets Cloud to pull data

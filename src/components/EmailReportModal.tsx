@@ -15,13 +15,20 @@ import {
 } from '../services/gmailService.ts';
 import { getAccessToken, googleSignIn } from '../services/authService.ts';
 import {
-  renderHtmlToPdfBlob
+  renderHtmlToPdfBlob,
+  getHandoverHtml,
+  getUsageSlipHtml,
+  getDispatchedRegistryHtml,
+  getAuditReportHtml,
+  getInventoryReportHtml
 } from '../utils/pdfExporter.ts';
 import {
-  exportInventoryReportToDocx,
+  getInventoryReportDocxDocument,
+  getHandoverDocxDocument,
+  getUsageSlipDocxDocument,
+  getDispatchedRegistryDocxDocument,
   generateDocxBlob
 } from '../utils/docxExporter.ts';
-import { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ShadingType } from 'docx';
 
 export type ReportType = 'INVENTORY_AUDIT' | 'HANDOVER' | 'USAGE_SLIP' | 'DISPATCHED_REGISTRY' | 'FULL_BACKUP';
 export type AttachmentFormat = 'PDF' | 'DOCX' | 'BOTH';
@@ -34,6 +41,10 @@ interface EmailReportModalProps {
   dispatchedRecords: DispatchedRecord[];
   usageSlips?: UsageSlip[];
   selectedHandover?: {
+    meta: any;
+    rows: any[];
+  } | null;
+  selectedHandoverData?: {
     meta: any;
     rows: any[];
   } | null;
@@ -51,11 +62,13 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
   dispatchedRecords,
   usageSlips = [],
   selectedHandover,
+  selectedHandoverData,
   selectedUsageSlip,
   role,
   currentUsername = 'admin',
   onAddToast
 }) => {
+  const activeHandover = selectedHandover || selectedHandoverData || null;
   // Form State
   const [reportType, setReportType] = useState<ReportType>(defaultReportType);
   const [format, setFormat] = useState<AttachmentFormat>('PDF');
@@ -199,8 +212,8 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
           </table>
         </div>
       `;
-    } else if (reportType === 'HANDOVER' && selectedHandover) {
-      const { meta, rows } = selectedHandover;
+    } else if (reportType === 'HANDOVER' && activeHandover) {
+      const { meta, rows } = activeHandover;
       const rowsTable = rows.map((r, i) => `
         <tr>
           <td style="border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center;">${i + 1}</td>
@@ -305,7 +318,7 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
       </body>
       </html>
     `;
-  }, [reportType, format, stats, selectedHandover, selectedUsageSlip, customNote, includeSummaryTable, currentUsername, dispatchedRecords]);
+  }, [reportType, format, stats, activeHandover, selectedUsageSlip, customNote, includeSummaryTable, currentUsername, dispatchedRecords]);
 
   // Generate File Attachments
   const generateAttachments = async (): Promise<EmailAttachment[]> => {
@@ -320,75 +333,12 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
         const title = `BaoCao_KiemKe_TonKho_CNS_${dateStr}`;
 
         if (format === 'PDF' || format === 'BOTH') {
-          // Construct HTML for Inventory
-          const rowsHtml = inventory.map((item, idx) => `
-            <tr>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 9pt;">${idx + 1}</td>
-              <td style="border: 1px solid #000; padding: 5px 6px; text-align: left; font-size: 9pt; font-weight: bold;">${item.name}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 8.5pt;">${item.category || '-'}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-family: monospace; font-size: 8.5pt;">${item.pn || '-'}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-family: monospace; font-size: 9pt; font-weight: bold;">${item.sn}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 9pt; font-weight: bold;">${item.qty}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 8.5pt;">${item.warehouse || '-'}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 8.5pt;">${item.loc || '-'}</td>
-              <td style="border: 1px solid #000; padding: 5px; text-align: center; font-size: 8.5pt; font-weight: bold;">
-                ${item.auditStatus === 'OK' ? 'ĐỦ / TỐT' : (item.auditStatus === 'MISSING' ? 'THIẾU/HỎNG' : 'CHƯA KIỂM')}
-              </td>
-            </tr>
-          `).join('');
-
-          const auditHtml = `
-            <div style="padding: 12mm 15mm; box-sizing: border-box; background: #fff; width: 210mm; font-family: 'Times New Roman', serif;">
-              <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
-                <tr>
-                  <td style="width: 50%; text-align: center; vertical-align: top;">
-                    <div style="font-size: 9pt; font-weight: bold; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
-                    <div style="font-size: 9.5pt; font-weight: bold; text-transform: uppercase;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-                    <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #1e40af;"><u>ĐỘI THÔNG TIN</u></div>
-                  </td>
-                  <td style="width: 50%; text-align: center; vertical-align: top;">
-                    <div style="font-size: 9.5pt; font-weight: bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                    <div style="font-size: 10pt; font-weight: bold;"><u>Độc lập - Tự do - Hạnh phúc</u></div>
-                    <div style="font-size: 8.5pt; font-style: italic; margin-top: 3px;">Ngày trích xuất: ${now.toLocaleDateString('vi-VN')}</div>
-                  </td>
-                </tr>
-              </table>
-
-              <div style="text-align: center; margin: 12px 0;">
-                <h1 style="font-size: 13pt; font-weight: bold; text-transform: uppercase; margin: 0;">
-                  BÁO CÁO KIỂM KÊ TỒN KHO & HIỆN TRẠNG VẬT TƯ DỰ PHÒNG
-                </h1>
-                <div style="font-size: 9pt; font-style: italic; margin-top: 2px;">
-                  (Tổng số: ${inventory.length} mã vật tư | Tổng số lượng: ${stats.totalQty} cái/bộ)
-                </div>
-              </div>
-
-              <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                <thead>
-                  <tr style="background-color: #f1f5f9; font-weight: bold;">
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; width: 30px; text-align: center;">STT</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: left;">Tên thiết bị</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">Chuyên mục</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">P/N</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">S/N</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center; width: 35px;">SL</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">Kho</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">Vị trí</th>
-                    <th style="border: 1px solid #000; padding: 4px; font-size: 8.5pt; text-align: center;">Tình trạng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rowsHtml}
-                </tbody>
-              </table>
-
-              <div style="margin-top: 20px; text-align: right; font-size: 10pt;">
-                <strong>NGƯỜI LẬP BÁO CÁO:</strong> ${currentUsername ? `${currentUsername.toUpperCase()}` : 'Nhân viên Phụ trách Kho'}
-              </div>
-            </div>
-          `;
-
-          const pdfBlob = await renderHtmlToPdfBlob(auditHtml, false);
+          const auditHtml = getInventoryReportHtml(inventory, {
+            currentUsername,
+            reportTitle: 'BÁO CÁO KIỂM KÊ TỒN KHO & HIỆN TRẠNG VẬT TƯ DỰ PHÒNG',
+            reportDate: now.toLocaleDateString('vi-VN')
+          });
+          const pdfBlob = await renderHtmlToPdfBlob(auditHtml, true); // Landscape A4
           attachments.push({
             filename: `${title}.pdf`,
             contentType: 'application/pdf',
@@ -397,48 +347,121 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
         }
 
         if (format === 'DOCX' || format === 'BOTH') {
-          // Generate DOCX blob
-          const doc = new Document({
-            sections: [{
-              properties: {},
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new TextRun({ text: 'BÁO CÁO KIỂM KÊ TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG', bold: true, size: 24 })]
-                }),
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new TextRun({ text: `Đội Thông Tin - Ngày ${dateStr}`, italics: true, size: 20 })]
-                }),
-                new Paragraph({ text: '' }),
-                new Table({
-                  width: { size: 100, type: WidthType.PERCENTAGE },
-                  rows: [
-                    new TableRow({
-                      tableHeader: true,
-                      children: [
-                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'STT', bold: true })] })] }),
-                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Tên Thiết Bị', bold: true })] })] }),
-                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })] }),
-                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'SL', bold: true })] })] }),
-                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Vị Trí', bold: true })] })] }),
-                      ]
-                    }),
-                    ...inventory.map((item, idx) => new TableRow({
-                      children: [
-                        new TableCell({ children: [new Paragraph({ text: String(idx + 1) })] }),
-                        new TableCell({ children: [new Paragraph({ text: item.name })] }),
-                        new TableCell({ children: [new Paragraph({ text: item.sn })] }),
-                        new TableCell({ children: [new Paragraph({ text: String(item.qty) })] }),
-                        new TableCell({ children: [new Paragraph({ text: item.loc || '-' })] }),
-                      ]
-                    }))
-                  ]
-                })
-              ]
-            }]
+          const doc = getInventoryReportDocxDocument(inventory, {
+            currentUsername,
+            reportDate: now.toLocaleDateString('vi-VN')
           });
+          const docxBlob = await generateDocxBlob(doc);
+          attachments.push({
+            filename: `${title}.docx`,
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            data: docxBlob
+          });
+        }
+      } else if (reportType === 'HANDOVER') {
+        const handoverMeta = activeHandover?.meta || {
+          handoverNo: `BBBG-${now.getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+          handoverLocation: 'Kho Vật Tư Đội Thông Tin - Trung Tâm BĐKT',
+          handoverDay: String(now.getDate()).padStart(2, '0'),
+          handoverMonth: String(now.getMonth() + 1).padStart(2, '0'),
+          handoverYear: String(now.getFullYear()),
+          handoverReason: 'Bàn giao thiết bị kỹ thuật phục vụ vận hành',
+          handoverGiverDept: 'Đội Thông Tin – Trung tâm BĐKT',
+          handoverGiverName: currentUsername ? currentUsername.toUpperCase() : 'Nhân viên Phụ trách Kho',
+          handoverGiverPos: 'Nhân viên Phụ trách Kho',
+          handoverReceiverDept: 'Tổ Vận Hành CNS/ATM',
+          handoverReceiverName: 'Kỹ Sư Trực Ban',
+          handoverReceiverPos: 'Kỹ Sư Vận Hành'
+        };
+        const handoverRows = activeHandover?.rows || inventory.slice(0, 5).map(item => ({
+          name: item.name,
+          unit: 'Cái',
+          qty: item.qty || 1,
+          quality: 'Tốt (Mới 100%)',
+          specs: item.pn || 'N/A',
+          sn: item.sn,
+          note: item.loc || ''
+        }));
 
+        const safeNo = (handoverMeta.handoverNo || 'BBBG').replace(/[\/\\]/g, '-');
+        const title = `BienBan_BanGiao_${safeNo}_${dateStr}`;
+
+        if (format === 'PDF' || format === 'BOTH') {
+          const handoverHtml = getHandoverHtml(handoverMeta, handoverRows);
+          const pdfBlob = await renderHtmlToPdfBlob(handoverHtml, false); // Portrait A4
+          attachments.push({
+            filename: `${title}.pdf`,
+            contentType: 'application/pdf',
+            data: pdfBlob
+          });
+        }
+
+        if (format === 'DOCX' || format === 'BOTH') {
+          const doc = getHandoverDocxDocument(handoverMeta, handoverRows);
+          const docxBlob = await generateDocxBlob(doc);
+          attachments.push({
+            filename: `${title}.docx`,
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            data: docxBlob
+          });
+        }
+      } else if (reportType === 'USAGE_SLIP') {
+        const slip = selectedUsageSlip || (usageSlips.length > 0 ? usageSlips[usageSlips.length - 1] : {
+          id: `PBS-${Date.now()}`,
+          docNumber: `PBSD-${now.getFullYear()}/001`,
+          date: now.toLocaleDateString('vi-VN'),
+          time: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          itemId: inventory[0]?.id || 'item-1',
+          itemName: inventory[0]?.name || 'Module nguồn Switch Cisco',
+          category: inventory[0]?.category || 'Vật tư CNS',
+          sn: inventory[0]?.sn || 'SN-DEFAULT',
+          qtyUsed: 1,
+          unit: 'Cái',
+          user: 'Kỹ sư Vận hành',
+          targetLocation: 'MUX MP4100 VSAT',
+          purpose: 'Thay thế dự phòng định kỳ',
+          giverName: currentUsername,
+          giverDept: 'Đội Thông Tin – Trung tâm BĐKT',
+          receiverDept: 'Tổ Vận Hành CNS/ATM'
+        } as UsageSlip);
+
+        const safeNo = (slip.docNumber || `PBSD-${slip.id.slice(-4)}`).replace(/[\/\\]/g, '-');
+        const title = `PhieuBaoSuDung_${safeNo}_${dateStr}`;
+
+        if (format === 'PDF' || format === 'BOTH') {
+          const slipHtml = getUsageSlipHtml(slip, currentUsername);
+          const pdfBlob = await renderHtmlToPdfBlob(slipHtml, false); // Portrait A4
+          attachments.push({
+            filename: `${title}.pdf`,
+            contentType: 'application/pdf',
+            data: pdfBlob
+          });
+        }
+
+        if (format === 'DOCX' || format === 'BOTH') {
+          const doc = getUsageSlipDocxDocument(slip, currentUsername);
+          const docxBlob = await generateDocxBlob(doc);
+          attachments.push({
+            filename: `${title}.docx`,
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            data: docxBlob
+          });
+        }
+      } else if (reportType === 'DISPATCHED_REGISTRY') {
+        const title = `SoTheoDoi_BanGiao_SuDung_${dateStr}`;
+
+        if (format === 'PDF' || format === 'BOTH') {
+          const registryHtml = getDispatchedRegistryHtml(dispatchedRecords, currentUsername);
+          const pdfBlob = await renderHtmlToPdfBlob(registryHtml, true); // Landscape A4
+          attachments.push({
+            filename: `${title}.pdf`,
+            contentType: 'application/pdf',
+            data: pdfBlob
+          });
+        }
+
+        if (format === 'DOCX' || format === 'BOTH') {
+          const doc = getDispatchedRegistryDocxDocument(dispatchedRecords, currentUsername);
           const docxBlob = await generateDocxBlob(doc);
           attachments.push({
             filename: `${title}.docx`,
@@ -460,6 +483,19 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
           filename: `CNS_Backup_Data_${dateStr}.json`,
           contentType: 'application/json',
           data: jsonBlob
+        });
+
+        // Also attach Inventory PDF summary for convenience
+        const summaryHtml = getInventoryReportHtml(inventory, {
+          currentUsername,
+          reportTitle: 'BÁO CÁO SAO LƯU TỒN KHO & HIỆN TRẠNG THIẾT BỊ',
+          reportDate: now.toLocaleDateString('vi-VN')
+        });
+        const summaryPdfBlob = await renderHtmlToPdfBlob(summaryHtml, true);
+        attachments.push({
+          filename: `BaoCao_TongHop_DinhKem_${dateStr}.pdf`,
+          contentType: 'application/pdf',
+          data: summaryPdfBlob
         });
       }
 
@@ -803,7 +839,7 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
                     </div>
                   </button>
 
-                  {selectedHandover && (
+                  {activeHandover && (
                     <button
                       type="button"
                       onClick={() => setReportType('HANDOVER')}
@@ -822,7 +858,7 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
                           {reportType === 'HANDOVER' && <Check className="w-4 h-4 text-rose-600" />}
                         </div>
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                          Số: {selectedHandover.meta.handoverNo || 'BBBG'} ({selectedHandover.rows.length} mục)
+                          Số: {activeHandover.meta.handoverNo || 'BBBG'} ({activeHandover.rows.length} mục)
                         </p>
                       </div>
                     </button>

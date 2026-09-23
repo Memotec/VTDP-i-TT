@@ -328,7 +328,7 @@ export async function renderHtmlToPdfBlob(htmlContent: string, landscape = false
 /**
  * 1. Xuất BIÊN BẢN BÀN GIAO THIẾT BỊ thành PDF
  */
-export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[]) {
+export function getHandoverHtml(meta: HandoverMeta, rows: HandoverRow[]): string {
   const rowsHtml = rows.map((row, idx) => `
     <tr>
       <td style="border: 1px solid #000; padding: 6px 4px; text-align: center; font-size: 11pt;">${idx + 1}</td>
@@ -342,8 +342,8 @@ export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[
     </tr>
   `).join('');
 
-  const html = `
-    <div style="padding: 15mm 15mm 15mm 20mm; box-sizing: border-box; background: #fff; width: 210mm;">
+  return `
+    <div style="padding: 15mm 15mm 15mm 20mm; box-sizing: border-box; background: #fff; width: 210mm; font-family: 'Times New Roman', Times, serif;">
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
           <td style="width: 44%; text-align: center; vertical-align: top;">
@@ -453,7 +453,10 @@ export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[
       </table>
     </div>
   `;
+}
 
+export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[]) {
+  const html = getHandoverHtml(meta, rows);
   const safeNo = (meta.handoverNo || 'BBBG').replace(/[\/\\]/g, '-');
   const fileName = `BienBan_BanGiao_${safeNo}.pdf`;
   await renderHtmlToPdf(html, fileName);
@@ -462,7 +465,7 @@ export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[
 /**
  * 2. Xuất PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG thành PDF
  */
-export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: string) {
+export function getUsageSlipHtml(slip: UsageSlip, currentUsername?: string): string {
   const now = new Date();
   let printDay = String(now.getDate()).padStart(2, '0');
   let printMonth = String(now.getMonth() + 1).padStart(2, '0');
@@ -488,7 +491,7 @@ export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: st
   const purpose = slip.purpose || 'Bảo dưỡng định kỳ / Thay thế dự phòng';
   const notes = slip.notes || 'Thiết bị đã kiểm tra các tham số kỹ thuật đạt chuẩn, hoạt động ổn định.';
 
-  const html = `
+  return `
     <div style="padding: 16mm 18mm 16mm 20mm; box-sizing: border-box; background: #fff; width: 210mm; font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.45;">
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
         <tr>
@@ -618,7 +621,17 @@ export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: st
       </table>
     </div>
   `;
+}
 
+export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: string) {
+  const html = getUsageSlipHtml(slip, currentUsername);
+  const now = new Date();
+  let printYear = String(now.getFullYear());
+  if (slip.date) {
+    const match = slip.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (match) printYear = match[3];
+  }
+  const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
   const safeNo = docNo.replace(/[\/\\]/g, '-');
   const fileName = `PhieuBaoSuDung_${safeNo}.pdf`;
   await renderHtmlToPdf(html, fileName);
@@ -627,7 +640,7 @@ export async function exportUsageSlipToPDF(slip: UsageSlip, currentUsername?: st
 /**
  * 3. Xuất BIÊN BẢN KIỂM KÊ THIẾT BỊ / SỔ THEO DÕI BÀN GIAO thành PDF
  */
-export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[], currentUsername?: string) {
+export function getDispatchedRegistryHtml(records: DispatchedRecord[], currentUsername?: string): string {
   const todayStr = new Date().toLocaleDateString('vi-VN');
   const rowsHtml = records.map((r, idx) => `
     <tr>
@@ -643,13 +656,14 @@ export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[],
     </tr>
   `).join('');
 
-  const html = `
-    <div style="padding: 12mm 15mm; box-sizing: border-box; background: #fff; width: 297mm;">
+  return `
+    <div style="padding: 12mm 15mm; box-sizing: border-box; background: #fff; width: 297mm; font-family: 'Times New Roman', Times, serif;">
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
         <tr>
           <td style="width: 45%; text-align: center; vertical-align: top;">
             <div style="font-size: 9.5pt; font-weight: bold; text-transform: uppercase;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
             <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;"><u>TRUNG TÂM BẢO ĐẢM KỸ THUẬT</u></div>
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1e40af; margin-top: 1px;"><u>ĐỘI THÔNG TIN</u></div>
           </td>
           <td style="width: 55%; text-align: center; vertical-align: top;">
             <div style="font-size: 10pt; font-weight: bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
@@ -705,7 +719,11 @@ export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[],
       </table>
     </div>
   `;
+}
 
+export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[], currentUsername?: string) {
+  const html = getDispatchedRegistryHtml(records, currentUsername);
+  const todayStr = new Date().toLocaleDateString('vi-VN');
   const fileName = `SoTheoDoi_BanGiao_SuDung_${todayStr.replace(/[\/\\]/g, '-')}.pdf`;
   await renderHtmlToPdf(html, fileName, true); // Landscape
 }
@@ -713,13 +731,13 @@ export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[],
 /**
  * 4. Xuất BIÊN BẢN KIỂM KÊ KHO TỔNG HỢP thành PDF
  */
-export async function exportAuditReportToPDF(
+export function getAuditReportHtml(
   inventory: InventoryItem[],
   inspectorName: string,
   auditDate: string,
   auditLocation: string,
   auditNote: string
-) {
+): string {
   const totalQty = inventory.reduce((sum, item) => sum + (item.qty || 0), 0);
   const okItems = inventory.filter(item => item.auditStatus === 'OK');
   const missingItems = inventory.filter(item => item.auditStatus === 'MISSING');
@@ -742,7 +760,7 @@ export async function exportAuditReportToPDF(
     </tr>
   `).join('');
 
-  const html = `
+  return `
     <div style="padding: 12mm 15mm; box-sizing: border-box; background: #fff; width: 210mm;">
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; border-bottom: 2px solid #1e3a8a; padding-bottom: 6px;">
         <tr>
@@ -856,7 +874,16 @@ export async function exportAuditReportToPDF(
       </table>
     </div>
   `;
+}
 
+export async function exportAuditReportToPDF(
+  inventory: InventoryItem[],
+  inspectorName: string,
+  auditDate: string,
+  auditLocation: string,
+  auditNote: string
+) {
+  const html = getAuditReportHtml(inventory, inspectorName, auditDate, auditLocation, auditNote);
   const fileName = `BienBan_KiemKe_Kho_${auditDate.replace(/[\/\\]/g, '-')}.pdf`;
   await renderHtmlToPdf(html, fileName);
 }
@@ -894,10 +921,10 @@ export interface InventoryExportOptions {
 /**
  * 5. Xuất BÁO CÁO TỒN KHO HIỆN TẠI (ĐÃ LỌC) THÀNH PDF CHUYÊN NGHIỆP CÓ LOGO ĐỘI THÔNG TIN
  */
-export async function exportInventoryReportToPDF(
+export function getInventoryReportHtml(
   filteredItems: InventoryItem[],
   options: InventoryExportOptions = {}
-) {
+): string {
   const now = new Date();
   const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -951,7 +978,7 @@ export async function exportInventoryReportToPDF(
     `;
   }).join('');
 
-  const html = `
+  return `
     <div style="padding: 10mm 12mm 10mm 12mm; box-sizing: border-box; background: #ffffff; width: 297mm; color: #0f172a; font-family: 'Times New Roman', Times, serif;">
       
       <!-- TOP HEADER WITH OFFICIAL LOGO & NATIONAL EMBLEM -->
@@ -1067,7 +1094,15 @@ export async function exportInventoryReportToPDF(
       </div>
     </div>
   `;
+}
 
+export async function exportInventoryReportToPDF(
+  filteredItems: InventoryItem[],
+  options: InventoryExportOptions = {}
+) {
+  const html = getInventoryReportHtml(filteredItems, options);
+  const now = new Date();
+  const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const safeCategory = (options.categoryFilter || 'All').replace(/[\/\s\\&]/g, '_');
   const fileName = `BaoCao_TonKho_DoiThongTin_${safeCategory}_${dateStr.replace(/[\/\\]/g, '-')}.pdf`;
   await renderHtmlToPdf(html, fileName, true); // Landscape A4 format

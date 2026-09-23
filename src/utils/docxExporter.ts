@@ -57,7 +57,7 @@ const headerBgShading = {
 /**
  * 1. XUẤT BÁO CÁO TỒN KHO & HIỆN TRẠNG TRANG THIẾT BỊ DỰ PHÒNG RA TỆP WORD (.DOCX)
  */
-export async function exportInventoryReportToDocx(
+export function getInventoryReportDocxDocument(
   items: InventoryItem[],
   options: {
     currentUsername?: string;
@@ -68,7 +68,7 @@ export async function exportInventoryReportToDocx(
     warehouseLocation?: string;
     notes?: string;
   } = {}
-): Promise<void> {
+): Document {
   const now = new Date();
   const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -339,6 +339,24 @@ export async function exportInventoryReportToDocx(
     ]
   });
 
+  return doc;
+}
+
+export async function exportInventoryReportToDocx(
+  items: InventoryItem[],
+  options: {
+    currentUsername?: string;
+    categoryFilter?: string;
+    searchQuery?: string;
+    reportTitle?: string;
+    reportDate?: string;
+    warehouseLocation?: string;
+    notes?: string;
+  } = {}
+): Promise<void> {
+  const doc = getInventoryReportDocxDocument(items, options);
+  const now = new Date();
+  const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const fileName = `BaoCao_TonKho_CNS_${dateStr.replace(/[\/\\]/g, '-')}.docx`;
   await downloadDocxDocument(doc, fileName);
 }
@@ -346,7 +364,7 @@ export async function exportInventoryReportToDocx(
 /**
  * 2. XUẤT BIÊN BẢN BÀN GIAO THIẾT BỊ (HANDOVER PROTOCOL) RA TỆP WORD (.DOCX)
  */
-export async function exportHandoverToDocx(
+export function getHandoverDocxDocument(
   meta: {
     handoverNo: string;
     handoverLocation: string;
@@ -362,7 +380,7 @@ export async function exportHandoverToDocx(
     handoverReceiverPos: string;
   },
   rows: HandoverRow[]
-): Promise<void> {
+): Document {
   const tableRows: TableRow[] = [
     new TableRow({
       tableHeader: true,
@@ -635,6 +653,27 @@ export async function exportHandoverToDocx(
     ]
   });
 
+  return doc;
+}
+
+export async function exportHandoverToDocx(
+  meta: {
+    handoverNo: string;
+    handoverLocation: string;
+    handoverDay: string;
+    handoverMonth: string;
+    handoverYear: string;
+    handoverReason: string;
+    handoverGiverDept: string;
+    handoverGiverName: string;
+    handoverGiverPos: string;
+    handoverReceiverDept: string;
+    handoverReceiverName: string;
+    handoverReceiverPos: string;
+  },
+  rows: HandoverRow[]
+): Promise<void> {
+  const doc = getHandoverDocxDocument(meta, rows);
   const safeNo = (meta.handoverNo || 'BBBG').replace(/[\/\\]/g, '-');
   const fileName = `BienBan_BanGiao_${safeNo}.docx`;
   await downloadDocxDocument(doc, fileName);
@@ -643,10 +682,10 @@ export async function exportHandoverToDocx(
 /**
  * 3. XUẤT PHIẾU BÁO SỬ DỤNG VẬT TƯ DỰ PHÒNG RA TỆP WORD (.DOCX)
  */
-export async function exportUsageSlipToDocx(
+export function getUsageSlipDocxDocument(
   slip: UsageSlip,
   currentUsername?: string
-): Promise<void> {
+): Document {
   const now = new Date();
   let printDay = String(now.getDate()).padStart(2, '0');
   let printMonth = String(now.getMonth() + 1).padStart(2, '0');
@@ -862,6 +901,23 @@ export async function exportUsageSlipToDocx(
     ]
   });
 
+  return doc;
+}
+
+export async function exportUsageSlipToDocx(
+  slip: UsageSlip,
+  currentUsername?: string
+): Promise<void> {
+  const doc = getUsageSlipDocxDocument(slip, currentUsername);
+  const now = new Date();
+  let printYear = String(now.getFullYear());
+  if (slip.date) {
+    const match = slip.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (match) {
+      printYear = match[3];
+    }
+  }
+  const docNo = slip.docNumber || `PBSD-${printYear}/${String(slip.id.slice(-4)).padStart(3, '0')}`;
   const safeNo = docNo.replace(/[\/\\]/g, '-');
   const fileName = `PhieuBaoSuDung_${safeNo}.docx`;
   await downloadDocxDocument(doc, fileName);
@@ -870,13 +926,13 @@ export async function exportUsageSlipToDocx(
 /**
  * 4. XUẤT BIÊN BẢN KIỂM KÊ THIẾT BỊ VÀ VẬT TƯ DỰ PHÒNG TẠI CHỖ RA TỆP WORD (.DOCX)
  */
-export async function exportAuditReportToDocx(
+export function getAuditReportDocxDocument(
   inventory: InventoryItem[],
   inspectorName: string,
   auditDate: string,
   auditLocation: string,
   auditNote: string
-): Promise<void> {
+): Document {
   const totalQty = inventory.reduce((sum, item) => sum + (item.qty || 0), 0);
   const okItems = inventory.filter(item => item.auditStatus === 'OK');
   const missingItems = inventory.filter(item => item.auditStatus === 'MISSING');
@@ -1102,6 +1158,17 @@ export async function exportAuditReportToDocx(
     ]
   });
 
+  return doc;
+}
+
+export async function exportAuditReportToDocx(
+  inventory: InventoryItem[],
+  inspectorName: string,
+  auditDate: string,
+  auditLocation: string,
+  auditNote: string
+): Promise<void> {
+  const doc = getAuditReportDocxDocument(inventory, inspectorName, auditDate, auditLocation, auditNote);
   const fileName = `BienBan_KiemKe_Kho_${auditDate.replace(/[\/\\]/g, '-')}.docx`;
   await downloadDocxDocument(doc, fileName);
 }
@@ -1109,10 +1176,10 @@ export async function exportAuditReportToDocx(
 /**
  * 5. XUẤT SỔ TỔNG HỢP THEO DÕI THIẾT BỊ ĐÃ BÀN GIAO & ĐƯA VÀO SỬ DỤNG RA TỆP WORD (.DOCX KHỔ NGANG LANDSCAPE)
  */
-export async function exportDispatchedRegistryToDocx(
+export function getDispatchedRegistryDocxDocument(
   records: DispatchedRecord[],
   currentUsername?: string
-): Promise<void> {
+): Document {
   const todayStr = new Date().toLocaleDateString('vi-VN');
   const deployedCount = records.filter(r => r.status === 'DEPLOYED').length;
   const returnedCount = records.filter(r => r.status === 'RETURNED').length;
@@ -1272,6 +1339,15 @@ export async function exportDispatchedRegistryToDocx(
     ]
   });
 
+  return doc;
+}
+
+export async function exportDispatchedRegistryToDocx(
+  records: DispatchedRecord[],
+  currentUsername?: string
+): Promise<void> {
+  const doc = getDispatchedRegistryDocxDocument(records, currentUsername);
+  const todayStr = new Date().toLocaleDateString('vi-VN');
   const fileName = `SoTheoDoi_BanGiao_SuDung_${todayStr.replace(/[\/\\]/g, '-')}.docx`;
   await downloadDocxDocument(doc, fileName);
 }

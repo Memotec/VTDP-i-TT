@@ -384,9 +384,6 @@ export const PublicItemLookupModal: React.FC<PublicItemLookupModalProps> = ({
                         <h1 className="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-950">
                           PHIẾU LÝ LỊCH & THÔNG TIN KỸ THUẬT THIẾT BỊ VẬT TƯ
                         </h1>
-                        <p className="text-[11px] sm:text-[12px] italic text-slate-600 mt-0.5">
-                          (Dữ liệu chuẩn hóa từ Kho Thiết bị Dự phòng Kỹ thuật Hàng không CNS/ATM)
-                        </p>
                       </div>
 
                       {/* Section I: Core Identification & Integrated QR */}

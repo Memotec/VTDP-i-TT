@@ -72,7 +72,7 @@ export const PRESET_CONTACTS: PresetContact[] = [
     id: 'kho-tb',
     name: 'Thủ Kho & Quản Lý Trang Thiết Bị',
     email: 'quanlykho.cns@cns.example.com',
-    role: 'Kỹ Sư Phụ Trách Kho',
+    role: 'Nhân viên Phụ trách Kho',
     department: 'Đội Thông Tin – Trung tâm BĐKT'
   }
 ];

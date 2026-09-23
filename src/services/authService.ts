@@ -144,3 +144,19 @@ export const googleLogout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
 };
+
+export const isRunningInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+};
+
+export const openAppInNewTab = () => {
+  try {
+    window.open(window.location.href, '_blank');
+  } catch (err) {
+    console.error('Không thể mở tab mới:', err);
+  }
+};

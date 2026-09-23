@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   X, Mail, Send, Paperclip, CheckCircle2, AlertCircle, Loader2,
   FileText, Layers, User, Building2, ShieldCheck, ExternalLink,
-  RefreshCw, AlertTriangle, Plus, Trash2, Check, Sparkles, FileSpreadsheet
+  RefreshCw, AlertTriangle, Plus, Trash2, Check, Sparkles, FileSpreadsheet, Download
 } from 'lucide-react';
 import { InventoryItem, UsageSlip, DispatchedRecord, Role } from '../types.ts';
 import {
@@ -13,7 +13,7 @@ import {
   EmailAttachment,
   SendEmailResult
 } from '../services/gmailService.ts';
-import { getAccessToken, googleSignIn } from '../services/authService.ts';
+import { getAccessToken, googleSignIn, openAppInNewTab, isRunningInIframe } from '../services/authService.ts';
 import {
   renderHtmlToPdfBlob,
   getHandoverHtml,
@@ -515,19 +515,62 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
     setStatus('CONFIRMING');
   };
 
+  // Direct download attachments fallback
+  const [isDownloadingFiles, setIsDownloadingFiles] = useState(false);
+  const handleDownloadAttachmentsDirectly = async () => {
+    try {
+      setIsDownloadingFiles(true);
+      showToast('Đang khởi tạo các tệp báo cáo đính kèm...', 'info');
+      const attachments = await generateAttachments();
+      if (attachments.length === 0) {
+        showToast('Không có tệp đính kèm nào để tải.', 'info');
+        return;
+      }
+      for (const att of attachments) {
+        const blob = att.data instanceof Blob ? att.data : new Blob([att.data], { type: att.contentType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = att.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      showToast(`Đã tải về thành công ${attachments.length} tệp đính kèm!`, 'success');
+    } catch (err: any) {
+      showToast('Lỗi tải tệp: ' + (err?.message || ''), 'error');
+    } finally {
+      setIsDownloadingFiles(false);
+    }
+  };
+
   // Perform Final Send
   const handleSendEmail = async () => {
     setStatus('SENDING');
-    setStatusDetail('Đang chuẩn bị tệp đính kèm và gửi email qua Gmail...');
+    setStatusDetail('Đang xác thực kết nối tài khoản Gmail...');
     setErrorMessage('');
 
     try {
-      // 1. Build attachments
+      // 1. Authenticate Google FIRST while the user's click gesture is still active
+      let token = await getAccessToken();
+      if (!token) {
+        setStatusDetail('Đang mở cửa sổ xác thực tài khoản Google...');
+        const signResult = await googleSignIn();
+        token = signResult?.accessToken || null;
+      }
+
+      if (!token) {
+        throw new Error('Chưa đăng nhập tài khoản Google có quyền gửi email (Gmail).');
+      }
+
+      // 2. Build attachments
+      setStatusDetail('Đang chuẩn bị tệp đính kèm và tạo tài liệu báo cáo...');
       const attachments = await generateAttachments();
 
       setStatusDetail(`Đang kết nối Gmail API gửi đến ${recipients.join(', ')}...`);
 
-      // 2. Call Gmail API
+      // 3. Call Gmail API
       const result = await sendEmailViaGmail({
         to: recipients,
         cc: ccList.length > 0 ? ccList : undefined,
@@ -548,9 +591,15 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
         showToast(result.error || 'Gửi email thất bại!', 'error');
       }
     } catch (err: any) {
+      console.error('Lỗi khi gửi email:', err);
       setStatus('ERROR');
-      setErrorMessage(err.message || 'Lỗi xử lý khi gửi thư.');
-      showToast('Lỗi gửi email: ' + err.message, 'error');
+      const msg = err?.message || '';
+      setErrorMessage(msg || 'Lỗi xử lý khi gửi thư.');
+      if (msg.includes('POPUP_BLOCKED')) {
+        showToast('Cửa sổ Google Pop-up bị chặn! Bạn hãy nhấn "Mở ở Tab mới" hoặc tải file về máy.', 'error');
+      } else {
+        showToast('Lỗi gửi email: ' + msg, 'error');
+      }
     }
   };
 
@@ -745,41 +794,117 @@ export const EmailReportModal: React.FC<EmailReportModalProps> = ({
           )}
 
           {status === 'ERROR' && (
-            <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-2xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              <div className="text-xs flex-1">
-                <h4 className="font-black text-rose-900 dark:text-rose-200 uppercase tracking-wider mb-1">
-                  Gửi email không thành công
-                </h4>
-                <p className="text-rose-800 dark:text-rose-300/90 leading-relaxed mb-3">
-                  {errorMessage}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatus('IDLE');
-                      setErrorMessage('');
-                    }}
-                    className="px-3.5 py-1.5 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 cursor-pointer"
-                  >
-                    Thử lại
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      openMailtoClient({
-                        to: recipients.join(','),
-                        subject: activeSubject,
-                        body: `Báo cáo vật tư Đội Thông Tin - Xem chi tiết trên hệ thống CNS.`
-                      });
-                    }}
-                    className="px-3.5 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-300 cursor-pointer"
-                  >
-                    Mở ứng dụng Mail (mailto)
-                  </button>
+            <div className="space-y-4 animate-scale-in">
+              {errorMessage.includes('POPUP_BLOCKED') ? (
+                <div className="p-5 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/80 rounded-2xl space-y-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/80 text-amber-700 dark:text-amber-300 rounded-xl shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs text-amber-950 dark:text-amber-100 flex-1">
+                      <h4 className="font-black text-sm text-amber-900 dark:text-amber-200">
+                        Cửa sổ Google Pop-up bị chặn bởi Trình duyệt / Iframe
+                      </h4>
+                      <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300/90">
+                        Trình duyệt hoặc khung xem trước (iframe) đang chặn cửa sổ đăng nhập của Google để cấp quyền gửi Gmail API. Để tiếp tục gửi báo cáo kỹ thuật, bạn có thể thực hiện một trong các cách sau:
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => openAppInNewTab()}
+                      className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-98"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>1. Mở ở Tab mới để gửi thư ↗</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadAttachmentsDirectly}
+                      disabled={isDownloadingFiles}
+                      className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{isDownloadingFiles ? 'Đang tải...' : '2. Tải ngay tệp báo cáo về máy'}</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-800/80">
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients.join(','))}&su=${encodeURIComponent(activeSubject)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-rose-500" />
+                      <span>3. Soạn trên Gmail Web (Trình duyệt)</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatus('IDLE');
+                        setErrorMessage('');
+                      }}
+                      className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      Quay lại chỉnh sửa
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 bg-amber-100/60 dark:bg-amber-900/30 rounded-xl text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                    <span className="font-bold">💡 Hướng dẫn cho phép Pop-up trên trình duyệt:</span> Nhấp vào biểu tượng 🚫 (Đã chặn cửa sổ bật lên) trên thanh địa chỉ của Chrome/Edge &gt; Chọn <em>"Luôn cho phép cửa sổ bật lên và chuyển hướng..."</em> &gt; Nhấn Xong rồi thử lại.
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-2xl flex items-start gap-3 text-left">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs flex-1">
+                    <h4 className="font-black text-rose-900 dark:text-rose-200 uppercase tracking-wider mb-1">
+                      Gửi email không thành công
+                    </h4>
+                    <p className="text-rose-800 dark:text-rose-300/90 leading-relaxed mb-3">
+                      {errorMessage}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatus('IDLE');
+                          setErrorMessage('');
+                        }}
+                        className="px-3.5 py-1.5 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 cursor-pointer"
+                      >
+                        Thử lại
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadAttachmentsDirectly}
+                        className="px-3.5 py-1.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Tải tệp đính kèm về máy</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openMailtoClient({
+                            to: recipients.join(','),
+                            subject: activeSubject,
+                            body: `Báo cáo vật tư Đội Thông Tin - Xem chi tiết trên hệ thống CNS.`
+                          });
+                        }}
+                        className="px-3.5 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-300 cursor-pointer"
+                      >
+                        Mở ứng dụng Mail (mailto)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

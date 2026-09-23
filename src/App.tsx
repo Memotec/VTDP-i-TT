@@ -22,7 +22,7 @@ import { MobileDrawerMenu } from './components/MobileDrawerMenu.tsx';
 import { MobileInstallBanner } from './components/MobileInstallBanner.tsx';
 import { usePWAInstall } from './hooks/usePWAInstall.ts';
 import { DeployedRegistryTable } from './components/DeployedRegistryTable.tsx';
-import { getAccessToken, googleSignIn, signInWithGoogleAccount } from './services/authService.ts';
+import { getAccessToken, googleSignIn, signInWithGoogleAccount, openAppInNewTab, isRunningInIframe } from './services/authService.ts';
 import { uploadToDrive } from './services/googleDriveService.ts';
 import { LocalDatabase } from './database/localDatabase.ts';
 import { syncService } from './services/syncService.ts';
@@ -194,6 +194,7 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isLoggingInGoogle, setIsLoggingInGoogle] = useState(false);
+  const [isLoginPopupBlocked, setIsLoginPopupBlocked] = useState(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -1443,9 +1444,10 @@ export default function App() {
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
       const msg = err?.message || '';
-      if (msg.includes('POPUP_BLOCKED')) {
-        setLoginError('Trình duyệt hoặc khung iframe đang chặn Cửa sổ Google Pop-up. Bạn có thể nhấn nút "Đăng nhập ngay bằng Gmail" (không cần Pop-up) hoặc "Mở ở Tab mới" bên dưới.');
-        addToast('Trình duyệt chặn Pop-up Google. Vui lòng bấm "Đăng nhập ngay bằng Gmail" hoặc "Mở ở Tab mới"!', 'warning');
+      if (msg.includes('POPUP_BLOCKED') || err?.code === 'auth/popup-blocked') {
+        setIsLoginPopupBlocked(true);
+        setLoginError('Trình duyệt hoặc khung xem trước (iframe) đang chặn Cửa sổ Google Pop-up.');
+        addToast('Trình duyệt chặn Pop-up Google! Bạn hãy nhấn "Đăng nhập ngay bằng Gmail" hoặc "Mở ở Tab mới" bên dưới.', 'warning');
       } else if (msg.includes('UNAUTHORIZED_DOMAIN') || msg.includes('OPERATION_NOT_ALLOWED')) {
         setLoginError('Tên miền xem trước chưa được thêm vào Firebase Authorized Domains. Bạn hãy dùng tính năng "Xác thực & Đăng nhập ngay bằng Gmail" phía trên.');
         addToast('Đang ở môi trường xem trước: Hãy dùng nút "Xác thực & Đăng nhập ngay bằng Gmail"!', 'info');
@@ -3631,6 +3633,20 @@ export default function App() {
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
                 Đội Thông tin • Trung tâm Bảo đảm kỹ thuật
               </p>
+
+              {isRunningInIframe() && (
+                <div className="mt-2.5 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => openAppInNewTab()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-300 text-[11px] font-bold hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors border border-blue-200 dark:border-blue-800/80 cursor-pointer shadow-xs"
+                    title="Mở ứng dụng toàn màn hình trong tab mới để đăng nhập Google không bị chặn Pop-up"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Mở ở Tab mới độc lập (Khuyên dùng) ↗</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Main Unified Login Form */}
@@ -3771,6 +3787,62 @@ export default function App() {
                 <span className="truncate">{isLoggingInGoogle ? 'Đang kết nối...' : 'Google'}</span>
               </button>
             </div>
+
+            {/* Direct 1-Touch Gmail Button - No popup needed */}
+            <div className="mt-2.5">
+              <button
+                type="button"
+                onClick={() => handleDirectGmailLogin('tailieutbtt@gmail.com')}
+                className="w-full p-2.5 bg-blue-50/80 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 rounded-xl text-[#2563EB] dark:text-blue-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 shadow-xs"
+                title="Đăng nhập ngay lập tức với tài khoản Quản trị viên Gmail mà không cần mở cửa sổ Pop-up"
+              >
+                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>Đăng nhập ngay bằng Gmail (tailieutbtt@gmail.com)</span>
+              </button>
+            </div>
+
+            {/* POPUP BLOCKED RESOLUTION CARD */}
+            {isLoginPopupBlocked && (
+              <div className="mt-3 p-3.5 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/80 rounded-2xl text-left space-y-3 animate-fade-in">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded-xl shrink-0 mt-0.5">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs text-amber-950 dark:text-amber-100 flex-1">
+                    <p className="font-extrabold text-xs text-amber-900 dark:text-amber-200">
+                      Cửa sổ Google Pop-up bị chặn bởi Trình duyệt / Iframe
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300/90">
+                      Trình duyệt hoặc khung xem trước (iframe) đang chặn cửa sổ đăng nhập pop-up của Google. Bạn hãy chọn một trong các giải pháp dưới đây để tiếp tục ngay:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleDirectGmailLogin('tailieutbtt@gmail.com')}
+                    className="w-full px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>⚡ Đăng nhập ngay với Gmail TAILIEUTBTT (Không cần Pop-up)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openAppInNewTab()}
+                    className="w-full px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>↗ Mở ứng dụng ở Tab mới (Bật đầy đủ Pop-up Google)</span>
+                  </button>
+                </div>
+
+                <div className="p-2 bg-amber-100/60 dark:bg-amber-900/30 rounded-xl text-[10.5px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                  <span className="font-bold">💡 Cách cho phép Pop-up trên trình duyệt:</span> Nhấp vào biểu tượng 🚫 trên thanh địa chỉ của trình duyệt &gt; Chọn <em>"Luôn cho phép cửa sổ bật lên..."</em> &gt; Tải lại trang.
+                </div>
+              </div>
+            )}
 
             {/* Subtle Footer Hint */}
             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-center">

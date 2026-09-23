@@ -218,7 +218,12 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       );
     } catch (err: any) {
       console.error('Lỗi tạo Google Doc:', err);
-      onAddToast(err.message || 'Có lỗi xảy ra khi tạo Google Doc.', 'error');
+      const msg = err?.message || '';
+      if (msg.includes('POPUP_BLOCKED')) {
+        onAddToast('Trình duyệt chặn Pop-up Google! Bạn hãy dùng nút "Xuất Word (.docx)" bên cạnh hoặc mở ở Tab mới.', 'warning');
+      } else {
+        onAddToast(msg || 'Có lỗi xảy ra khi tạo Google Doc.', 'error');
+      }
     } finally {
       setIsExportingGoogleDoc(false);
     }

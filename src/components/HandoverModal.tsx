@@ -207,7 +207,12 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
       window.open(docRes.webViewLink, '_blank');
     } catch (err: any) {
       console.error('Lỗi xuất Google Doc bàn giao:', err);
-      onAddToast(err.message || 'Có lỗi xảy ra khi tạo Google Doc biên bản.', 'error');
+      const msg = err?.message || '';
+      if (msg.includes('POPUP_BLOCKED')) {
+        onAddToast('Trình duyệt chặn Pop-up Google! Bạn hãy dùng nút "Tải Word (.docx)" hoặc mở ở Tab mới.', 'warning');
+      } else {
+        onAddToast(msg || 'Có lỗi xảy ra khi tạo Google Doc biên bản.', 'error');
+      }
     } finally {
       setIsExportingGoogleDoc(false);
     }

@@ -186,6 +186,146 @@ async function renderHtmlToPdf(htmlContent: string, fileName: string, landscape 
 }
 
 /**
+ * Render HTML to PDF Blob for direct file attachment (e.g. Gmail API, Google Drive upload)
+ */
+export async function renderHtmlToPdfBlob(htmlContent: string, landscape = false): Promise<Blob> {
+  return new Promise<Blob>(async (resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '0';
+    iframe.style.top = '0';
+    iframe.style.width = landscape ? '1122px' : '794px';
+    iframe.style.height = '1200px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = 'none';
+    iframe.style.zIndex = '-99999';
+    document.body.appendChild(iframe);
+
+    try {
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!iframeDoc) {
+        throw new Error('Không thể khởi tạo môi trường render tài liệu');
+      }
+
+      const cleanHtml = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Tài liệu xuất PDF</title>
+          <style>
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            html, body {
+              font-family: 'Times New Roman', Times, 'DejaVu Sans', serif;
+              background: #ffffff !important;
+              color: #000000 !important;
+              width: ${landscape ? '297mm' : '210mm'};
+              margin: 0 auto;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            table {
+              border-collapse: collapse;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="pdf-render-root">
+            ${htmlContent}
+          </div>
+        </body>
+        </html>
+      `;
+
+      iframeDoc.open();
+      iframeDoc.write(cleanHtml);
+      iframeDoc.close();
+
+      await new Promise(r => setTimeout(r, 250));
+
+      const targetEl = iframeDoc.getElementById('pdf-render-root') || iframeDoc.body;
+
+      const canvas = await html2canvas(targetEl as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: landscape ? 1122 : 794,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Không thể xử lý đồ họa trang in');
+      }
+
+      const pdf = new jsPDF({
+        orientation: landscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = landscape ? 297 : 210;
+      const pdfHeight = landscape ? 210 : 297;
+
+      const pageCanvasHeightInPx = Math.floor((canvas.width * pdfHeight) / pdfWidth);
+      const totalPages = Math.ceil(canvas.height / pageCanvasHeightInPx);
+
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) {
+          pdf.addPage();
+        }
+
+        const sourceY = page * pageCanvasHeightInPx;
+        const currentSliceHeight = Math.min(pageCanvasHeightInPx, canvas.height - sourceY);
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pageCanvasHeightInPx;
+        const ctx = pageCanvas.getContext('2d');
+
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0,
+            sourceY,
+            canvas.width,
+            currentSliceHeight,
+            0,
+            0,
+            canvas.width,
+            currentSliceHeight
+          );
+
+          const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.96);
+          pdf.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        }
+      }
+
+      const blob = pdf.output('blob');
+      resolve(blob);
+    } catch (err) {
+      console.warn('Lỗi khi render PDF Blob:', err);
+      reject(err);
+    } finally {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }
+  });
+}
+
+/**
  * 1. Xuất BIÊN BẢN BÀN GIAO THIẾT BỊ thành PDF
  */
 export async function exportHandoverToPDF(meta: HandoverMeta, rows: HandoverRow[]) {
@@ -553,7 +693,7 @@ export async function exportDispatchedRegistryToPDF(records: DispatchedRecord[],
             <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">NGƯỜI LẬP BÁO CÁO</div>
             <div style="font-size: 10pt; font-style: italic; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
             <div style="height: 60px;"></div>
-            <div style="font-weight: bold; font-size: 11pt;">${currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Kỹ sư Quản lý Kho'}</div>
+            <div style="font-weight: bold; font-size: 11pt;">${currentUsername ? `${currentUsername.toUpperCase()}` : 'Nhân viên Phụ trách Kho'}</div>
           </td>
           <td style="width: 50%; text-align: center; vertical-align: top;">
             <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">LÃNH ĐẠO PHÊ DUYỆT</div>
@@ -643,7 +783,7 @@ export async function exportAuditReportToPDF(
           <strong>Thành phần tham gia kiểm kê:</strong>
           <div style="padding-left: 10px; margin-top: 2px;">
             1. Ông/Bà: <strong>${inspectorName}</strong> - Kỹ sư trực ban / Đại diện Tổ Kiểm kê<br/>
-            2. Ông/Bà: ................................................................ - Kỹ sư phụ trách kho vật tư<br/>
+            2. Ông/Bà: ................................................................ - Nhân viên phụ trách kho vật tư<br/>
             3. Ông/Bà: ................................................................ - Đại diện Lãnh đạo Đội Thông Tin
           </div>
         </div>
@@ -761,7 +901,7 @@ export async function exportInventoryReportToPDF(
   const now = new Date();
   const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const username = options.currentUsername || options.inspectorName || 'Kỹ sư Quản lý Kho';
+  const username = options.currentUsername || options.inspectorName || 'Nhân viên Phụ trách Kho';
   const category = options.categoryFilter && options.categoryFilter !== 'ALL' ? options.categoryFilter : 'Tất cả chuyên mục';
   const search = options.searchQuery ? `Từ khóa: "${options.searchQuery}"` : 'Toàn bộ';
   
@@ -906,7 +1046,7 @@ export async function exportInventoryReportToPDF(
             <div style="font-weight: bold; font-size: 9.5pt; color: #0f172a;">${username}</div>
           </td>
           <td style="width: 33.3%; text-align: center; vertical-align: top;">
-            <div style="font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #0f172a;">KỸ SƯ PHỤ TRÁCH KHO</div>
+            <div style="font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #0f172a;">NHÂN VIÊN PHỤ TRÁCH KHO</div>
             <div style="font-size: 8.5pt; font-style: italic; color: #64748b; margin-top: 2px;">(Ký, ghi rõ họ tên)</div>
             <div style="height: 55px;"></div>
             <div style="font-weight: bold; font-size: 9.5pt; color: #0f172a;">........................................</div>
@@ -922,7 +1062,7 @@ export async function exportInventoryReportToPDF(
 
       <!-- FOOTER NOTE -->
       <div style="margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 6px; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between;">
-        <div>Tài liệu kỹ thuật nội bộ • Đội Thông Tin CNS/ATM • Trung tâm Bảo đảm Kỹ thuật - Công ty Quản lý bay miền Nam</div>
+        <div>Tài liệu kỹ thuật nội bộ • Đội Thông Tin • Trung tâm Bảo đảm Kỹ thuật - Công ty Quản lý bay miền Nam</div>
         <div>Hệ thống CNS v3.1 • Mã báo cáo: BC-CNS-${Date.now().toString().slice(-6)}</div>
       </div>
     </div>
@@ -943,7 +1083,7 @@ export function safePrintHtml(htmlContent: string): boolean {
     <html lang="vi">
     <head>
       <meta charset="utf-8" />
-      <title>In Báo Cáo - Đội Thông Tin CNS</title>
+      <title>In Báo Cáo - Đội Thông Tin</title>
       <style>
         @page {
           size: A4 landscape;
@@ -1086,7 +1226,7 @@ export function renderItemProfileHtml(
             <div style="font-size: 9.5pt; text-transform: uppercase;">TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM</div>
             <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">CÔNG TY QUẢN LÝ BAY MIỀN NAM</div>
             <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-top: 1px;">TRUNG TÂM BẢO ĐẢM KỸ THUẬT</div>
-            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;"><u>ĐỘI THÔNG TIN CNS/ATM</u></div>
+            <div style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin-top: 2px;"><u>ĐỘI THÔNG TIN</u></div>
             <div style="font-size: 10pt; font-style: italic; margin-top: 6px;">Số hồ sơ: <strong>LLTB-${scanCode}</strong></div>
           </td>
           <td style="width: 52%; text-align: center; vertical-align: top;">
@@ -1229,10 +1369,10 @@ export function renderItemProfileHtml(
             <div style="font-size: 9.5pt; color: #64748b;">(Xác nhận thông tin thiết bị)</div>
           </td>
           <td style="width: 35%; text-align: center; vertical-align: top;">
-            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">KỸ SƯ PHỤ TRÁCH KHO</div>
+            <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">NHÂN VIÊN PHỤ TRÁCH KHO</div>
             <div style="font-size: 9pt; font-style: italic;">(Ký và ghi rõ họ tên)</div>
             <div style="height: 52px;"></div>
-            <div style="font-size: 10pt; font-weight: bold;">${options?.currentUsername || 'Kỹ sư Quản lý Kho CNS'}</div>
+            <div style="font-size: 10pt; font-weight: bold;">${options?.currentUsername || 'Nhân viên Phụ trách Kho'}</div>
           </td>
           <td style="width: 30%; text-align: center; vertical-align: top;">
             <div style="font-size: 10pt; font-weight: bold; text-transform: uppercase;">XÁC THỰC KỸ THUẬT SỐ</div>
@@ -1253,7 +1393,7 @@ export function renderItemProfileHtml(
 
       <!-- Footer Note -->
       <div style="margin-top: 18px; border-top: 1px dashed #94a3b8; padding-top: 6px; font-size: 8.5pt; color: #64748b; text-align: center; font-style: italic;">
-        Tài liệu điện tử trích xuất từ Hệ thống Quản lý Trang thiết bị Dự phòng Đội Thông Tin CNS/ATM • Thời gian: ${now.toLocaleTimeString('vi-VN')} ${now.toLocaleDateString('vi-VN')}
+        Tài liệu điện tử trích xuất từ Hệ thống Quản lý Trang thiết bị Dự phòng Đội Thông Tin • Thời gian: ${now.toLocaleTimeString('vi-VN')} ${now.toLocaleDateString('vi-VN')}
       </div>
     </div>
   `;

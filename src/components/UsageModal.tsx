@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, FileText, History, Printer, Trash2, Search, Download, Loader2, 
   Eye, CheckCircle2, Calendar, MapPin, Building2, User, 
-  Layers, ShieldCheck, QrCode, ArrowRight 
+  Layers, ShieldCheck, QrCode, ArrowRight, Mail 
 } from 'lucide-react';
 import { InventoryItem, UsageSlip, Role } from '../types.ts';
 import { exportUsageSlipToPDF } from '../utils/pdfExporter.ts';
@@ -21,6 +21,7 @@ interface UsageModalProps {
   onDeleteSlip: (slipId: string) => void;
   onClearHistory: () => void;
   onPrintSlip: (slip: UsageSlip) => void;
+  onSendEmailSlip?: (slip: UsageSlip) => void;
 }
 
 export const UsageModal: React.FC<UsageModalProps> = ({
@@ -33,16 +34,17 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   onSubmitUsage,
   onDeleteSlip,
   onClearHistory,
-  onPrintSlip
+  onPrintSlip,
+  onSendEmailSlip
 }) => {
   // Usage form state
   const [usageDocNumber, setUsageDocNumber] = useState(() => `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`);
   const [usageUser, setUsageUser] = useState(role === 'admin' ? 'Kỹ sư Đội Thông Tin' : 'Kỹ sư ' + (role || 'Guest'));
-  const [usageReceiverDept, setUsageReceiverDept] = useState('Tổ Vận Hành CNS/ATM');
+  const [usageReceiverDept, setUsageReceiverDept] = useState('Tổ Vận Hành');
   const [usageReceiverPos, setUsageReceiverPos] = useState('Kỹ sư trực ban');
-  const [usageGiverName, setUsageGiverName] = useState(role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Admin Kho');
+  const [usageGiverName, setUsageGiverName] = useState(role === 'admin' ? 'Nhân viên Phụ trách Kho' : 'Admin Kho');
   const [usageGiverDept, setUsageGiverDept] = useState('Đội Thông Tin – Trung tâm BĐKT');
-  const [usageGiverPos, setUsageGiverPos] = useState('Kỹ sư phụ trách kho');
+  const [usageGiverPos, setUsageGiverPos] = useState('Nhân viên phụ trách kho');
   const [usageQty, setUsageQty] = useState(1);
   const [usageUnit, setUsageUnit] = useState('Chiếc');
   const [usagePurpose, setUsagePurpose] = useState('Bảo dưỡng định kỳ / Thay thế dự phòng');
@@ -233,6 +235,42 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     onCloseUsageForm();
   };
 
+  const handleFormSubmitWithEmail = () => {
+    if (!selectedItemForUsage) return;
+    if (!usageUser.trim()) return;
+
+    const todayStr = new Date().toLocaleString('vi-VN');
+    const newSlip: UsageSlip = {
+      id: `slip-${Date.now()}`,
+      docNumber: usageDocNumber.trim() || `PBSD-${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`,
+      itemId: selectedItemForUsage.id,
+      itemName: selectedItemForUsage.name,
+      sn: selectedItemForUsage.sn,
+      pn: selectedItemForUsage.pn || '',
+      category: selectedItemForUsage.category || 'Khác',
+      warehouse: selectedItemForUsage.warehouse || '',
+      originalLoc: selectedItemForUsage.loc || '',
+      user: usageUser.trim(),
+      qtyUsed: usageQty,
+      unit: usageUnit.trim() || 'Chiếc',
+      giverDept: usageGiverDept.trim(),
+      giverName: usageGiverName.trim(),
+      giverPos: usageGiverPos.trim(),
+      receiverDept: usageReceiverDept.trim(),
+      receiverPos: usageReceiverPos.trim(),
+      purpose: usagePurpose,
+      notes: usageNotes.trim(),
+      targetLocation: usageTargetLoc.trim(),
+      date: todayStr
+    };
+
+    onSubmitUsage(newSlip, deductInventory);
+    onCloseUsageForm();
+    if (onSendEmailSlip) {
+      onSendEmailSlip(newSlip);
+    }
+  };
+
   return (
     <>
       {/* Document Preview Modal for Usage Slip */}
@@ -295,6 +333,17 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                   {isExportingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">Google Docs</span>
                 </button>
+                {onSendEmailSlip && (
+                  <button
+                    type="button"
+                    onClick={() => onSendEmailSlip(previewSlip)}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Gửi email báo cáo đính kèm qua Gmail"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Gửi Email</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setPreviewSlip(null)}
@@ -353,7 +402,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Đơn Vị Giao / Trích Xuất</span>
                   <div className="font-extrabold text-slate-900 dark:text-white">{previewSlip.giverDept || 'Đội Thông Tin – Trung tâm BĐKT'}</div>
-                  <div className="text-slate-600 dark:text-slate-300">Người lập / Thủ kho: <span className="font-bold">{previewSlip.giverName || 'Kỹ sư quản lý kho'}</span></div>
+                  <div className="text-slate-600 dark:text-slate-300">Người lập / Thủ kho: <span className="font-bold">{previewSlip.giverName || 'Nhân viên phụ trách kho'}</span></div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Đơn Vị / Kỹ Sư Tiếp Nhận</span>
@@ -794,6 +843,17 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                   )}
                   <span>XUẤT FILE PDF</span>
                 </button>
+                {onSendEmailSlip && (
+                  <button
+                    type="button"
+                    onClick={handleFormSubmitWithEmail}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 px-3 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20"
+                    title="Tạo phiếu và mở giao diện gửi email Gmail"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>GỬI EMAIL</span>
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black py-2.5 px-3 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
@@ -964,6 +1024,15 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                                   >
                                     <Download className="w-3.5 h-3.5" />
                                   </button>
+                                  {onSendEmailSlip && (
+                                    <button
+                                      onClick={() => onSendEmailSlip(slip)}
+                                      className="p-1.5 bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500 hover:text-white dark:bg-indigo-500/20 dark:text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                                      title="Gửi phiếu qua Gmail"
+                                    >
+                                      <Mail className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => onPrintSlip(slip)}
                                     className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 rounded-lg transition-colors cursor-pointer"
@@ -1047,6 +1116,16 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                             >
                               <Download className="w-3.5 h-3.5" />
                             </button>
+                            {onSendEmailSlip && (
+                              <button
+                                type="button"
+                                onClick={() => onSendEmailSlip(slip)}
+                                className="p-1.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 rounded-xl cursor-pointer"
+                                title="Gửi qua Gmail"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => onDeleteSlip(slip.id)}

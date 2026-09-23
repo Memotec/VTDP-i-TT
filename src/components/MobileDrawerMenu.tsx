@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Clock,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Mail
 } from 'lucide-react';
 import { Role } from '../types.ts';
 
@@ -36,6 +37,7 @@ interface MobileDrawerMenuProps {
   onSelectWorkspaceTab: (tab: 'INVENTORY' | 'DISPATCHED' | 'AUDIT_LOG') => void;
   onOpenPrintCenter: () => void;
   onOpenGoogleDrive: () => void;
+  onOpenEmailReport?: () => void;
   onOpenAdminAccounts: () => void;
   onOpenSettings: () => void;
   onOpenSystemAuditLogs: () => void;
@@ -61,6 +63,7 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
   onSelectWorkspaceTab,
   onOpenPrintCenter,
   onOpenGoogleDrive,
+  onOpenEmailReport,
   onOpenAdminAccounts,
   onOpenSettings,
   onOpenSystemAuditLogs,
@@ -241,6 +244,20 @@ export const MobileDrawerMenu: React.FC<MobileDrawerMenuProps> = ({
                 <HardDrive className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span className="truncate">Google Drive</span>
               </button>
+
+              {onOpenEmailReport && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenEmailReport();
+                    onClose();
+                  }}
+                  className="flex items-center gap-2.5 p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/60 text-xs font-bold active:scale-98 transition-all"
+                >
+                  <Mail className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="truncate">Gửi Email Báo Cáo</span>
+                </button>
+              )}
 
               {role === 'admin' && (
                 <button

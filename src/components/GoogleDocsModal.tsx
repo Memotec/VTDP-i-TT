@@ -47,7 +47,7 @@ export const GoogleDocsModal: React.FC<GoogleDocsModalProps> = ({
   onClose,
   inventory,
   selectedCategory = 'ALL',
-  currentUsername = 'Kỹ sư Quản lý Kho',
+  currentUsername = 'Nhân viên Phụ trách Kho',
   onAddToast
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);

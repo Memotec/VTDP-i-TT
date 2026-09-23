@@ -211,14 +211,14 @@ export async function exportInventoryReportToGoogleDoc(
   const now = new Date();
   const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const username = options.currentUsername || 'Kỹ sư Quản lý Kho';
+  const username = options.currentUsername || 'Nhân viên Phụ trách Kho';
   const category = options.categoryFilter && options.categoryFilter !== 'ALL' ? options.categoryFilter : 'Tất cả chuyên mục';
   const docTitle = `Báo Cáo Tồn Kho CNS - ${dateStr.replace(/[\/\\]/g, '-')}`;
 
   const headerText = 
 `TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM
 CÔNG TY QUẢN LÝ BAY MIỀN NAM - TRUNG TÂM BẢO ĐẢM KỸ THUẬT
-ĐỘI THÔNG TIN (CNS/ATM)
+ĐỘI THÔNG TIN
 
 CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
 Độc lập - Tự do - Hạnh phúc
@@ -282,7 +282,7 @@ export async function exportHandoverToGoogleDoc(
   const headerText = 
 `TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM
 CÔNG TY QUẢN LÝ BAY MIỀN NAM - TRUNG TÂM BẢO ĐẢM KỸ THUẬT
-ĐỘI THÔNG TIN (CNS/ATM)
+ĐỘI THÔNG TIN
 
 CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
 Độc lập - Tự do - Hạnh phúc
@@ -297,7 +297,7 @@ Lý do bàn giao: ${meta.handoverReason || 'Cung cấp thay thế dự phòng & 
 I. BÊN GIAO (BÊN A):
 - Đơn vị / Bộ phận: ${meta.handoverGiverDept || 'Đội Thông tin - Trung tâm BĐKT'}
 - Đại diện: Ông/Bà ${meta.handoverGiverName || '................................................'}
-- Chức vụ: ${meta.handoverGiverPos || 'Kỹ sư quản lý kho'}
+- Chức vụ: ${meta.handoverGiverPos || 'Nhân viên phụ trách kho'}
 
 II. BÊN NHẬN (BÊN B):
 - Đơn vị / Bộ phận: ${meta.handoverReceiverDept || '................................................'}
@@ -344,7 +344,7 @@ export async function exportUsageSlipToGoogleDoc(
   const fullContent = 
 `TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM
 CÔNG TY QUẢN LÝ BAY MIỀN NAM - TRUNG TÂM BẢO ĐẢM KỸ THUẬT
-ĐỘI THÔNG TIN (CNS/ATM)
+ĐỘI THÔNG TIN
 
 CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
 Độc lập - Tự do - Hạnh phúc
@@ -369,7 +369,7 @@ Thời gian ghi nhận: ${slip.date}
 
 3. THÔNG TIN GIAO NHẬN:
 - Người đề nghị / sử dụng: ${slip.user}
-- Người cấp phát: ${slip.giverName || 'Kỹ sư quản lý kho'} (${slip.giverDept || 'Đội Thông tin'})
+- Người cấp phát: ${slip.giverName || 'Nhân viên phụ trách kho'} (${slip.giverDept || 'Đội Thông tin'})
 - Người tiếp nhận: ${slip.receiverName || slip.user} (${slip.receiverDept || 'Đơn vị khai thác'})
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -379,7 +379,7 @@ Thời gian ghi nhận: ${slip.date}
 
 
 
-    ${slip.user}                                                ${slip.giverName || 'Kỹ sư Quản lý Kho'}
+    ${slip.user}                                                ${slip.giverName || 'Nhân viên Phụ trách Kho'}
 `;
 
   return await createBlankGoogleDoc(accessToken, docTitle, fullContent);

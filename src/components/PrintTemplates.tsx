@@ -56,7 +56,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                   DANH SÁCH BẢNG MÃ QR ĐỊNH DANH VẬT TƯ DỰ PHÒNG
                 </h1>
                 <div className="text-xs text-slate-600">
-                  Đội Thông Tin CNS/ATM • Tổng cộng: <strong>{validQrItems.length}</strong> mã thiết bị
+                  Đội Thông Tin • Tổng cộng: <strong>{validQrItems.length}</strong> mã thiết bị
                 </div>
               </div>
               <div className="text-right text-[11px] text-slate-600 font-mono">
@@ -100,7 +100,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
           </div>
 
           <div className="print-footer-simple">
-            <span>Hệ thống Quản lý Vật tư Dự phòng Đội Thông Tin CNS/ATM</span>
+            <span>Hệ thống Quản lý Vật tư Dự phòng Đội Thông Tin</span>
             <span>Trang in tự động</span>
           </div>
         </div>
@@ -232,7 +232,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
               <strong>Thành phần tham gia kiểm kê gồm có:</strong>
               <ul className="audit-member-list">
                 <li>1. Ông/Bà: <strong>{inspectorName}</strong> - Kỹ sư trực ban / Đại diện Tổ Kiểm kê</li>
-                <li>2. Ông/Bà: ................................................................ - Kỹ sư phụ trách kho vật tư</li>
+                <li>2. Ông/Bà: ................................................................ - Nhân viên phụ trách kho vật tư</li>
                 <li>3. Ông/Bà: ................................................................ - Đại diện Lãnh đạo Đội Thông Tin</li>
               </ul>
             </div>
@@ -554,7 +554,7 @@ export const PrintTemplates: React.FC<PrintTemplatesProps> = ({
                   <div className="sig-header">NGƯỜI LẬP PHIẾU</div>
                   <div className="sig-sub">(Ký, ghi rõ họ tên)</div>
                   <div className="sig-space" style={{ height: '65px' }}></div>
-                  <div className="sig-name">{selectedDispatchedRecord.giverName || inspectorName || 'Kỹ sư quản lý kho'}</div>
+                  <div className="sig-name">{selectedDispatchedRecord.giverName || inspectorName || 'Nhân viên phụ trách kho'}</div>
                 </td>
                 <td style={{ width: '25%', verticalAlign: 'top', textAlign: 'center' }}>
                   <div className="sig-header">PHỤ TRÁCH KHO</div>

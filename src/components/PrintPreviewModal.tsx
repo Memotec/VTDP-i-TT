@@ -433,7 +433,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       const summaryText = `
 ========================================================================
 TỔNG CÔNG TY QUẢN LÝ BAY VIỆT NAM - CÔNG TY QUẢN LÝ BAY MIỀN NAM
-TRUNG TÂM BẢO ĐẢM KỸ THUẬT - ĐỘI THÔNG TIN CNS/ATM
+TRUNG TÂM BẢO ĐẢM KỸ THUẬT - ĐỘI THÔNG TIN
 ========================================================================
 BÁO CÁO TÓM TẮT KIỂM KÊ & TỒN KHO VẬT TƯ DỰ PHÒNG KỸ THUẬT HÀNG KHÔNG
 Mã báo cáo / Giao dịch: ${sendReceipt?.id || 'GAS-REP-LOCAL'}
@@ -750,7 +750,7 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                       DANH SÁCH MÃ QR TRUY XUẤT VẬT TƯ DỰ PHÒNG
                     </h1>
                     <p className="text-xs text-slate-600">
-                      Đội Thông Tin CNS/ATM • Tổng cộng: <strong>{targetItems.length}</strong> thiết bị in hàng loạt
+                      Đội Thông Tin • Tổng cộng: <strong>{targetItems.length}</strong> thiết bị in hàng loạt
                     </p>
                   </div>
                   <div className="text-right text-xs text-slate-600 font-mono">
@@ -899,7 +899,7 @@ Hệ thống quản trị cơ sở dữ liệu vật tư CNS/ATM
                     <strong>Thành phần tham gia kiểm kê gồm có:</strong>
                     <ul className="list-disc list-inside pl-2 space-y-0.5 mt-1">
                       <li>1. Ông/Bà: <strong>{inspectorName}</strong> - Kỹ sư trực ban / Đại diện Tổ Kiểm kê</li>
-                      <li>2. Ông/Bà: ................................................................ - Kỹ sư phụ trách kho vật tư</li>
+                      <li>2. Ông/Bà: ................................................................ - Nhân viên phụ trách kho vật tư</li>
                       <li>3. Ông/Bà: ................................................................ - Đại diện Lãnh đạo Đội Thông Tin</li>
                     </ul>
                   </div>

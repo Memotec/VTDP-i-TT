@@ -29,6 +29,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Usage slips collection
+    match /usageSlips/{slipId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Settings collection
     match /settings/{settingId} {
       allow read: if true;

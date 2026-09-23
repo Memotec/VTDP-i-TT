@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2, FileText } from 'lucide-react';
+import { X, ArrowRightLeft, Trash2, Printer, Download, Loader2, FileText, Mail } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { exportHandoverToPDF } from '../utils/pdfExporter.ts';
 import { exportHandoverToDocx } from '../utils/docxExporter.ts';
@@ -49,6 +49,7 @@ interface HandoverModalProps {
   setHandoverRows: React.Dispatch<React.SetStateAction<HandoverRow[]>>;
   onPrintHandover: () => void;
   onSaveHandoverToRegistry?: (deductStock: boolean) => void;
+  onSendEmail?: () => void;
   onAddToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -84,6 +85,7 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   setHandoverRows,
   onPrintHandover,
   onSaveHandoverToRegistry,
+  onSendEmail,
   onAddToast
 }) => {
   const [deductStock, setDeductStock] = useState(true);
@@ -681,6 +683,24 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
               )}
               XUẤT GOOGLE DOCS
             </button>
+
+            {onSendEmail && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSaveHandoverToRegistry) {
+                    onSaveHandoverToRegistry(deductStock);
+                  }
+                  onSendEmail();
+                }}
+                disabled={handoverRows.length === 0}
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-3 rounded-2xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/15 disabled:opacity-40"
+                title="Gửi biên bản bàn giao đính kèm qua Gmail"
+              >
+                <Mail className="w-4 h-4" />
+                GỬI EMAIL (GMAIL)
+              </button>
+            )}
 
             <button
               type="button"

@@ -174,7 +174,7 @@ export const PublicItemLookupModal: React.FC<PublicItemLookupModalProps> = ({
             </div>
             <div>
               <div className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-blue-200">
-                CÔNG TY QUẢN LÝ BAY MIỀN NAM • ĐỘI THÔNG TIN CNS
+                CÔNG TY QUẢN LÝ BAY MIỀN NAM • ĐỘI THÔNG TIN
               </div>
               <h2 className="text-xs sm:text-base font-black tracking-tight text-white flex items-center gap-2">
                 HỒ SƠ TRA CỨU THIẾT BỊ VẬT TƯ
@@ -355,7 +355,7 @@ export const PublicItemLookupModal: React.FC<PublicItemLookupModalProps> = ({
                               TRUNG TÂM BẢO ĐẢM KỸ THUẬT
                             </div>
                             <div className="text-[12px] sm:text-[13px] font-bold uppercase underline text-slate-950 mt-0.5">
-                              ĐỘI THÔNG TIN CNS/ATM
+                              ĐỘI THÔNG TIN
                             </div>
                             <div className="text-[11px] italic text-slate-700 mt-1">
                               Số hồ sơ: <strong className="font-mono text-blue-900">LLTB-{scanCode}</strong>
@@ -547,10 +547,10 @@ export const PublicItemLookupModal: React.FC<PublicItemLookupModalProps> = ({
                           </div>
 
                           <div>
-                            <div className="font-bold uppercase text-slate-900">KỸ SƯ PHỤ TRÁCH KHO</div>
+                            <div className="font-bold uppercase text-slate-900">NHÂN VIÊN PHỤ TRÁCH KHO</div>
                             <div className="italic text-[10px] text-slate-500">(Ký & ghi rõ họ tên)</div>
                             <div className="h-12 sm:h-14"></div>
-                            <div className="font-bold text-slate-900">Kỹ sư Quản lý Kho CNS</div>
+                            <div className="font-bold text-slate-900">Nhân viên Phụ trách Kho</div>
                           </div>
 
                           <div>
@@ -846,7 +846,7 @@ export const PublicItemLookupModal: React.FC<PublicItemLookupModalProps> = ({
         <div className="px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
           <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 text-center sm:text-left">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Kho Vật tư Dự phòng Đội Thông Tin CNS/ATM • Quản lý bay miền Nam</span>
+            <span>Kho Vật tư Dự phòng Đội Thông Tin • Quản lý bay miền Nam</span>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">

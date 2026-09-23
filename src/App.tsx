@@ -67,6 +67,8 @@ const ItemFormModal = React.lazy(() => import('./components/ItemFormModal.tsx').
 const ConflictResolutionModal = React.lazy(() => import('./components/ConflictResolutionModal.tsx').then(m => ({ default: m.ConflictResolutionModal })));
 const PublicItemLookupModal = React.lazy(() => import('./components/PublicItemLookupModal.tsx').then(m => ({ default: m.PublicItemLookupModal })));
 const ItemQrCodeModal = React.lazy(() => import('./components/ItemQrCodeModal.tsx').then(m => ({ default: m.ItemQrCodeModal })));
+const EmailReportModal = React.lazy(() => import('./components/EmailReportModal.tsx').then(m => ({ default: m.EmailReportModal })));
+import type { ReportType } from './components/EmailReportModal.tsx';
 
 
 const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
@@ -227,6 +229,10 @@ export default function App() {
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isGoogleDriveModalOpen, setIsGoogleDriveModalOpen] = useState(false);
   const [isGoogleDocsModalOpen, setIsGoogleDocsModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailDefaultReportType, setEmailDefaultReportType] = useState<ReportType>('INVENTORY_AUDIT');
+  const [emailSelectedUsageSlip, setEmailSelectedUsageSlip] = useState<UsageSlip | null>(null);
+  const [emailSelectedHandover, setEmailSelectedHandover] = useState<{ meta: any; rows: HandoverRow[] } | null>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [activePrintMode, setActivePrintMode] = useState<PrintMode>('QR');
@@ -1887,7 +1893,7 @@ export default function App() {
       addToast('Đang khởi tạo tài liệu Google Docs...', 'info');
       const isFilteredCat = selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'Tất cả loại';
       const docParams = {
-        currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
+        currentUsername: currentUsername || (role === 'admin' ? 'Nhân viên Phụ trách Kho' : 'Kiểm kê viên'),
         categoryFilter: selectedCategory,
         searchQuery: searchQuery,
         reportTitle: isFilteredCat
@@ -1937,7 +1943,7 @@ export default function App() {
       addToast('Đang khởi tạo tệp PDF Báo cáo tồn kho Đội Thông Tin...', 'info');
       const isFilteredCat = selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'Tất cả loại';
       await exportInventoryReportToPDF(filteredInventory, {
-        currentUsername: currentUsername || (role === 'admin' ? 'Kỹ sư Quản lý Kho' : 'Kiểm kê viên'),
+        currentUsername: currentUsername || (role === 'admin' ? 'Nhân viên Phụ trách Kho' : 'Kiểm kê viên'),
         categoryFilter: selectedCategory,
         searchQuery: searchQuery,
         reportTitle: isFilteredCat
@@ -2990,8 +2996,8 @@ export default function App() {
       warehouse: newSlip.warehouse,
       originalLoc: newSlip.originalLoc,
       giverDept: newSlip.giverDept || 'Đội Thông Tin – TT BĐKT',
-      giverName: newSlip.giverName || (currentUsername ? `Kỹ sư ${currentUsername}` : 'Admin Kho'),
-      giverPos: newSlip.giverPos || 'Kỹ sư quản lý kho',
+      giverName: newSlip.giverName || (currentUsername ? `${currentUsername}` : 'Admin Kho'),
+      giverPos: newSlip.giverPos || 'Nhân viên phụ trách kho',
       receiverDept: newSlip.receiverDept || 'Tổ Vận Hành CNS/ATM',
       receiverName: newSlip.user,
       receiverPos: newSlip.receiverPos || 'Kỹ sư tiếp nhận',
@@ -3537,7 +3543,7 @@ export default function App() {
               <td>
                 <div style="font-weight: bold; font-size: 12.5px; text-transform: uppercase;">NGƯỜI LẬP BÁO CÁO</div>
                 <div style="font-size: 12px; font-style: italic; margin-top: 4px;">(Ký, ghi rõ họ tên)</div>
-                <div style="font-weight: bold; font-size: 13px; margin-top: 70px;">${currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Kỹ sư Quản lý Kho'}</div>
+                <div style="font-weight: bold; font-size: 13px; margin-top: 70px;">${currentUsername ? `${currentUsername.toUpperCase()}` : 'Nhân viên Phụ trách Kho'}</div>
               </td>
               <td>
                 <div style="font-weight: bold; font-size: 12.5px; text-transform: uppercase;">LÃNH ĐẠO PHÊ DUYỆT</div>
@@ -3906,6 +3912,21 @@ export default function App() {
                 </span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailDefaultReportType('INVENTORY_AUDIT');
+                  setIsEmailModalOpen(true);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+              >
+                <Mail className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
+                <span className="flex-1 text-left truncate">Gửi Email Báo Cáo</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shrink-0">
+                  Gmail
+                </span>
+              </button>
+
               <div className="pt-3 text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 py-1 tracking-wider">Quản Trị & Hệ Thống</div>
 
               {role === 'admin' && (
@@ -4109,6 +4130,20 @@ export default function App() {
                   title="Quản Lý & Tạo Văn Bản Google Docs"
                 >
                   <FileText className="w-4.5 h-4.5" />
+                </button>
+
+                {/* Gmail Report Quick Action */}
+                <button
+                  onClick={() => {
+                    setEmailDefaultReportType(
+                      activeWorkspaceTab === 'DISPATCHED' ? 'DISPATCHED_REGISTRY' : 'INVENTORY_AUDIT'
+                    );
+                    setIsEmailModalOpen(true);
+                  }}
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-[#E2E8F0] dark:border-slate-800 text-indigo-600 dark:text-indigo-400 rounded-xl transition-all cursor-pointer"
+                  title="Gửi Email Báo Cáo & Biên Bản (Gmail)"
+                >
+                  <Mail className="w-4.5 h-4.5" />
                 </button>
 
                 {/* Theme Toggle */}
@@ -4385,6 +4420,18 @@ export default function App() {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
                     <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-scale-in space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsExportDropdownOpen(false);
+                          setEmailDefaultReportType('INVENTORY_AUDIT');
+                          setIsEmailModalOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <Mail className="w-4 h-4 text-indigo-600" />
+                        <span>Gửi Email Báo Cáo Kèm Tệp (Gmail)</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -4812,6 +4859,11 @@ export default function App() {
               addToast('Đã xóa trắng lịch sử phiếu sử dụng.', 'info');
             }}
             onPrintSlip={handlePrintUsageSlip}
+            onSendEmailSlip={(slip) => {
+              setEmailSelectedUsageSlip(slip);
+              setEmailDefaultReportType('USAGE_SLIP');
+              setIsEmailModalOpen(true);
+            }}
           />
         </Suspense>
       )}
@@ -4851,6 +4903,27 @@ export default function App() {
             setHandoverRows={setHandoverRows}
             onPrintHandover={handlePrintOfficialHandover}
             onSaveHandoverToRegistry={handleSaveHandoverToRegistry}
+            onSendEmail={() => {
+              setEmailSelectedHandover({
+                meta: {
+                  handoverNo,
+                  handoverLocation,
+                  handoverDay,
+                  handoverMonth,
+                  handoverYear,
+                  handoverReason,
+                  handoverGiverDept,
+                  handoverGiverName,
+                  handoverGiverPos,
+                  handoverReceiverDept,
+                  handoverReceiverName,
+                  handoverReceiverPos
+                },
+                rows: handoverRows
+              });
+              setEmailDefaultReportType('HANDOVER');
+              setIsEmailModalOpen(true);
+            }}
             onAddToast={addToast}
           />
         </Suspense>
@@ -4945,7 +5018,30 @@ export default function App() {
             onClose={() => setIsGoogleDocsModalOpen(false)}
             inventory={inventory}
             selectedCategory={selectedCategory}
-            currentUsername={currentUsername || 'Kỹ sư Quản lý Kho'}
+            currentUsername={currentUsername || 'Nhân viên Phụ trách Kho'}
+            onAddToast={addToast}
+          />
+        </Suspense>
+      )}
+
+      {/* Gmail Report Dispatch Modal */}
+      {isEmailModalOpen && (
+        <Suspense fallback={null}>
+          <EmailReportModal
+            isOpen={isEmailModalOpen}
+            onClose={() => {
+              setIsEmailModalOpen(false);
+              setEmailSelectedUsageSlip(null);
+              setEmailSelectedHandover(null);
+            }}
+            inventory={inventory}
+            dispatchedRecords={dispatchedRecords}
+            usageSlips={usageSlips}
+            role={role}
+            currentUsername={users.find(u => u.username.toLowerCase() === currentUsername?.toLowerCase())?.fullName || currentUsername || 'Nhân viên Phụ trách Kho'}
+            defaultReportType={emailDefaultReportType}
+            selectedUsageSlip={emailSelectedUsageSlip}
+            selectedHandoverData={emailSelectedHandover}
             onAddToast={addToast}
           />
         </Suspense>
@@ -5070,6 +5166,10 @@ export default function App() {
         }}
         onOpenPrintCenter={() => handleOpenPrintCenter('AUDIT_REPORT')}
         onOpenGoogleDrive={() => setIsGoogleDriveModalOpen(true)}
+        onOpenEmailReport={() => {
+          setEmailDefaultReportType('INVENTORY_AUDIT');
+          setIsEmailModalOpen(true);
+        }}
         onOpenAdminAccounts={() => setIsAdminAccountModalOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenSystemAuditLogs={() => setIsAuditLogModalOpen(true)}

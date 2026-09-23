@@ -17,6 +17,10 @@ import { InventoryItem, UsageSlip, DispatchedRecord } from '../types.ts';
 import { HandoverRow } from '../components/HandoverModal.tsx';
 
 // Helper to trigger browser download of a docx file
+export async function generateDocxBlob(doc: Document): Promise<Blob> {
+  return Packer.toBlob(doc);
+}
+
 export async function downloadDocxDocument(doc: Document, fileName: string): Promise<void> {
   const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
@@ -68,7 +72,7 @@ export async function exportInventoryReportToDocx(
   const now = new Date();
   const dateStr = options.reportDate || now.toLocaleDateString('vi-VN');
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const username = options.currentUsername || 'Kỹ sư Quản lý Kho';
+  const username = options.currentUsername || 'Nhân viên Phụ trách Kho';
   const category = options.categoryFilter && options.categoryFilter !== 'ALL' ? options.categoryFilter : 'Tất cả chuyên mục';
   const location = options.warehouseLocation || 'Kho Vật Tư Đội Thông Tin - Trung Tâm BĐKT';
 
@@ -226,7 +230,7 @@ export async function exportInventoryReportToDocx(
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'TỔNG CÔNG TY QUẢN LÝ BAY VN', size: 18 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'CÔNG TY QUẢN LÝ BAY MIỀN NAM', size: 18, bold: true })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'TRUNG TÂM BẢO ĐẢM KỸ THUẬT', size: 19, bold: true })] }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐỘI THÔNG TIN (CNS/ATM)', size: 19, bold: true, underline: {} })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'ĐỘI THÔNG TIN', size: 19, bold: true, underline: {} })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: `Số: ......./BC-ĐTT`, size: 19, italics: true })] })
                     ]
                   }),
@@ -552,7 +556,7 @@ export async function exportHandoverToDocx(
             new TextRun({ text: `- Ông/Bà: `, size: 20 }),
             new TextRun({ text: meta.handoverGiverName || '...........................................', bold: true, size: 20 }),
             new TextRun({ text: `    |    Chức vụ: `, size: 20 }),
-            new TextRun({ text: meta.handoverGiverPos || 'Kỹ sư quản lý kho', bold: true, size: 20 })
+            new TextRun({ text: meta.handoverGiverPos || 'Nhân viên phụ trách kho', bold: true, size: 20 })
           ] }),
 
           new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `2. Đại diện bên nhận (Bên B): `, bold: true, size: 20 }), new TextRun({ text: meta.handoverReceiverDept || '...........................................', size: 20 })] }),
@@ -1012,7 +1016,7 @@ export async function exportAuditReportToDocx(
           // Attendees
           new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: 'Thành phần tham gia kiểm kê:', bold: true, size: 20 })] }),
           new Paragraph({ indent: { left: 400 }, spacing: { after: 30 }, children: [new TextRun({ text: `1. Ông/Bà: `, size: 20 }), new TextRun({ text: inspectorName, bold: true, size: 20 }), new TextRun({ text: ` - Kỹ sư trực ban / Đại diện Tổ Kiểm kê`, size: 20 })] }),
-          new Paragraph({ indent: { left: 400 }, spacing: { after: 30 }, children: [new TextRun({ text: `2. Ông/Bà: ................................................................ - Kỹ sư phụ trách kho vật tư`, size: 20 })] }),
+          new Paragraph({ indent: { left: 400 }, spacing: { after: 30 }, children: [new TextRun({ text: `2. Ông/Bà: ................................................................ - Nhân viên phụ trách kho vật tư`, size: 20 })] }),
           new Paragraph({ indent: { left: 400 }, spacing: { after: 140 }, children: [new TextRun({ text: `3. Ông/Bà: ................................................................ - Đại diện Lãnh đạo Đội Thông Tin`, size: 20 })] }),
 
           // Table Section
@@ -1247,7 +1251,7 @@ export async function exportDispatchedRegistryToDocx(
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'NGƯỜI LẬP BÁO CÁO', bold: true, size: 21 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true, size: 18 })] }),
                       new Paragraph({ spacing: { before: 1000 } }),
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Kỹ sư Quản lý Kho', bold: true, size: 21 })] })
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: currentUsername ? `Kỹ sư ${currentUsername.toUpperCase()}` : 'Nhân viên Phụ trách Kho', bold: true, size: 21 })] })
                     ]
                   }),
                   new TableCell({
